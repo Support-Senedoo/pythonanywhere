@@ -41,6 +41,30 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 **Option A — Git (recommandé)**  
 Si le dépôt est cloné sur PA : `git pull` dans le dossier du projet, puis `pip install …`, puis **Reload** du site web.
 
+### Déployer / mettre à jour Flask depuis votre PC (clé SSH déjà OK)
+
+Dans PowerShell, à la racine du clone local, depuis le dossier `odoo-pythonanywhere` :
+
+```powershell
+Get-Content .\deploy_pa.sh -Raw | ssh senedoo@ssh.pythonanywhere.com bash
+```
+
+*(Si le dépôt GitHub est **privé**, configurez d’abord un accès `git` sur PA : token HTTPS ou clé déployée — sinon le `git clone`/`pull` échouera.)*
+
+### Déployer depuis la console Bash PythonAnywhere
+
+1. **Files** : uploader `deploy_pa.sh` dans votre répertoire home, ou coller son contenu dans un fichier.  
+2. **Bash** :
+
+```bash
+chmod +x ~/deploy_pa.sh   # si besoin
+bash ~/deploy_pa.sh
+```
+
+*(Vous pouvez aussi `bash` directement le fichier du repo après un clone manuel.)*
+
+Fichier script : **[`deploy_pa.sh`](deploy_pa.sh)**.
+
 **Option B — SCP / rsync depuis votre PC**  
 Synchroniser le dossier `odoo-pythonanywhere/` vers `/home/senedoo/odoo-pythonanywhere/` (exclure `.venv`, `__pycache__`, `toolbox_*.json` locaux si vous ne voulez pas écraser les secrets du serveur).
 
