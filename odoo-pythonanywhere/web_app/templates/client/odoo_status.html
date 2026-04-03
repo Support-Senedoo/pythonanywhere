@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Odoo — client{% endblock %}
+{% block body %}
+<h1>État Odoo</h1>
+<pre>{% for line in lines %}{{ line }}
+{% endfor %}</pre>
+<p><a href="{{ url_for('legacy.client_home') }}">Retour espace client</a></p>
+{% endblock %}

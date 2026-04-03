@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Odoo — staff{% endblock %}
+{% block body %}
+<h1>État Odoo (base sélectionnée)</h1>
+<pre>{% for line in lines %}{{ line }}
+{% endfor %}</pre>
+<p><a href="{{ url_for('staff.apps_home') }}">Retour applications</a></p>
+{% endblock %}

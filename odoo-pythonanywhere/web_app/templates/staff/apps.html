@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Applications — staff{% endblock %}
+{% block body %}
+<h1>Applications (vue client)</h1>
+{% if not selected %}
+<p class="muted">Aucune base sélectionnée.</p>
+<p><a class="btn btn-secondary" href="{{ url_for('staff.staff_home') }}">Choisir un client</a></p>
+{% else %}
+<p>Base active : <strong>{{ selected_label }}</strong> (<code>{{ selected }}</code>)</p>
+<div class="card">
+  <ul>
+    <li><a href="{{ url_for('staff.staff_apps_odoo_status') }}">État connexion Odoo</a></li>
+  </ul>
+</div>
+{% endif %}
+<p><a href="{{ url_for('staff.staff_home') }}">Tableau de bord Senedoo</a></p>
+{% endblock %}

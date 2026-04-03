@@ -1,0 +1,7 @@
+# Optionnel : renommez ce fichier en .env pour pré-remplir les valeurs par défaut
+# dans lancer_import.py / lancer_export.py (vous devrez quand même confirmer le nom de la base).
+
+ODOO_URL=https://votre-instance.odoo.com
+ODOO_DB=
+ODOO_USER=votre@email.com
+ODOO_PASSWORD=

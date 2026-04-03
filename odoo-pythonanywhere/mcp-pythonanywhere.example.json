@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "pythonanywhere-ssh": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "ssh-mcp-server"],
+      "env": {
+        "SSH_MCP_MAX_CONNECTIONS": "10",
+        "SSH_MCP_HOST_KEY_MODE": "accept"
+      }
+    }
+  }
+}

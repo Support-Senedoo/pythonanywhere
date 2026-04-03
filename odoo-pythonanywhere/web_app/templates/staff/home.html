@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Senedoo — tableau de bord{% endblock %}
+{% block body %}
+<h1>Espace Senedoo</h1>
+
+<div class="card">
+  <h2>Mode applications (comme le client)</h2>
+  <p class="muted">Choisissez une base, puis accédez aux mêmes types d’outils que le client.</p>
+  <form method="post" action="{{ url_for('staff.select_client') }}">
+    <label for="client_id">Client / base</label>
+    <select id="client_id" name="client_id" required>
+      <option value="">— Choisir —</option>
+      {% for cid, c in clients.items() %}
+      <option value="{{ cid }}" {% if selected == cid %}selected{% endif %}>{{ c.label }} ({{ cid }})</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Valider et ouvrir le menu applications</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Utilitaires</h2>
+  <p>Outils techniques : choix de la base à l’intérieur de chaque utilitaire.</p>
+  <a class="btn" href="{{ url_for('staff.utilities_home') }}">Liste des utilitaires</a>
+</div>
+
+<p><a href="{{ url_for('public.index') }}">Accueil public</a></p>
+{% endblock %}

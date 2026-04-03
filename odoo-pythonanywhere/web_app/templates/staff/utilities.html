@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Utilitaires{% endblock %}
+{% block body %}
+<h1>Utilitaires Senedoo</h1>
+<ul>
+  <li><a href="{{ url_for('staff.personalize_report') }}">Personnalisation rapport comptable</a> (SYSCOHADA / détail comptes, groupby, repliable)</li>
+</ul>
+<p><a href="{{ url_for('staff.staff_home') }}">Tableau de bord</a></p>
+{% endblock %}

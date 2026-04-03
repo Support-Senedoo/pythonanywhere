@@ -1,0 +1,12 @@
+{
+  "clients": [
+    {
+      "id": "la_ripaille",
+      "label": "La Ripaille",
+      "url": "https://votre-instance.odoo.com",
+      "db": "nom_base_odoo",
+      "user": "api_technique@votredomaine.com",
+      "password": "CLE_API_OU_MOT_DE_PASSE"
+    }
+  ]
+}

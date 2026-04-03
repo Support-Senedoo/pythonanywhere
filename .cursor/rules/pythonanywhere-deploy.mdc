@@ -1,0 +1,12 @@
+---
+description: Déploiement / reprise PythonAnywhere — lire la mémoire projet avant d’agir
+alwaysApply: true
+---
+
+# PythonAnywhere (budget-financier)
+
+Les assistants n’ont **pas** de mémoire des sessions précédentes.
+
+- Avant de déployer, déboguer le WSGI ou l’SSH vers PA : ouvrir et suivre **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)** (utilisateur PA `senedoo`, exemple MCP : `odoo-pythonanywhere/mcp-pythonanywhere.example.json`).
+- Après un changement de procédure (chemins, version Python, fichier WSGI, variables), **mettre à jour ce fichier** pour la prochaine fois.
+- Ne jamais committer les clés privées SSH ni le contenu de `toolbox_users.json` / `toolbox_clients.json` (déjà dans `.gitignore`).

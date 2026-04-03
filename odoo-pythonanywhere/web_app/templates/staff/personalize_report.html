@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Personnalisation rapport{% endblock %}
+{% block body %}
+<h1>Personnalisation du rapport comptable</h1>
+<p class="muted">Exécute la même logique que l’outil local <code>personalize_syscohada_detail.py --fix-detail</code> sur une <strong>copie</strong> de rapport (suppression notes custom feuilles, groupby compte, repliable, filter_hierarchy).</p>
+
+<div class="card">
+  <form method="post">
+    <label for="client_id">Base Odoo (client)</label>
+    <select id="client_id" name="client_id" required>
+      <option value="">— Choisir —</option>
+      {% for cid, c in clients.items() %}
+      <option value="{{ cid }}">{{ c.label }} ({{ cid }})</option>
+      {% endfor %}
+    </select>
+
+    <label for="report_id">ID du rapport (<code>account.report</code>)</label>
+    <input type="number" id="report_id" name="report_id" min="1" required placeholder="ex. 32">
+
+    <label for="confirm">Confirmation</label>
+    <input type="text" id="confirm" name="confirm" required placeholder="Tapez OUI en majuscules">
+    <p class="muted">Cette opération modifie le rapport sur la base indiquée.</p>
+
+    <button type="submit">Lancer la personnalisation</button>
+  </form>
+</div>
+<p><a href="{{ url_for('staff.utilities_home') }}">Retour utilitaires</a></p>
+{% endblock %}

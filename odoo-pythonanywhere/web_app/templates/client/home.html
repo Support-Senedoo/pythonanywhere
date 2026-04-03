@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Espace client{% endblock %}
+{% block body %}
+<h1>Espace client</h1>
+<p class="muted">Applications disponibles pour votre compte.</p>
+
+<div class="card">
+  <h2>La Ripaille — outils</h2>
+  <p>Connexion et indicateurs légers sur votre Odoo.</p>
+  <ul>
+    <li><a href="{{ url_for('legacy.client_odoo_status') }}">État connexion Odoo</a></li>
+  </ul>
+  <p class="muted">Intégrez ici les routes de votre appli web existante (blueprint dédié).</p>
+</div>
+{% endblock %}

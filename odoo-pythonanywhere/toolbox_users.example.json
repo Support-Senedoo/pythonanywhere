@@ -1,0 +1,15 @@
+{
+  "users": [
+    {
+      "login": "client.ripaille",
+      "password_hash": "REMPLACER_par_pbkdf2_sha256_voir_script_generate",
+      "role": "client",
+      "client_id": "la_ripaille"
+    },
+    {
+      "login": "staff.senedoo",
+      "password_hash": "REMPLACER_par_pbkdf2_sha256_voir_script_generate",
+      "role": "staff"
+    }
+  ]
+}

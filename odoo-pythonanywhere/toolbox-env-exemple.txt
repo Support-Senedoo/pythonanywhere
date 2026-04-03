@@ -1,0 +1,10 @@
+# Copier les variables utiles dans l’onglet Web PythonAnywhere (ou .env local pour tests).
+
+TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
+# Chemins optionnels (défaut : toolbox_users.json et toolbox_clients.json à la racine du projet)
+# TOOLBOX_USERS_PATH=/home/VOTRE_USER/odoo-pythonanywhere/toolbox_users.json
+# TOOLBOX_CLIENTS_PATH=/home/VOTRE_USER/odoo-pythonanywhere/toolbox_clients.json
+
+# Génération des hash mots de passe :
+#   python toolbox_generate_password_hash.py
+# Coller le résultat dans toolbox_users.json (champ password_hash).

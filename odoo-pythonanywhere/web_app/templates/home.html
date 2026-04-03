@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Accueil — Toolbox{% endblock %}
+{% block body %}
+<h1>Accueil</h1>
+<p class="muted">Choisissez votre espace. Les identifiants diffèrent selon le portail.</p>
+
+<div class="card">
+  <h2>Espace client</h2>
+  <p>Applications prévues pour votre entreprise (ex. La Ripaille), sur votre base Odoo uniquement.</p>
+  <a class="btn" href="{{ url_for('public.login', portal='client') }}">Connexion client</a>
+</div>
+
+<div class="card">
+  <h2>Espace Senedoo</h2>
+  <p>Équipe technique : accès aux applications sur la base d’un client choisi, et aux utilitaires (personnalisation de rapport, etc.).</p>
+  <a class="btn" href="{{ url_for('public.login', portal='staff') }}">Connexion équipe</a>
+</div>
+{% endblock %}

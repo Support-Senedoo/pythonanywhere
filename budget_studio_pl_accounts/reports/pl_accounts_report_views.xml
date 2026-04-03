@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pl_accounts_wizard_form" model="ir.ui.view">
+        <field name="name">pl.accounts.report.wizard.form</field>
+        <field name="model">pl.accounts.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Comptes produits et charges">
+                <group>
+                    <field name="company_id" options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_print_pdf" string="Imprimer le PDF" type="object" class="btn-primary" data-hotkey="q"/>
+                    <button string="Annuler" class="btn-secondary" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pl_accounts_wizard" model="ir.actions.act_window">
+        <field name="name">Comptes produits et charges</field>
+        <field name="res_model">pl.accounts.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_pl_accounts_wizard"
+        name="Comptes produits et charges"
+        parent="account.menu_finance_reports"
+        action="action_pl_accounts_wizard"
+        sequence="25"
+    />
+</odoo>

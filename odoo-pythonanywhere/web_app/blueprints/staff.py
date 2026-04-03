@@ -1,0 +1,142 @@
+"""Espace Senedoo : choix client / apps + utilitaires (personnalisation rapport)."""
+from __future__ import annotations
+
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+
+from web_app.blueprints.public import login_required_staff
+from web_app.odoo_registry import load_clients_registry
+from odoo_client import OdooClient
+from personalize_syscohada_detail import personalize_fix_detail_complete
+
+from web_app.session_odoo import get_config_by_id, get_xmlrpc_for_staff_client_id
+
+bp = Blueprint("staff", __name__)
+
+
+def _registry():
+    return load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
+
+
+def _require_staff_client_selected():
+    cid = session.get("staff_selected_client_id")
+    if not cid:
+        flash("Choisissez d’abord un client (mode applications).", "warning")
+        return None
+    try:
+        get_config_by_id(cid)
+    except ValueError:
+        flash("Client invalide.", "danger")
+        return None
+    return cid
+
+
+@bp.route("/")
+@login_required_staff
+def staff_home():
+    reg = _registry()
+    return render_template(
+        "staff/home.html",
+        clients=reg,
+        selected=session.get("staff_selected_client_id"),
+    )
+
+
+@bp.route("/select-client", methods=["POST"])
+@login_required_staff
+def select_client():
+    cid = (request.form.get("client_id") or "").strip()
+    if not cid or cid not in _registry():
+        flash("Client inconnu.", "danger")
+        return redirect(url_for("staff.staff_home"))
+    session["staff_selected_client_id"] = cid
+    flash(f"Base active pour les applications : {_registry()[cid].label}", "success")
+    return redirect(url_for("staff.apps_home"))
+
+
+@bp.route("/apps")
+@login_required_staff
+def apps_home():
+    reg = _registry()
+    cid = session.get("staff_selected_client_id")
+    label = None
+    if cid and cid in reg:
+        label = reg[cid].label
+    return render_template(
+        "staff/apps.html",
+        clients=reg,
+        selected=cid,
+        selected_label=label,
+    )
+
+
+@bp.route("/apps/odoo-status")
+@login_required_staff
+def staff_apps_odoo_status():
+    cid = _require_staff_client_selected()
+    if not cid:
+        return redirect(url_for("staff.apps_home"))
+    try:
+        cfg = get_config_by_id(cid)
+        c = OdooClient(cfg.url, cfg.db, cfg.user, cfg.password)
+        ver = c.version()
+        c.authenticate()
+        n = c.execute("res.partner", "search_count", [[]])
+        lines = [
+            f"Client : {cfg.label}",
+            f"Version serveur : {ver.get('server_version', ver)}",
+            "Authentification Odoo : OK",
+            f"Nombre de partenaires (indicatif) : {n}",
+        ]
+    except Exception as e:
+        lines = [f"Erreur : {e!s}"]
+    return render_template("staff/odoo_status.html", lines=lines)
+
+
+@bp.route("/utilities")
+@login_required_staff
+def utilities_home():
+    reg = _registry()
+    return render_template("staff/utilities.html", clients=reg)
+
+
+@bp.route("/utilities/personalize-report", methods=["GET", "POST"])
+@login_required_staff
+def personalize_report():
+    reg = _registry()
+    if request.method == "POST":
+        cid = (request.form.get("client_id") or "").strip()
+        try:
+            rid = int(request.form.get("report_id") or "0")
+        except ValueError:
+            rid = 0
+        confirm = (request.form.get("confirm") or "").strip()
+        if cid not in reg:
+            flash("Base / client inconnu.", "danger")
+            return redirect(url_for("staff.personalize_report"))
+        if rid <= 0:
+            flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
+            return redirect(url_for("staff.personalize_report"))
+        if confirm != "OUI":
+            flash("Tapez OUI en majuscules pour confirmer.", "warning")
+            return redirect(url_for("staff.personalize_report"))
+        try:
+            models, db, uid, pwd = get_xmlrpc_for_staff_client_id(cid)
+            personalize_fix_detail_complete(models, db, uid, pwd, rid)
+            flash(
+                f"Personnalisation appliquée sur « {reg[cid].label} » pour le rapport id={rid}.",
+                "success",
+            )
+        except Exception as e:
+            flash(f"Échec : {e!s}", "danger")
+        return redirect(url_for("staff.personalize_report"))
+
+    return render_template("staff/personalize_report.html", clients=reg)
