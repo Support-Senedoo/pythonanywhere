@@ -2,6 +2,16 @@
 
 Ce fichier sert de **mémoire projet** : les assistants IA n’ont pas de souvenir des sessions passées. Tout ce qui compte pour remettre en ligne ou mettre à jour l’app doit rester **ici** (et dans le Git).
 
+## Dépôt GitHub
+
+- Organisation : **Support-Senedoo**
+- Dépôt : **`pythonanywhere`** — https://github.com/Support-Senedoo/pythonanywhere  
+- Clone : `git clone https://github.com/Support-Senedoo/pythonanywhere.git`
+
+Le dépôt contient tout le dossier local (dont `odoo-pythonanywhere/`, `import-rapport-odoo/`, etc.). Sur PythonAnywhere, le **fichier WSGI** doit pointer vers le sous-dossier applicatif, par ex.  
+`/home/senedoo/pythonanywhere/odoo-pythonanywhere/pythonanywhere_wsgi.py`  
+si vous clonez le repo dans `/home/senedoo/pythonanywhere`. (Si vous ne gardez que le sous-dossier `odoo-pythonanywhere` à l’ancien chemin, adaptez le tableau ci-dessous.)
+
 ## Ce qui est déployé (état attendu)
 
 - **Application** : Flask « toolbox » (`web_app`), WSGI = **`pythonanywhere_wsgi.py`** ou **`pa_wsgi.py`** (équivalent).
