@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
 from web_app.dev_auth import dev_login_disabled, try_dev_user
-from web_app.users_store import verify_user
+from web_app.password_reset import consume_reset_token, issue_reset_token, send_reset_email
+from web_app.users_store import get_user_row, set_user_password, verify_user
 
 bp = Blueprint("public", __name__)
 
@@ -107,6 +108,75 @@ def login():
         return redirect(url_for("staff.staff_home"))
 
     return render_template("login.html", portal=portal)
+
+
+@bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        login = (request.form.get("login") or "").strip()
+        path = current_app.config["TOOLBOX_USERS_PATH"]
+        tok_path = current_app.config["TOOLBOX_PASSWORD_RESET_TOKENS_PATH"]
+        row = get_user_row(path, login) if login else None
+        if row:
+            token = issue_reset_token(tok_path, row["login"])
+            base = (current_app.config.get("TOOLBOX_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+            if not base:
+                base = request.url_root.rstrip("/")
+            reset_url = f"{base}{url_for('public.reset_password', token=token)}"
+            host = current_app.config.get("TOOLBOX_SMTP_HOST") or ""
+            mail_from = current_app.config.get("TOOLBOX_MAIL_FROM") or ""
+            if not host or not mail_from:
+                flash(
+                    "L’envoi d’e-mails n’est pas configuré (SMTP). Contactez l’administrateur Senedoo.",
+                    "danger",
+                )
+                return render_template("forgot_password.html"), 503
+            try:
+                send_reset_email(
+                    to_addr=str(row["login"]),
+                    reset_url=reset_url,
+                    smtp_host=host,
+                    smtp_port=int(current_app.config.get("TOOLBOX_SMTP_PORT") or 587),
+                    smtp_user=current_app.config.get("TOOLBOX_SMTP_USER") or "",
+                    smtp_password=current_app.config.get("TOOLBOX_SMTP_PASSWORD") or "",
+                    mail_from=mail_from,
+                )
+                flash("Un e-mail avec un lien (valide 24 h) vous a été envoyé.", "success")
+            except Exception as e:
+                flash(f"Impossible d’envoyer l’e-mail : {e!s}", "danger")
+                return render_template("forgot_password.html"), 500
+        else:
+            flash(
+                "Si cet identifiant est enregistré, un e-mail de réinitialisation vient d’être envoyé.",
+                "info",
+            )
+        return redirect(url_for("public.login"))
+    return render_template("forgot_password.html")
+
+
+@bp.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    token = (request.args.get("token") or request.form.get("token") or "").strip()
+    if request.method == "POST":
+        pw = (request.form.get("password") or "").strip()
+        pw2 = (request.form.get("password2") or "").strip()
+        if pw != pw2:
+            flash("Les deux mots de passe ne correspondent pas.", "danger")
+            return render_template("reset_password.html", token=token), 400
+        tok_path = current_app.config["TOOLBOX_PASSWORD_RESET_TOKENS_PATH"]
+        users_path = current_app.config["TOOLBOX_USERS_PATH"]
+        login = consume_reset_token(tok_path, token)
+        if not login:
+            flash("Lien invalide ou expiré. Demandez une nouvelle réinitialisation.", "danger")
+            return redirect(url_for("public.forgot_password"))
+        try:
+            set_user_password(users_path, login, pw)
+        except ValueError as e:
+            flash(str(e), "danger")
+            return render_template("reset_password.html", token=token), 400
+        flash("Mot de passe mis à jour. Vous pouvez vous connecter.", "success")
+        return redirect(url_for("public.login"))
+    return render_template("reset_password.html", token=token)
 
 
 @bp.route("/logout")

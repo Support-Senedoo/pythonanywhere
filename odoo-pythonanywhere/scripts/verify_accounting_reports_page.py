@@ -40,6 +40,22 @@ REQUIRED_ALWAYS = [
     "le rapport d\u2019origine n\u2019est pas modifié",
 ]
 
+REQUIRED_BALANCE_PAGE = [
+    'id="ajouter-base-odoo"',
+    'name="filter_label"',
+    'name="new_client_id"',
+    'value="add_client"',
+    "Ajouter une nouvelle base",
+    "Enregistrer la base",
+    "sn-page-bottom-flash",
+    "6 colonnes",
+]
+
+REQUIRED_BALANCE_WITH_CLIENT_EXTRA = [
+    'id="form-personalize-balance"',
+    'value="personalize_balance"',
+]
+
 # Uniquement si ?client_id=… pointe vers un client connu du registre
 REQUIRED_WITH_CLIENT = [
     'id="sn-reports-list"',
@@ -70,16 +86,17 @@ def verify_local() -> int:
     first_cid = next(iter(reg.keys()), None)
 
     urls = (
-        "/staff/utilities/rapports-comptables",
-        "/staff/utilities/personalize-report",
+        ("/staff/utilities/rapports-comptables", REQUIRED_ALWAYS),
+        ("/staff/utilities/personalize-report", REQUIRED_ALWAYS),
+        ("/staff/utilities/personalize-balance", REQUIRED_BALANCE_PAGE),
     )
-    for path in urls:
+    for path, required in urls:
         r = client.get(path)
         if r.status_code != 200:
             print(f"ERREUR {path} : HTTP {r.status_code}", file=sys.stderr)
             return 1
         html = r.get_data(as_text=True)
-        missing = _missing_markers(html, REQUIRED_ALWAYS)
+        missing = _missing_markers(html, required)
         if missing:
             print(f"ERREUR {path} : marqueurs absents :", file=sys.stderr)
             for m in missing:
@@ -93,7 +110,11 @@ def verify_local() -> int:
                 print(f"ERREUR {path}?client_id=… : HTTP {r2.status_code}", file=sys.stderr)
                 return 1
             html2 = r2.get_data(as_text=True)
-            missing2 = _missing_markers(html2, REQUIRED_ALWAYS + REQUIRED_WITH_CLIENT)
+            if path == "/staff/utilities/personalize-balance":
+                extra = REQUIRED_BALANCE_WITH_CLIENT_EXTRA + ["Ouvrir dans Odoo", 'id="sn-reports-list"']
+            else:
+                extra = REQUIRED_WITH_CLIENT
+            missing2 = _missing_markers(html2, required + extra)
             if missing2:
                 print(f"ERREUR {path}?client_id={first_cid} : marqueurs absents :", file=sys.stderr)
                 for m in missing2:

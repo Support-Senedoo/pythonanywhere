@@ -1,15 +1,15 @@
 {
   "users": [
     {
+      "login": "support@senedoo.com",
+      "password_hash": "scrypt:32768:8:1$GsjXN3dDCdQpkdM9$12e3508320565224455ed586948a25fca15e192115c9c7defda0692a11171f008a901420585c17b2a15276ac9662e9a596be35ae0617ccb9c7b580f79a1b2375",
+      "role": "staff"
+    },
+    {
       "login": "client.ripaille",
       "password_hash": "REMPLACER_par_pbkdf2_sha256_voir_script_generate",
       "role": "client",
       "client_id": "la_ripaille"
-    },
-    {
-      "login": "staff.senedoo",
-      "password_hash": "REMPLACER_par_pbkdf2_sha256_voir_script_generate",
-      "role": "staff"
     }
   ]
 }

@@ -31,6 +31,17 @@ def create_app() -> Flask:
     )
     app.config["DEBUG"] = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
     app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+    _users_p = Path(app.config["TOOLBOX_USERS_PATH"])
+    app.config["TOOLBOX_PASSWORD_RESET_TOKENS_PATH"] = os.environ.get(
+        "TOOLBOX_PASSWORD_RESET_TOKENS_PATH",
+        str(_users_p.parent / "toolbox_password_reset_tokens.json"),
+    )
+    app.config["TOOLBOX_PUBLIC_BASE_URL"] = (os.environ.get("TOOLBOX_PUBLIC_BASE_URL") or "").rstrip("/")
+    app.config["TOOLBOX_SMTP_HOST"] = (os.environ.get("TOOLBOX_SMTP_HOST") or "").strip()
+    app.config["TOOLBOX_SMTP_PORT"] = int(os.environ.get("TOOLBOX_SMTP_PORT") or "587")
+    app.config["TOOLBOX_SMTP_USER"] = (os.environ.get("TOOLBOX_SMTP_USER") or "").strip()
+    app.config["TOOLBOX_SMTP_PASSWORD"] = os.environ.get("TOOLBOX_SMTP_PASSWORD") or ""
+    app.config["TOOLBOX_MAIL_FROM"] = (os.environ.get("TOOLBOX_MAIL_FROM") or "").strip()
 
     # Relecture des .html si le fichier change (complément au cache_size=0 ci-dessus sur PA).
     _force_tpl = os.environ.get("TOOLBOX_TEMPLATE_AUTO_RELOAD", "").lower() in ("1", "true", "yes")

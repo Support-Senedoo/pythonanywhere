@@ -27,8 +27,10 @@
 
     <button type="submit">Se connecter</button>
   </form>
+  <p style="margin-top:0.85rem;"><a href="{{ url_for('public.forgot_password') }}">Mot de passe oublié ?</a></p>
   <p class="sn-muted" style="margin-top:1rem;font-size:0.85rem;">
-    Démo : <strong>test</strong> / <strong>passer</strong> (selon le portail choisi).
+    Équipe : <strong>support@senedoo.com</strong> / <strong>2026@Senedoo</strong> (démo, désactivable avec <code>TOOLBOX_DISABLE_DEV_LOGIN</code>).
+    Client : <strong>test</strong> / <strong>passer</strong>.
   </p>
 </div>
 <p style="margin-top:1rem;"><a href="{{ url_for('public.index') }}">← Retour accueil</a></p>

@@ -36,13 +36,16 @@ from web_app.pointage_import_util import (
     safe_upload_filename,
 )
 from odoo_client import OdooClient, normalize_odoo_base_url
+from personalize_balance_6cols import personalize_balance_six_columns
 from personalize_syscohada_detail import personalize_fix_detail_complete
 
 from web_app.odoo_account_reports import (
     UTILITY_AUTHOR,
     UTILITY_DATE,
     UTILITY_TITLE,
+    UTILITY_TITLE_BALANCE,
     UTILITY_VERSION,
+    account_report_odoo_form_url,
     duplicate_account_report,
     probe_odoo_reports_access,
     read_account_report_label,
@@ -259,11 +262,17 @@ def _rapports_url_params(
     return d
 
 
-@bp.route("/utilities/personalize-report", methods=["GET", "POST"])
-@bp.route("/utilities/rapports-comptables", methods=["GET", "POST"])
-@login_required_staff
-def rapports_comptables():
+_ACCOUNTING_EP = {
+    "standard": "staff.rapports_comptables",
+    "balance": "staff.rapports_balance",
+}
+
+
+def _accounting_reports_page(accounting_mode: str):
     reg = _registry()
+
+    def ru(**kwargs):
+        return url_for(_ACCOUNTING_EP[accounting_mode], **kwargs)
 
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
@@ -277,7 +286,7 @@ def rapports_comptables():
             except ValueError as e:
                 flash(str(e), "danger")
                 return redirect(
-                    url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post))
+                    ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post))
                 )
             label = (request.form.get("new_label") or "").strip() or new_cid
             url = (request.form.get("new_url") or "").strip()
@@ -287,7 +296,7 @@ def rapports_comptables():
             if not url or not db or not user:
                 flash("URL, nom de base (db) et utilisateur Odoo sont requis.", "danger")
                 return redirect(
-                    url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post))
+                    ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post))
                 )
             env_raw = (request.form.get("new_environment") or "").strip().lower()
             env_kw = env_raw if env_raw in ("production", "test") else None
@@ -307,11 +316,10 @@ def rapports_comptables():
             except ValueError as e:
                 flash(str(e), "danger")
                 return redirect(
-                    url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post))
+                    ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post))
                 )
             return redirect(
-                url_for(
-                    "staff.rapports_comptables",
+                ru(
                     **_rapports_url_params(
                         client_id=new_cid,
                         q=filter_q,
@@ -323,7 +331,7 @@ def rapports_comptables():
         cid = (request.form.get("client_id") or "").strip().lower()
         if cid not in reg:
             flash("Base / client inconnu.", "danger")
-            return redirect(url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post)))
+            return redirect(ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post)))
         if action == "prefill":
             rid = (request.form.get("report_id") or "").strip()
             try:
@@ -331,8 +339,7 @@ def rapports_comptables():
             except ValueError:
                 rid_int = 0
             return redirect(
-                url_for(
-                    "staff.rapports_comptables",
+                ru(
                     **_rapports_url_params(
                         client_id=cid,
                         q=filter_q,
@@ -347,12 +354,11 @@ def rapports_comptables():
         except Exception as e:
             flash(f"Connexion impossible : {e!s}", "danger")
             return redirect(
-                url_for(
-                    "staff.rapports_comptables",
+                ru(
                     **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                 )
             )
-        if action == "personalize":
+        if action == "personalize" and accounting_mode == "standard":
             try:
                 rid = int(request.form.get("report_id") or "0")
             except ValueError:
@@ -360,8 +366,7 @@ def rapports_comptables():
             if (request.form.get("confirm") or "").strip() != "OUI":
                 flash("Tapez OUI en majuscules pour confirmer la personnalisation.", "warning")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(
                             client_id=cid,
                             q=filter_q,
@@ -373,8 +378,7 @@ def rapports_comptables():
             if rid <= 0:
                 flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                     )
                 )
@@ -391,8 +395,7 @@ def rapports_comptables():
             except Exception as e:
                 flash(f"Échec personnalisation : {e!s}", "danger")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(
                             client_id=cid,
                             q=filter_q,
@@ -402,8 +405,70 @@ def rapports_comptables():
                     )
                 )
             return redirect(
-                url_for(
-                    "staff.rapports_comptables",
+                ru(
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=new_rid,
+                        filter_label=fl_save,
+                    ),
+                )
+            )
+        if action == "personalize_balance" and accounting_mode == "balance":
+            try:
+                rid = int(request.form.get("report_id") or "0")
+            except ValueError:
+                rid = 0
+            if (request.form.get("confirm") or "").strip() != "OUI":
+                flash("Tapez OUI en majuscules pour confirmer la personnalisation de la balance.", "warning")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            report_id=rid if rid > 0 else None,
+                            filter_label=fl_save,
+                        ),
+                    )
+                )
+            if rid <= 0:
+                flash("Indiquez un identifiant de rapport balance (account.report) valide.", "danger")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    )
+                )
+            try:
+                new_rid = duplicate_account_report(
+                    models,
+                    db,
+                    uid,
+                    pwd,
+                    rid,
+                    name_suffix=" — copie Senedoo (6 col.)",
+                )
+                personalize_balance_six_columns(models, db, uid, pwd, new_rid)
+                src_label = read_account_report_label(models, db, uid, pwd, rid)
+                rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
+                flash(
+                    f"Balance : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »), "
+                    f"6 colonnes (débit/crédit initiaux et finaux). L’original n’a pas été modifié.",
+                    "success",
+                )
+            except Exception as e:
+                flash(f"Échec personnalisation balance : {e!s}", "danger")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            report_id=rid if rid > 0 else None,
+                            filter_label=fl_save,
+                        ),
+                    )
+                )
+            return redirect(
+                ru(
                     **_rapports_url_params(
                         client_id=cid,
                         q=filter_q,
@@ -421,16 +486,14 @@ def rapports_comptables():
             if rid <= 0:
                 flash("Identifiant de rapport invalide.", "danger")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                     )
                 )
             if not new_name:
                 flash("Saisissez un nom pour le rapport.", "warning")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                     )
                 )
@@ -440,8 +503,7 @@ def rapports_comptables():
             except Exception as e:
                 flash(f"Impossible de renommer le rapport : {e!s}", "danger")
             return redirect(
-                url_for(
-                    "staff.rapports_comptables",
+                ru(
                     **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                 )
             )
@@ -454,16 +516,14 @@ def rapports_comptables():
             if (request.form.get("confirm_delete") or "").strip() != expected:
                 flash("Confirmation de suppression incorrecte.", "danger")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                     )
                 )
             if rid <= 0:
                 flash("Identifiant de rapport invalide.", "danger")
                 return redirect(
-                    url_for(
-                        "staff.rapports_comptables",
+                    ru(
                         **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                     )
                 )
@@ -474,17 +534,13 @@ def rapports_comptables():
             except Exception as e:
                 flash(f"Suppression impossible : {e!s}", "danger")
             return redirect(
-                url_for(
-                    "staff.rapports_comptables",
+                ru(
                     **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                 )
             )
         flash("Action non reconnue.", "warning")
         return redirect(
-            url_for(
-                "staff.rapports_comptables",
-                **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
-            )
+            ru(**_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save)),
         )
 
     selected = (request.args.get("client_id") or "").strip().lower()
@@ -582,6 +638,13 @@ def rapports_comptables():
         "yes",
     )
 
+    utitle = UTILITY_TITLE_BALANCE if accounting_mode == "balance" else UTILITY_TITLE
+    report_open_urls: dict[int, str] = {}
+    if selected and conn_status == "ok" and reports and selected in reg:
+        bu = reg[selected].url
+        for r in reports:
+            report_open_urls[int(r["id"])] = account_report_odoo_form_url(bu, int(r["id"]))
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
@@ -599,8 +662,24 @@ def rapports_comptables():
         instance_meta_rows=instance_meta_rows,
         prefill_new_label=prefill_new_label,
         open_add_base_panel=open_add_base_panel,
-        utility_title=UTILITY_TITLE,
+        accounting_mode=accounting_mode,
+        accounting_endpoint=_ACCOUNTING_EP[accounting_mode],
+        report_open_urls=report_open_urls,
+        utility_title=utitle,
         utility_version=UTILITY_VERSION,
         utility_date=UTILITY_DATE,
         utility_author=UTILITY_AUTHOR,
     )
+
+
+@bp.route("/utilities/personalize-report", methods=["GET", "POST"])
+@bp.route("/utilities/rapports-comptables", methods=["GET", "POST"])
+@login_required_staff
+def rapports_comptables():
+    return _accounting_reports_page("standard")
+
+
+@bp.route("/utilities/personalize-balance", methods=["GET", "POST"])
+@login_required_staff
+def rapports_balance():
+    return _accounting_reports_page("balance")

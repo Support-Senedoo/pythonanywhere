@@ -287,3 +287,20 @@ def get_user_row(path: str | Path, login: str) -> dict[str, Any] | None:
         if _login_key(str(row.get("login", ""))) == key:
             return dict(row)
     return None
+
+
+def set_user_password(path: str | Path, login: str, new_password: str) -> None:
+    """Met à jour le mot de passe (hash stocké) pour un login existant."""
+    key = _login_key(login)
+    pw = (new_password or "").strip()
+    if len(pw) < 8:
+        raise ValueError("Mot de passe trop court (minimum 8 caractères).")
+    data = read_users_file(path)
+    users: list[dict[str, Any]] = list(data.get("users", []))
+    for i, row in enumerate(users):
+        if _login_key(str(row.get("login", ""))) == key:
+            users[i] = {**row, "password_hash": generate_password_hash(pw)}
+            data["users"] = users
+            write_users_file(path, data)
+            return
+    raise ValueError("Utilisateur introuvable.")

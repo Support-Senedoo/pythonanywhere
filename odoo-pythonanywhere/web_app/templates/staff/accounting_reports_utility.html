@@ -4,7 +4,15 @@
 {% block flash_zone %}{# Messages flash affichés en bas de page pour cette utilitaire #}{% endblock %}
 {% block body %}
 <h1>{{ utility_title }}</h1>
+<p class="sn-muted" style="margin:-0.35rem 0 0.85rem;">
+  {% if accounting_mode == 'balance' %}
+  <a href="{{ url_for('staff.rapports_comptables') }}">← Rapports comptables (détail / SYSCOHADA)</a>
+  {% else %}
+  <a href="{{ url_for('staff.rapports_balance') }}">Utilitaire balance — 6 colonnes (débit/crédit initiaux et finaux)</a>
+  {% endif %}
+</p>
 
+{% if accounting_mode != 'balance' %}
 <details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
@@ -20,7 +28,7 @@
     (ex. <code>client_prod</code> / <code>client_test</code>) et indiquez <strong>production</strong> ou <strong>test</strong> pour chaque entrée.
   </p>
   <ul>
-    <li><strong>Nouvelle base</strong> : dans la carte ci-dessous, cliquez sur « Ajouter une nouvelle base » pour afficher le formulaire → enregistrement puis rechargement avec la base présélectionnée.</li>
+    <li><strong>Nouvelle base</strong> : le formulaire d’ajout est visible dans la carte ci-dessous → enregistrement puis rechargement avec la base présélectionnée.</li>
     <li><strong>Choisir une base</strong> : sans libellé, <strong>Actualiser</strong> affiche <strong>toutes les bases</strong> (liste déroulante + tableau avec état de connexion). Avec un libellé, seules les bases de ce client. Cliquez sur <strong>Utiliser cette base</strong> ou choisissez dans la liste déroulante.</li>
     <li>Après sélection d’une base, le <strong>voyant</strong> et les <strong>informations instance</strong> (version, expiration, édition, etc.) s’affichent lorsque la connexion Odoo réussit.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
@@ -36,6 +44,21 @@
     <span class="sn-muted" style="font-size:0.82rem;">(disque ; après <code>git pull</code> sans Reload, la version affichée peut rester ancienne)</span>
   </p>
 </details>
+{% else %}
+<details class="sn-doc">
+  <summary>Descriptif &amp; mode d’emploi — balance 6 colonnes</summary>
+  <p style="margin:0.65rem 0 0;line-height:1.5;">
+    <strong>But.</strong> Choisir une balance comptable standard Odoo à <strong>4 colonnes</strong> (solde initial, débit, crédit, solde final sur la période),
+    en créer une <strong>copie</strong>, puis la transformer en <strong>6 colonnes</strong> : débit initial, crédit initial, débit période, crédit période, débit final, crédit final.
+    L’original n’est pas modifié. Le rapport doit utiliser le moteur standard sur les colonnes initiale/finale (subformule <code>sum</code>).
+  </p>
+  <p class="sn-meta-line" style="margin-top:0.65rem;">
+    <strong>Auteur :</strong> {{ utility_author }} ·
+    <strong>Version :</strong> {{ utility_version }} ·
+    <strong>Date :</strong> {{ utility_date }}
+  </p>
+</details>
+{% endif %}
 
 <div class="sn-card sn-card--accent">
   <h2 style="margin-top:0;font-size:1.05rem;">Base Odoo et filtre des rapports</h2>
@@ -71,13 +94,11 @@
     <div id="ajouter-base-odoo" class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
       <button type="submit">Actualiser la liste</button>
       <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
-      <button type="button" class="sn-btn sn-btn--ghost" id="btn-show-add-base" aria-expanded="false" aria-controls="panel-add-base-odoo">
-        Ajouter une nouvelle base
-      </button>
     </div>
   </form>
 
-    <div id="panel-add-base-odoo" class="sn-panel-add-base" hidden style="margin-top:0.85rem;padding-top:0.85rem;border-top:1px dashed var(--sn-border);">
+    <div id="panel-add-base-odoo" class="sn-panel-add-base" style="margin-top:0.85rem;padding-top:0.85rem;border-top:1px dashed var(--sn-border);">
+      <h3 style="margin:0 0 0.5rem;font-size:1rem;">Ajouter une nouvelle base</h3>
       <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
         Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
       </p>
@@ -108,7 +129,6 @@
         <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
         <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
       </form>
-      <button type="button" class="sn-btn sn-btn--ghost" id="btn-hide-add-base" style="margin-top:0.65rem;">Fermer le formulaire</button>
     </div>
 </div>
 
@@ -144,7 +164,7 @@
           {% endif %}
         </td>
         <td>
-          <a class="sn-btn" style="padding:0.35rem 0.65rem;font-size:0.85rem;white-space:nowrap;" href="{{ url_for('staff.rapports_comptables', client_id=row.client_id, filter_label=filter_label) }}{% if filter_q %}&amp;q={{ filter_q|urlencode }}{% endif %}">Utiliser cette base</a>
+          <a class="sn-btn" style="padding:0.35rem 0.65rem;font-size:0.85rem;white-space:nowrap;" href="{{ url_for(accounting_endpoint, client_id=row.client_id, filter_label=filter_label) }}{% if filter_q %}&amp;q={{ filter_q|urlencode }}{% endif %}">Utiliser cette base</a>
         </td>
       </tr>
       {% endfor %}
@@ -201,7 +221,7 @@
         </td>
         <td>
           {% if not sr.current %}
-          <a class="sn-btn sn-btn--ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;" href="{{ url_for('staff.rapports_comptables', client_id=sr.client_id, filter_label=filter_label) }}{% if filter_q %}&amp;q={{ filter_q|urlencode }}{% endif %}">Basculer</a>
+          <a class="sn-btn sn-btn--ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;" href="{{ url_for(accounting_endpoint, client_id=sr.client_id, filter_label=filter_label) }}{% if filter_q %}&amp;q={{ filter_q|urlencode }}{% endif %}">Basculer</a>
           {% endif %}
         </td>
       </tr>
@@ -242,6 +262,7 @@
       <tr>
         <th>Id</th>
         <th>Nom</th>
+        <th>Odoo</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -251,13 +272,20 @@
         <td><code>{{ r.id }}</code></td>
         <td>{{ r.name }}</td>
         <td>
+          {% if report_open_urls.get(r.id) %}
+          <a class="sn-btn sn-btn--ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;white-space:nowrap;" href="{{ report_open_urls[r.id] }}" target="_blank" rel="noopener noreferrer">Ouvrir dans Odoo</a>
+          {% else %}
+          <span class="sn-muted">—</span>
+          {% endif %}
+        </td>
+        <td>
           <form method="post" action="{{ request.path }}" style="display:inline;margin:0;">
             <input type="hidden" name="client_id" value="{{ selected_client }}">
             <input type="hidden" name="filter_q" value="{{ filter_q }}">
             <input type="hidden" name="filter_label" value="{{ filter_label }}">
             <input type="hidden" name="action" value="prefill">
             <input type="hidden" name="report_id" value="{{ r.id }}">
-            <button type="submit" class="sn-btn" style="margin-top:0;padding:0.35rem 0.75rem;font-size:0.85rem;">Personnaliser</button>
+            <button type="submit" class="sn-btn" style="margin-top:0;padding:0.35rem 0.75rem;font-size:0.85rem;">{% if accounting_mode == 'balance' %}Préparer{% else %}Personnaliser{% endif %}</button>
           </form>
           <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
             <summary style="cursor:pointer;font-size:0.88rem;">Renommer…</summary>
@@ -302,6 +330,21 @@
 </div>
 
 <div class="sn-card" id="personalize">
+  {% if accounting_mode == 'balance' %}
+  <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation balance — 6 colonnes</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Copie du rapport (suffixe « — copie Senedoo (6 col.) »), puis colonnes et expressions adaptées. La balance source doit avoir <strong>exactement 4 colonnes</strong> dans l’ordre attendu par Odoo.</p>
+  <form id="form-personalize-balance" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate>
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="filter_label" value="{{ filter_label }}">
+    <input type="hidden" name="action" value="personalize_balance">
+    <label for="report_id_b">ID du rapport balance <strong>source</strong> (<code>account.report</code>)</label>
+    <input type="number" id="report_id_b" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. balance générale standard">
+    <label for="confirm_b">Confirmation</label>
+    <input type="text" id="confirm_b" name="confirm" placeholder="Tapez OUI en majuscules">
+    <button type="submit">Créer la copie et appliquer les 6 colonnes</button>
+  </form>
+  {% else %}
   <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation (détail comptes / SYSCOHADA)</h2>
   <details class="sn-muted" style="margin-bottom:0.85rem;">
     <summary style="cursor:pointer;font-weight:600;color:var(--sn-muted);">Explications (replier pour gagner de la place)</summary>
@@ -310,7 +353,7 @@
       — comme l’usage recommandé de <code>personalize_syscohada_detail.py</code> sur une copie.
     </p>
   </details>
-  <form id="form-personalize-report" method="post" action="{{ request.path }}" novalidate>
+  <form id="form-personalize-report" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q }}">
     <input type="hidden" name="filter_label" value="{{ filter_label }}">
@@ -323,6 +366,7 @@
     <input type="text" id="confirm_p" name="confirm" placeholder="Tapez OUI en majuscules">
     <button type="submit">Créer la copie et personnaliser</button>
   </form>
+  {% endif %}
 </div>
 {% else %}
 <p class="sn-muted">« Actualiser » sans base sélectionnée affiche toutes les bases (ou filtrées par libellé) ; choisissez-en une dans la liste ou le tableau. Utilisez « Ajouter une nouvelle base » si besoin.</p>
@@ -330,8 +374,8 @@
 
 <div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">
   <div class="sn-progress-overlay__box" role="status" aria-live="polite">
-    <p style="margin:0 0 0.75rem;font-weight:600;">Personnalisation en cours…</p>
-    <p class="sn-muted" style="margin:0 0 0.85rem;font-size:0.88rem;line-height:1.45;">Création de la copie et application des réglages sur Odoo — merci de patienter (cela peut prendre plusieurs minutes).</p>
+    <p style="margin:0 0 0.75rem;font-weight:600;">Traitement en cours sur Odoo…</p>
+    <p class="sn-muted" style="margin:0 0 0.85rem;font-size:0.88rem;line-height:1.45;">Création de la copie et application des réglages — merci de patienter (cela peut prendre plusieurs minutes).</p>
     <div class="sn-progress-bar" aria-label="Progression">
       <div class="sn-progress-bar__indeterminate"></div>
     </div>
@@ -349,65 +393,39 @@
 <script>
 (function(){
   var anchorAdd = document.getElementById('ajouter-base-odoo');
-  var panelAdd = document.getElementById('panel-add-base-odoo');
-  var btnShowAdd = document.getElementById('btn-show-add-base');
-  var btnHideAdd = document.getElementById('btn-hide-add-base');
-  function openAddBasePanel() {
-    if (!panelAdd || !btnShowAdd) return;
-    panelAdd.hidden = false;
-    btnShowAdd.setAttribute('aria-expanded', 'true');
-  }
-  function closeAddBasePanel() {
-    if (!panelAdd || !btnShowAdd) return;
-    panelAdd.hidden = true;
-    btnShowAdd.setAttribute('aria-expanded', 'false');
-  }
-  if (btnShowAdd) {
-    btnShowAdd.addEventListener('click', function () {
-      openAddBasePanel();
-      try { var ni = document.getElementById('new_client_id'); if (ni) ni.focus(); } catch (x) {}
-    });
-  }
-  if (btnHideAdd) {
-    btnHideAdd.addEventListener('click', closeAddBasePanel);
-  }
-  if (location.hash === '#ajouter-base-odoo' && anchorAdd && panelAdd) {
-    openAddBasePanel();
-    anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    try { var ni2 = document.getElementById('new_client_id'); if (ni2) ni2.focus(); } catch (x) {}
+  if (location.hash === '#ajouter-base-odoo' && anchorAdd) {
+    try { anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+    try { var ni = document.getElementById('new_client_id'); if (ni) ni.focus(); } catch (x) {}
   }
   {% if open_add_base_panel %}
-  if (panelAdd && btnShowAdd) {
-    openAddBasePanel();
-    if (anchorAdd) {
-      try { anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
-    }
+  if (anchorAdd) {
+    try { anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
     try { var ni3 = document.getElementById('new_client_id'); if (ni3) ni3.focus(); } catch (x) {}
   }
   {% endif %}
-  var form = document.getElementById('form-personalize-report');
   var overlay = document.getElementById('sn-personalize-overlay');
-  if (!form || !overlay) return;
-  /* Soumission HTML native (pas fetch) : le navigateur attend la 302/200 jusqu’à la fin du traitement Odoo ;
-     l’overlay reste visible pendant tout le POST (comme les autres formulaires longs de l’outil). */
-  form.addEventListener('submit', function (ev) {
-    if (form.getAttribute('data-sn-native-personalize') === '1') {
-      return;
-    }
-    ev.preventDefault();
-    overlay.hidden = false;
-    overlay.setAttribute('aria-hidden', 'false');
-    form.setAttribute('data-sn-native-personalize', '1');
-    requestAnimationFrame(function () {
+  document.querySelectorAll('form.form-sn-long-post').forEach(function (form) {
+    if (!overlay) return;
+    form.addEventListener('submit', function (ev) {
+      if (form.getAttribute('data-sn-native-longpost') === '1') {
+        return;
+      }
+      ev.preventDefault();
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      form.setAttribute('data-sn-native-longpost', '1');
       requestAnimationFrame(function () {
-        HTMLFormElement.prototype.submit.call(form);
+        requestAnimationFrame(function () {
+          HTMLFormElement.prototype.submit.call(form);
+        });
       });
     });
   });
   window.addEventListener('pageshow', function (ev) {
-    if (ev.persisted && form) {
-      form.removeAttribute('data-sn-native-personalize');
-    }
+    if (!ev.persisted) return;
+    document.querySelectorAll('form.form-sn-long-post').forEach(function (form) {
+      form.removeAttribute('data-sn-native-longpost');
+    });
   });
 })();
 </script>

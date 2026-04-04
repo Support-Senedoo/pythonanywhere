@@ -3,14 +3,22 @@ from __future__ import annotations
 
 from typing import Any
 
+from odoo_client import normalize_odoo_base_url
 from personalize_syscohada_detail import execute_kw
 from web_app import app_version
 
 # Titre spécifique à l’écran ; version / date / auteur = source unique app_version.py
 UTILITY_TITLE = "Rapports comptables Odoo"
+UTILITY_TITLE_BALANCE = "Balance comptable — 6 colonnes (Senedoo)"
 UTILITY_VERSION = app_version.TOOLBOX_APP_VERSION
 UTILITY_DATE = app_version.TOOLBOX_APP_DATE
 UTILITY_AUTHOR = app_version.TOOLBOX_APP_AUTHOR
+
+
+def account_report_odoo_form_url(base_url: str, report_id: int) -> str:
+    """Lien backend Odoo vers la fiche du rapport comptable (ouverture / exécution manuelle)."""
+    base = normalize_odoo_base_url(base_url).rstrip("/")
+    return f"{base}/web#id={int(report_id)}&model=account.report&view_type=form"
 
 
 def format_report_name(val: Any) -> str:
