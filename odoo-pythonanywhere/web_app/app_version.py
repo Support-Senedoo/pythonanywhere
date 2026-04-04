@@ -4,16 +4,21 @@ from __future__ import annotations
 import os
 
 # À incrémenter lors des livraisons visibles pour les utilisateurs.
-_DEFAULT_VERSION = "1.3.2"
+_DEFAULT_VERSION = "1.3.3"
 _DEFAULT_DATE = "2026-04-04"
+
+# Valeurs souvent mises par erreur dans l’onglet Web PA (ne reflètent pas la livraison réelle).
+_IGNORE_TOOLBOX_APP_VERSION = frozenset({"1", "1.0", "1.0.0"})
 
 
 def _version_from_env(raw: str | None, default: str) -> str:
-    """PA : une erreur fréquente est TOOLBOX_APP_VERSION=1 (seul) → affichage « 1 ». On exige au moins un point (ex. 1.3.2)."""
+    """PA : erreurs fréquentes TOOLBOX_APP_VERSION=1 ou =1.0.0 → mauvaise version affichée."""
     v = (raw or "").strip()
     if not v:
         return default
     if "." not in v:
+        return default
+    if v in _IGNORE_TOOLBOX_APP_VERSION:
         return default
     return v
 

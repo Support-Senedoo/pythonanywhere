@@ -21,7 +21,7 @@ si vous clonez le repo dans `/home/senedoo/pythonanywhere`. (Si vous ne gardez q
   - `toolbox_clients.json` — URL / base / user API Odoo par `client_id`
   - Variable **`TOOLBOX_SECRET_KEY`** (onglet Web PythonAnywhere)
 
-Si l’interface affiche une **version « 1 »** : vérifiez l’onglet Web — **`TOOLBOX_APP_VERSION=1` seul est invalide** (à supprimer ou remplacer par ex. `1.3.2`). Depuis avril 2026 le code **ignore** une valeur sans point et reprend le défaut du dépôt.
+Si l’interface affiche une **version « 1 »**, **« 1.0.0 »** ou autre valeur incohérente : onglet Web — supprimez **`TOOLBOX_APP_VERSION`** ou mettez une vraie livraison (ex. `1.3.3`). Le code **ignore** `1`, `1.0`, `1.0.0` et toute valeur **sans point**, puis reprend le défaut du dépôt. Après déploiement : **Reload** le site + rechargement forcé du navigateur (**Ctrl+Shift+R**) sur les pages `/staff/…` pour éviter un vieux HTML en cache.
 
 Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbox-env-exemple.txt`.
 

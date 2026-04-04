@@ -41,6 +41,15 @@ from web_app.session_odoo import get_config_by_id, get_xmlrpc_for_staff_client_i
 bp = Blueprint("staff", __name__)
 
 
+@bp.after_request
+def _staff_disable_html_cache(response):
+    """Évite qu’un vieux HTML staff (ancien formulaire, ancienne version) reste en cache navigateur après déploiement."""
+    ct = response.headers.get("Content-Type", "")
+    if "text/html" in ct:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
 def _registry():
     return load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
 
