@@ -17,7 +17,7 @@
     <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
       Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
     </p>
-    <form method="post" action="{{ url_for('staff.rapports_comptables') }}" autocomplete="off" novalidate>
+    <form method="post" action="{{ request.path }}" autocomplete="off" novalidate>
       <input type="hidden" name="action" value="add_client">
       <input type="hidden" name="filter_q" value="{{ filter_q }}">
       <label for="new_client_id">Identifiant technique (unique par base)</label>
@@ -73,7 +73,7 @@
   </p>
 </details>
 
-<form method="get" class="sn-card sn-card--accent" action="{{ url_for('staff.rapports_comptables') }}" novalidate>
+<form method="get" class="sn-card sn-card--accent" action="{{ request.path }}" novalidate>
   <label for="client_id">Base Odoo (client)</label>
   <select id="client_id" name="client_id">
     <option value="">— Choisir —</option>
@@ -136,7 +136,7 @@
         <td><code>{{ r.id }}</code></td>
         <td>{{ r.name }}</td>
         <td>
-          <form method="post" action="{{ url_for('staff.rapports_comptables') }}" style="display:inline;margin:0;">
+          <form method="post" action="{{ request.path }}" style="display:inline;margin:0;">
             <input type="hidden" name="client_id" value="{{ selected_client }}">
             <input type="hidden" name="filter_q" value="{{ filter_q }}">
             <input type="hidden" name="action" value="prefill">
@@ -146,7 +146,7 @@
           <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
             <summary style="cursor:pointer;color:var(--sn-danger);font-size:0.88rem;">Supprimer…</summary>
             <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
-              <form method="post" action="{{ url_for('staff.rapports_comptables') }}" novalidate>
+              <form method="post" action="{{ request.path }}" novalidate>
                 <input type="hidden" name="client_id" value="{{ selected_client }}">
                 <input type="hidden" name="filter_q" value="{{ filter_q }}">
                 <input type="hidden" name="action" value="unlink">
@@ -176,7 +176,7 @@
       — comme l’usage recommandé de <code>personalize_syscohada_detail.py</code> sur une copie.
     </p>
   </details>
-  <form id="form-personalize-report" method="post" action="{{ url_for('staff.rapports_comptables') }}" novalidate>
+  <form id="form-personalize-report" method="post" action="{{ request.path }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q }}">
     <input type="hidden" name="action" value="personalize">
@@ -235,10 +235,22 @@
     overlay.setAttribute('aria-hidden', 'false');
     var ctrl = new AbortController();
     var t = setTimeout(function() { ctrl.abort(); }, 900000);
+    function navigateAfterPersonalizeRedirect() {
+      var fd = new FormData(form);
+      var path = window.location.pathname;
+      var sp = new URLSearchParams();
+      var cid = fd.get('client_id');
+      var fq = fd.get('filter_q');
+      if (cid) sp.set('client_id', cid);
+      if (fq) sp.set('q', fq);
+      var qs = sp.toString();
+      window.location.href = path + (qs ? '?' + qs : '');
+    }
     fetch(form.action, {
       method: 'POST',
       body: new FormData(form),
       credentials: 'same-origin',
+      cache: 'no-store',
       redirect: 'manual',
       signal: ctrl.signal
     }).then(function(resp) {
@@ -250,13 +262,21 @@
           return;
         }
       }
+      /* Chrome / Firefox : redirect: manual -> type opaqueredirect, status 0, pas d'en-tête Location lisible */
+      if (resp.type === 'opaqueredirect' || resp.status === 0) {
+        navigateAfterPersonalizeRedirect();
+        return;
+      }
       overlay.hidden = true;
       overlay.setAttribute('aria-hidden', 'true');
       if (resp.ok) {
         window.location.reload();
         return;
       }
-      window.alert('La personnalisation a échoué ou la réponse du serveur est inattendue (HTTP ' + resp.status + ').');
+      window.alert(
+        'La personnalisation a échoué ou la réponse du serveur est inattendue (HTTP ' + resp.status + '). ' +
+        'Si le traitement était long, rechargez la page : la copie a peut‑être quand même été créée dans Odoo.'
+      );
     }).catch(function(err) {
       clearTimeout(t);
       overlay.hidden = true;
