@@ -13,3 +13,11 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 # TOOLBOX_DISABLE_DEV_LOGIN=1
 # Client démo associé au registre (id dans toolbox_clients.json) :
 # TOOLBOX_TEST_CLIENT_ID=la_ripaille
+
+# Bases Odoo « gérées » (suggestions dans le champ Base lors de l’édition client, séparateur virgule ou ;)
+# À remplir avec les noms techniques des bases accessibles au compte API (ex. support@senedoo.com).
+# Ne pas mettre de mot de passe ici — uniquement dans toolbox_clients.json (champ chiffré côté serveur si possible).
+# TOOLBOX_ODOO_MANAGED_DATABASES=base_client_a,base_client_b
+
+# Placeholder du champ « Login Odoo » dans le formulaire client (optionnel, défaut support@senedoo.com)
+# TOOLBOX_ODOO_DEFAULT_API_USER=support@senedoo.com

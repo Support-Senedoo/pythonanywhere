@@ -22,10 +22,23 @@
     <input type="url" id="url" name="url" required value="{{ client.url if client else '' }}" placeholder="https://xxx.odoo.com">
 
     <label for="db">Nom de la base Odoo</label>
-    <input type="text" id="db" name="db" required value="{{ client.db if client else '' }}" placeholder="nom_technique_base">
+    <datalist id="odoo-db-suggestions">
+      {% for name in odoo_db_presets|default([]) %}
+      <option value="{{ name }}"></option>
+      {% endfor %}
+    </datalist>
+    <input type="text" id="db" name="db" required list="odoo-db-suggestions"
+           value="{{ client.db if client else '' }}" placeholder="Choisir ou saisir le nom technique">
+    <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">
+      Suggestions : variable serveur <code>TOOLBOX_ODOO_MANAGED_DATABASES</code> (bases gérées, ex. compte support)
+      + bouton ci-dessous pour interroger <code>/xmlrpc/2/db</code> list() sur l’URL (si le serveur l’autorise).
+    </p>
+    <button type="button" class="sn-btn sn-btn--ghost" id="btn-refresh-odoo-dbs" style="margin-top:0.5rem;">Actualiser les suggestions de bases</button>
+    <span id="odoo-db-list-msg" class="sn-muted" style="font-size:0.82rem;margin-left:0.5rem;"></span>
 
     <label for="odoo_user">Login Odoo (connexion API / XML-RPC)</label>
-    <input type="text" id="odoo_user" name="odoo_user" required value="{{ client.user if client else '' }}" autocomplete="off">
+    <input type="text" id="odoo_user" name="odoo_user" required value="{{ client.user if client else '' }}"
+           placeholder="{{ default_odoo_api_user }}" autocomplete="off">
 
     <label for="odoo_password">Mot de passe Odoo ou clé API</label>
     <input type="password" id="odoo_password" name="odoo_password" autocomplete="new-password"
@@ -57,4 +70,37 @@
   </form>
 </div>
 {% endif %}
+
+<script>
+(function(){
+  var btn = document.getElementById('btn-refresh-odoo-dbs');
+  var msg = document.getElementById('odoo-db-list-msg');
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var u = (document.getElementById('url') && document.getElementById('url').value || '').trim();
+    var dl = document.getElementById('odoo-db-suggestions');
+    if (!dl) return;
+    msg.textContent = '…';
+    var url = {{ url_for('staff_admin.odoo_databases_suggest')|tojson }} + '?url=' + encodeURIComponent(u);
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        dl.innerHTML = '';
+        (data.databases || []).forEach(function(name){
+          var o = document.createElement('option');
+          o.value = name;
+          dl.appendChild(o);
+        });
+        if (data.server_error) {
+          msg.textContent = 'Serveur : ' + data.server_error;
+        } else if (!u) {
+          msg.textContent = 'Liste « gérées » (env) uniquement — renseignez l’URL pour tenter db.list().';
+        } else {
+          msg.textContent = (data.databases && data.databases.length) ? data.databases.length + ' suggestion(s).' : 'Aucune suggestion.';
+        }
+      })
+      .catch(function(e){ msg.textContent = 'Erreur réseau.'; });
+  });
+})();
+</script>
 {% endblock %}

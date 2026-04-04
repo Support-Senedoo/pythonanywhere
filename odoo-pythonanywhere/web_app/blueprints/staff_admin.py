@@ -1,10 +1,13 @@
 """Administration : clients Odoo + comptes (staff / client)."""
 from __future__ import annotations
 
+import os
+
 from flask import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -13,6 +16,7 @@ from flask import (
 
 from web_app.blueprints.public import login_required_staff
 from web_app.client_apps import KNOWN_APPS, apps_for_template
+from web_app.odoo_db_list import managed_databases_from_env, merge_database_suggestions
 from web_app.odoo_registry import delete_client, load_clients_registry, upsert_client
 from web_app.users_store import (
     count_users_for_client,
@@ -37,6 +41,27 @@ def _users_path():
 
 def _clients_path():
     return current_app.config["TOOLBOX_CLIENTS_PATH"]
+
+
+def _odoo_db_presets() -> list[str]:
+    return managed_databases_from_env(os.environ.get("TOOLBOX_ODOO_MANAGED_DATABASES"))
+
+
+def _default_odoo_api_user_placeholder() -> str:
+    """Placeholder champ login API (pas de mot de passe ici)."""
+    return (os.environ.get("TOOLBOX_ODOO_DEFAULT_API_USER") or "support@senedoo.com").strip()
+
+
+@bp.route("/odoo-databases")
+@login_required_staff
+def odoo_databases_suggest():
+    """JSON : bases depuis TOOLBOX_ODOO_MANAGED_DATABASES + db.list() sur l’URL si fournie."""
+    url = (request.args.get("url") or "").strip()
+    merged, err = merge_database_suggestions(
+        url=url,
+        env_managed_raw=os.environ.get("TOOLBOX_ODOO_MANAGED_DATABASES"),
+    )
+    return jsonify({"databases": merged, "server_error": err})
 
 
 @bp.route("/")
@@ -95,6 +120,8 @@ def client_new():
         mode="new",
         client=None,
         known_apps=KNOWN_APPS,
+        odoo_db_presets=_odoo_db_presets(),
+        default_odoo_api_user=_default_odoo_api_user_placeholder(),
     )
 
 
@@ -135,6 +162,8 @@ def client_edit(client_id: str):
         mode="edit",
         client=cfg,
         known_apps=KNOWN_APPS,
+        odoo_db_presets=_odoo_db_presets(),
+        default_odoo_api_user=_default_odoo_api_user_placeholder(),
     )
 
 
