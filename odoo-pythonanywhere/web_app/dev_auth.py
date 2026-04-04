@@ -10,11 +10,13 @@ _DEV_PASSWORD = "passer"
 
 
 def try_dev_user(login: str, password: str, portal: str) -> ToolboxUser | None:
-    if os.environ.get("TOOLBOX_DISABLE_DEV_LOGIN", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("TOOLBOX_DISABLE_DEV_LOGIN", "").strip().lower() in ("1", "true", "yes", "on"):
         return None
-    if (login or "").strip().lower() != _DEV_LOGIN or password != _DEV_PASSWORD:
+    login_clean = (login or "").strip().lower()
+    password_clean = (password or "").strip()
+    if login_clean != _DEV_LOGIN or password_clean != _DEV_PASSWORD:
         return None
-    portal = (portal or "client").lower()
+    portal = (portal or "client").strip().lower()
     if portal == "client":
         cid = (os.environ.get("TOOLBOX_TEST_CLIENT_ID") or "la_ripaille").strip()
         return ToolboxUser(login=_DEV_LOGIN, role="client", client_id=cid)

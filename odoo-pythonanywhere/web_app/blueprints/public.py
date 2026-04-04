@@ -44,7 +44,7 @@ def health():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    portal = (request.args.get("portal") or request.form.get("portal") or "client").lower()
+    portal = (request.args.get("portal") or request.form.get("portal") or "client").strip().lower()
     if portal not in ("client", "staff"):
         portal = "client"
 
@@ -59,7 +59,14 @@ def login():
         if not user:
             user = verify_user(path, login_name, password)
         if not user:
-            flash("Identifiant ou mot de passe incorrect.", "danger")
+            if login_name.lower() == "test" and (password or "").strip() == "passer":
+                flash(
+                    "Le compte démo test/passer est désactivé sur ce serveur "
+                    "(variable d’environnement TOOLBOX_DISABLE_DEV_LOGIN).",
+                    "danger",
+                )
+            else:
+                flash("Identifiant ou mot de passe incorrect.", "danger")
             return render_template("login.html", portal=portal), 401
         if portal == "client" and user.role != "client":
             flash("Ce compte n’est pas un accès client. Utilisez l’espace Senedoo.", "warning")
