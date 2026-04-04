@@ -13,9 +13,10 @@ Sources supportées :
 Odoo Enterprise (balance d’essai) : le handler attache des totaux « unaffected earnings » à chaque
 ``expression_label``. Les colonnes ``sn_*`` provoquaient un ``KeyError`` si la copie restait une
 **variante** (``root_report_id``) : le post-processeur semble caler les clés sur le schéma racine
-(4 colonnes) alors que l’affichage utilise les 6 colonnes de la copie. Après transformation, la toolbox
-**détache** la copie de la racine pour les handlers « trial balance », en recopiant les options de
-filtre depuis la racine pour limiter les écarts de comportement.
+(4 colonnes) alors que l’affichage utilise les 6 colonnes de la copie. Après sélection du rapport (2 ou 4 colonnes), la toolbox **détache d’abord** la copie de la racine
+pour les handlers « trial balance », **avant** de recréer les colonnes `sn_*` : ainsi on évite tout
+état persistant « variante + colonnes supplémentaires » (cause typique du `KeyError: sn_open_deb` sur
+Odoo 19 Enterprise). Les options de filtre sont recopiées depuis la racine lors du détachement.
 
 **Ne pas** retirer ``custom_handler_model_name`` sur la copie : les lignes au moteur « custom »
 ``_report_custom_engine_trial_balance`` exigent ce handler ; sans lui, Odoo affiche « Méthode invalide ».
@@ -104,8 +105,10 @@ def _detach_trial_balance_variant_after_six_columns(
     report_id: int,
 ) -> dict[str, Any]:
     """
-    Coupe ``root_report_id`` sur une copie « trial balance » après ajout des colonnes ``sn_*``,
+    Coupe ``root_report_id`` sur une copie « trial balance » liée à une racine Enterprise,
     puis réécrit les options héritées de la racine (sinon elles retombent sur les défauts du cœur).
+    Appelé en **début** de ``personalize_balance_six_columns`` (avant les colonnes ``sn_*``) pour
+    éviter l’état variante + colonnes supplémentaires.
     """
     names = _account_report_field_names(models, db, uid, password)
     if "root_report_id" not in names:
@@ -345,6 +348,9 @@ def personalize_balance_six_columns(
             "**4 colonnes** (solde initial, débit, crédit, solde final) ou à **2 colonnes** "
             "(débit et crédit sur la période) sont prises en charge pour la transformation en 6 colonnes."
         )
+    detach_meta = _detach_trial_balance_variant_after_six_columns(
+        models, db, uid, password, report_id
+    )
     cols = execute_kw(
         models,
         db,
@@ -596,6 +602,4 @@ def personalize_balance_six_columns(
     ]
     for cv in to_create:
         execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
-    return _detach_trial_balance_variant_after_six_columns(
-        models, db, uid, password, report_id
-    )
+    return detach_meta
