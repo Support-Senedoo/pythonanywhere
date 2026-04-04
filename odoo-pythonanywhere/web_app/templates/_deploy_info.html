@@ -1,0 +1,16 @@
+{# Bloc version / indicateur de déploiement — variables : toolbox_*, toolbox_git_revision (context_processor) #}
+<div class="sn-deploy-info" role="status" aria-label="Version et déploiement">
+  <div class="sn-deploy-info__title">
+    <span class="sn-deploy-info__dot" title="Révision Git lue sur le disque du serveur" aria-hidden="true"></span>
+    Indicateur de mise à jour
+  </div>
+  <p class="sn-deploy-info__version">
+    <strong>{{ toolbox_app_label }}</strong>
+    · version <strong>{{ toolbox_version }}</strong>
+    · {{ toolbox_version_date }}
+    · révision <code>{{ toolbox_git_revision }}</code>
+  </p>
+  <p class="sn-deploy-info__hint">
+    La révision reflète le dernier commit présent sur le serveur. Après un <code>git pull</code>, un <strong>Reload</strong> (onglet Web PythonAnywhere) peut être nécessaire pour que l’application charge ce code en mémoire.
+  </p>
+</div>

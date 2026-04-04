@@ -4,7 +4,7 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 
 # Version affichée (optionnel — sinon défaut dans web_app/app_version.py).
 # IMPORTANT : ne pas mettre 1, 1.0, 1.0.0 ni une seule valeur sans sens — l’appli les ignore et reprend le défaut du code (voir web_app/app_version.py).
-# TOOLBOX_APP_VERSION=1.3.4
+# TOOLBOX_APP_VERSION=1.3.5
 # TOOLBOX_APP_DATE=2026-04-03
 # TOOLBOX_APP_LABEL=Toolbox Senedoo
 # TOOLBOX_APP_AUTHOR=Senedoo

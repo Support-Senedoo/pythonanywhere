@@ -8,6 +8,9 @@
   </div>
   <p class="sn-hero-tagline">Portail client &amp; équipe — outils sur votre base Odoo</p>
 </div>
+
+{% include '_deploy_info.html' %}
+
 <h1>Bienvenue</h1>
 <p class="sn-muted">Choisissez l’espace qui correspond à votre profil.</p>
 
@@ -30,7 +33,4 @@
   Accès démo (temporaire) : identifiant <strong>test</strong>, mot de passe <strong>passer</strong> — client et staff.
 </p>
 
-<p class="sn-meta-line" style="margin-top:1.75rem;">
-  {{ toolbox_app_label }} · version <strong>{{ toolbox_version }}</strong> · {{ toolbox_version_date }}
-</p>
 {% endblock %}

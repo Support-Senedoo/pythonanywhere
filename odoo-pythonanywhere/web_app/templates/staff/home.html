@@ -5,6 +5,8 @@
 <h1>Espace Senedoo</h1>
 <p class="sn-muted">Sélectionnez une base client pour utiliser les mêmes écrans que l’espace client.</p>
 
+{% include '_deploy_info.html' %}
+
 <div class="sn-card sn-card--accent">
   <h2>Applications (mode client)</h2>
   <p class="sn-muted">Choisissez une base, puis ouvrez le menu applications.</p>
@@ -34,7 +36,4 @@
 
 <p class="sn-muted"><a href="{{ url_for('public.index') }}">← Accueil public</a></p>
 
-<p class="sn-meta-line" style="margin-top:1.25rem;">
-  {{ toolbox_app_label }} · version <strong>{{ toolbox_version }}</strong> · {{ toolbox_version_date }}
-</p>
 {% endblock %}

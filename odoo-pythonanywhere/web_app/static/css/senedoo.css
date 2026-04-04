@@ -413,3 +413,50 @@ pre,
   color: var(--sn-muted);
   margin-top: 0.75rem;
 }
+
+/* Accueil : version + indicateur déploiement (révision Git disque) */
+.sn-deploy-info {
+  margin: 0.5rem 0 1.5rem;
+  padding: 0.9rem 1.05rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(111, 45, 168, 0.1);
+}
+.sn-deploy-info__title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sn-text);
+}
+.sn-deploy-info__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.22);
+  flex-shrink: 0;
+}
+.sn-deploy-info__version {
+  margin: 0 0 0.45rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--sn-text);
+}
+.sn-deploy-info__version code {
+  font-size: 0.88em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.sn-deploy-info__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--sn-muted);
+}
+.sn-deploy-info__hint code {
+  font-size: 0.92em;
+}
