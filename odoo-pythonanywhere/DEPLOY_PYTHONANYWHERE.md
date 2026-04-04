@@ -39,10 +39,10 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 
 ## Déploiement / mise à jour du code
 
-**À chaque modification** : enregistrer le code dans Git, **pousser sur GitHub**, puis mettre à jour PythonAnywhere (voir ci‑dessous). Sans push, le `git pull` côté PA ne récupère rien de nouveau.
+**À chaque modification** : **commit** puis lancer **`deploy_pa.ps1`** depuis votre PC. Le script fait d’abord un **`git push`** vers `origin` (sauf si `-SkipGitPush`), puis sur PA **`deploy_pa.sh`** exécute **`git fetch` + `git pull --ff-only`**, `pip`, et vous rappelle le **Reload**. Sans commit / sans push réussi, le serveur ne verra pas les derniers fichiers.
 
 **Option A — Git (recommandé)**  
-Si le dépôt est cloné sur PA : `git pull` dans le dossier du projet, puis `pip install …`, puis **Reload** du site web. Le script **`deploy_pa.sh`** (via **`deploy_pa.ps1`**) exécute ce `pull` automatiquement à chaque lancement.
+Depuis `odoo-pythonanywhere/` : **`.\deploy_pa.ps1`**. Pour ne pas pousser depuis la machine locale : **`.\deploy_pa.ps1 -SkipGitPush`** (à utiliser seulement si le push a déjà été fait ailleurs).
 
 ### Déploiement sans saisie de phrase secrète (agent / MCP)
 

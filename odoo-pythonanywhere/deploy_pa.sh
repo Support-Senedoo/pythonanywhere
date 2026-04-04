@@ -8,8 +8,11 @@ TARGET="${HOME}/pythonanywhere"
 APP_DIR="${TARGET}/odoo-pythonanywhere"
 
 if [[ -d "${TARGET}/.git" ]]; then
-  echo ">>> git pull dans ${TARGET} (mise à jour obligatoire après chaque push GitHub)"
+  echo ">>> git fetch + pull --ff-only dans ${TARGET}"
+  git -C "${TARGET}" fetch origin
   git -C "${TARGET}" pull --ff-only
+  echo ">>> HEAD actuel :"
+  git -C "${TARGET}" log -1 --oneline
 else
   echo ">>> git clone vers ${TARGET}"
   git clone "${REPO_URL}" "${TARGET}"
@@ -27,7 +30,7 @@ echo ">>> pip (${PY}) install --user"
 
 echo ""
 echo "=== OK ==="
-echo "0) Code : git pull vient d’être exécuté — après une nouvelle modif, push puis relancer ce script."
+echo "0) Code : fetch + pull exécutés — depuis Windows, lancez deploy_pa.ps1 (push local puis ce script)."
 echo "1) Onglet Web : fichier WSGI ="
 echo "   ${APP_DIR}/pythonanywhere_wsgi.py"
 echo "2) Variables (onglet Web) : TOOLBOX_SECRET_KEY + chemins si besoin"

@@ -1,9 +1,11 @@
 # Déploie la toolbox Flask sur PythonAnywhere via SSH (clé privée locale).
 # À lancer dans PowerShell sur VOTRE PC (pas uniquement via un agent distant sans accès SSH).
 #
-# Après chaque modification du code : commit + push sur GitHub, puis lancer ce script.
-# Sur le serveur, deploy_pa.sh exécute systématiquement « git pull » dans le clone PA
-# (alignement sur la branche distante), puis pip et vous rappelle de faire « Reload » Web.
+# Enchaînement automatique :
+#   1) git push depuis la racine du dépôt (pour que GitHub ait les derniers commits) ;
+#   2) sur PA : deploy_pa.sh fait git fetch + pull --ff-only, puis pip.
+# Pensez à committer avant de lancer le script (les fichiers non commités ne partent pas au push).
+# Pour sauter l’étape push (réseau indisponible, dépôt en lecture seule) : -SkipGitPush
 #
 # Si SSH/scp demande encore le mot de passe PA à chaque fois : une fois seulement
 #   .\install_pa_ssh_key.ps1
@@ -19,10 +21,13 @@
 #   .\deploy_pa.ps1
 # Forcer ta clé personnelle :
 #   .\deploy_pa.ps1 -IdentityFile "C:\Users\patri\.ssh\id_ed25519"
+# Sans push local :
+#   .\deploy_pa.ps1 -SkipGitPush
 
 param(
     [string]$IdentityFile,
-    [string]$UserHost = "senedoo@ssh.pythonanywhere.com"
+    [string]$UserHost = "senedoo@ssh.pythonanywhere.com",
+    [switch]$SkipGitPush
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,6 +56,37 @@ $sshOpts = @(
 Write-Host ">>> Clé : $IdentityFile"
 Write-Host ">>> Cible : $UserHost"
 
+if (-not $SkipGitPush) {
+    $gitTop = ""
+    try {
+        $gitTop = (& git @("-C", $PSScriptRoot, "rev-parse", "--show-toplevel") 2>$null)
+        if ($gitTop) { $gitTop = $gitTop.Trim() }
+    } catch {
+        $gitTop = ""
+    }
+    if ($gitTop) {
+        Write-Host ">>> Git : dépôt $gitTop"
+        $dirty = ""
+        try {
+            $dirty = (& git @("-C", $gitTop, "status", "--porcelain") 2>$null)
+        } catch {
+            $dirty = ""
+        }
+        if ($dirty) {
+            Write-Host ">>> ATTENTION : modifications non commitées — elles ne seront pas poussées. Committez puis relancez." -ForegroundColor Yellow
+        }
+        Write-Host ">>> Git push (origin) pour que le pull sur PythonAnywhere récupère le dernier code..."
+        & git @("-C", $gitTop, "push")
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "git push a échoué (réseau, branche sans upstream, ou conflit). Corrigez ou relancez avec -SkipGitPush."
+        }
+    } else {
+        Write-Host ">>> Aucun dépôt Git détecté depuis $PSScriptRoot — étape push ignorée." -ForegroundColor DarkYellow
+    }
+} else {
+    Write-Host ">>> SkipGitPush : pas de git push local."
+}
+
 # Éviter Get-Content | ssh (conflit stdin si phrase secrète ou certains clients).
 # Forcer LF : CRLF Windows casse bash (ex. set -o pipefail -> "invalid option name").
 $remoteName = "deploy_pa_run.sh"
@@ -69,8 +105,7 @@ try {
     Remove-Item -LiteralPath $tmpUnix -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ">>> Exécution sur PA (git pull + pip dans le clone)..."
-Write-Host "    Vérifiez que vos commits sont bien poussés sur GitHub avant de compter sur la mise à jour."
+Write-Host ">>> Exécution sur PA (git fetch + pull + pip)..."
 & ssh.exe @sshOpts $UserHost "chmod +x ~/${remoteName} && bash ~/${remoteName}; ec=`$?; rm -f ~/${remoteName}; exit `$ec"
 $code = $LASTEXITCODE
 Write-Host ">>> Terminé (code $code)."
