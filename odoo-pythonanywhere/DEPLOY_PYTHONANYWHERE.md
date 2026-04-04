@@ -41,13 +41,30 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 **Option A — Git (recommandé)**  
 Si le dépôt est cloné sur PA : `git pull` dans le dossier du projet, puis `pip install …`, puis **Reload** du site web.
 
-### Déployer / mettre à jour Flask depuis votre PC (clé SSH déjà OK)
+### Déployer / mettre à jour Flask depuis votre PC (avec votre clé SSH)
 
-Dans PowerShell, à la racine du clone local, depuis le dossier `odoo-pythonanywhere` :
+**Forcer l’usage de la clé privée** (recommandé si plusieurs clés ou agent absent) :
 
 ```powershell
-Get-Content .\deploy_pa.sh -Raw | ssh senedoo@ssh.pythonanywhere.com bash
+cd "...\budget-financier\odoo-pythonanywhere"
+.\deploy_pa.ps1
 ```
+
+Par défaut le script utilise `%USERPROFILE%\.ssh\id_ed25519`. Autre fichier :
+
+```powershell
+.\deploy_pa.ps1 -IdentityFile "C:\Users\patri\.ssh\id_rsa"
+```
+
+Équivalent manuel (évite le tube `Get-Content | ssh`, qui peut bloquer avec une clé protégée par phrase secrète) :
+
+```powershell
+$key = "$env:USERPROFILE\.ssh\id_ed25519"
+scp -i $key -o StrictHostKeyChecking=accept-new .\deploy_pa.sh senedoo@ssh.pythonanywhere.com:~/deploy_pa_run.sh
+ssh -i $key -o StrictHostKeyChecking=accept-new senedoo@ssh.pythonanywhere.com "chmod +x ~/deploy_pa_run.sh && bash ~/deploy_pa_run.sh; rm -f ~/deploy_pa_run.sh"
+```
+
+**Note** : un assistant lancé dans un environnement **sans** accès à votre agent SSH / votre session Windows peut échouer avec `Permission denied` même avec `-i` ; dans ce cas exécutez **`deploy_pa.ps1` vous-même** dans PowerShell ou le terminal intégré Cursor **sur votre machine**.
 
 *(Si le dépôt GitHub est **privé**, configurez d’abord un accès `git` sur PA : token HTTPS ou clé déployée — sinon le `git clone`/`pull` échouera.)*
 

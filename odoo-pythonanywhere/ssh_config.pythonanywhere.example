@@ -1,0 +1,11 @@
+# À fusionner dans %USERPROFILE%\.ssh\config (créer le dossier .ssh et le fichier si besoin).
+# Ensuite : ssh pa   ou   .\deploy_pa.ps1 -UserHost pa
+#
+# EU : HostName ssh.eu.pythonanywhere.com
+
+Host pa
+    HostName ssh.pythonanywhere.com
+    User senedoo
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new

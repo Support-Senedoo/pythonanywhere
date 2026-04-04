@@ -1,0 +1,15 @@
+{
+  "name": "mcp-pa-ssh",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP SSH minimal pour PythonAnywhere (lecture clé corrigée vs ssh-mcp-server npm)",
+  "bin": {
+    "mcp-pa-ssh": "./index.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "ssh2": "^1.16.0",
+    "zod": "^3.25.0"
+  }
+}

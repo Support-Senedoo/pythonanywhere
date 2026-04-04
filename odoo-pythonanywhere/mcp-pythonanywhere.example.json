@@ -1,12 +1,10 @@
 {
   "mcpServers": {
     "pythonanywhere-ssh": {
-      "command": "C:\\Program Files\\nodejs\\npx.cmd",
-      "args": ["-y", "ssh-mcp-server"],
-      "env": {
-        "SSH_MCP_MAX_CONNECTIONS": "10",
-        "SSH_MCP_HOST_KEY_MODE": "accept"
-      }
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "G:/Mon Drive/SENEDOO/CURSOR/budget-financier/odoo-pythonanywhere/mcp-pa-ssh/index.mjs"
+      ]
     }
   }
 }

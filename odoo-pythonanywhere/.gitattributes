@@ -1,0 +1,2 @@
+# Scripts shell : toujours LF (évite les erreurs bash sur Linux / PythonAnywhere).
+*.sh text eol=lf

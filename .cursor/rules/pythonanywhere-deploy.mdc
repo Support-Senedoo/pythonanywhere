@@ -1,12 +1,48 @@
 ---
-description: Déploiement / reprise PythonAnywhere — lire la mémoire projet avant d’agir
+description: PythonAnywhere — SSH, déploiement, MCP : procédure rapide et limites des assistants
 alwaysApply: true
 ---
 
-# PythonAnywhere (budget-financier)
+# PythonAnywhere (budget-financier) — mémoire opérationnelle
 
-Les assistants n’ont **pas** de mémoire des sessions précédentes.
+Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte utile est **ici** et dans **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)**.
 
-- Avant de déployer, déboguer le WSGI ou l’SSH vers PA : ouvrir et suivre **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)** (utilisateur PA `senedoo`, exemple MCP : `odoo-pythonanywhere/mcp-pythonanywhere.example.json`).
-- Après un changement de procédure (chemins, version Python, fichier WSGI, variables), **mettre à jour ce fichier** pour la prochaine fois.
-- Ne jamais committer les clés privées SSH ni le contenu de `toolbox_users.json` / `toolbox_clients.json` (déjà dans `.gitignore`).
+## Compte et hôtes
+
+- Utilisateur SSH / PA : **`senedoo`** (sensible à la casse, pas l’e-mail).
+- US : `ssh.pythonanywhere.com` ; EU : `ssh.eu.pythonanywhere.com`.
+- Dépôt Git cible du script de déploiement : `Support-Senedoo/pythonanywhere` → clone sous `~/pythonanywhere`, appli dans `~/pythonanywhere/odoo-pythonanywhere`.
+- WSGI PA (référence) : `.../odoo-pythonanywhere/pythonanywhere_wsgi.py`.
+
+## Connexion SSH « comme la dernière fois » (PC utilisateur)
+
+1. **Une fois** si mot de passe demandé à chaque fois : depuis `odoo-pythonanywhere`, lancer **`install_pa_ssh_key.ps1`** (mot de passe compte PA une fois ; `PubkeyAuthentication=no` pour éviter les essais de clés inutiles).
+2. Déploiement / mise à jour : **`deploy_pa.ps1`** (scp + ssh, script en LF ; `-i` + `IdentitiesOnly=yes`).
+3. **Persistance** : fusionner **`ssh_config.pythonanywhere.example`** dans `%USERPROFILE%\.ssh\config`, puis utiliser **`deploy_pa.ps1 -UserHost pa`** (alias `pa`).
+
+Fichiers : `odoo-pythonanywhere/install_pa_ssh_key.ps1`, `deploy_pa.ps1`, `deploy_pa.sh`, `ssh_config.pythonanywhere.example`, `mcp-pythonanywhere.example.json`, dossier **`mcp-pa-ssh/`** (serveur MCP SSH corrigé).
+
+## MCP Cursor `pythonanywhere-ssh`
+
+- Config type : **`%USERPROFILE%\.cursor\mcp.json`** ; modèle **`odoo-pythonanywhere/mcp-pythonanywhere.example.json`** (adapter le chemin vers `mcp-pa-ssh/index.mjs` si le dépôt est ailleurs).
+- **Ne pas utiliser** `npx -y ssh-mcp-server` pour PA : le paquet npm passe une **Promise** à `ssh2` au lieu du contenu de la clé → logs **`All configured authentication methods failed`**, process Node qui plante → **`Not connected`**. Le message **`SSH MCP server running`** en rouge vient de `console.error` du paquet (bruit, pas forcément un échec de démarrage).
+- **À la place** : serveur local **`odoo-pythonanywhere/mcp-pa-ssh/`** (`npm install` dans ce dossier, voir **`mcp-pa-ssh/INSTALL.txt`**). Lancer avec **`node.exe`** + chemin absolu vers **`index.mjs`**.
+- Si **`npm install`** échoue sur Google Drive / « Mon Drive », copier **tout** le dossier `mcp-pa-ssh` vers un disque local (ex. `C:\tools\mcp-pa-ssh`), `npm install` là, et mettre dans `mcp.json` le chemin vers **ce** `index.mjs` (avec `node_modules` au même endroit).
+- Erreur **`ERR_MODULE_NOT_FOUND` … `sdk\server\index.js`** : imports corrigés dans le dépôt (`@modelcontextprotocol/sdk/server`) ; refaire **`npm install`** dans `mcp-pa-ssh`.
+- Alternative maintenue : **`@uarlouski/ssh-mcp-server`** avec fichier de config (GitHub `uarlouski/ssh-mcp-server`).
+- Même avec MCP OK, l’agent peut ne pas résoudre les chemins de clés comme le terminal : en cas de doute, **`deploy_pa.ps1`** sur la machine utilisateur.
+
+## API token PythonAnywhere
+
+- **Ne remplace pas** SSH pour `scp` / shell interactif.
+- Utile pour reload webapp, arbre de fichiers API, etc. — jamais de token dans le chat ou le dépôt : variable d’environnement uniquement.
+- Si un token a fuité : **régénérer** sur l’onglet Account → API token.
+
+## Secrets et Git
+
+- Ne jamais committer : clés **privées** SSH, **`toolbox_users.json`**, **`toolbox_clients.json`**, tokens (voir `.gitignore`).
+- Scripts d’exemple : `toolbox_*.example.json`, `toolbox-env-exemple.txt`.
+
+## Quand la procédure change
+
+Après changement de chemins, version Python PA, fichier WSGI ou étapes de déploiement : **mettre à jour** `DEPLOY_PYTHONANYWHERE.md` **et** cette règle si besoin.

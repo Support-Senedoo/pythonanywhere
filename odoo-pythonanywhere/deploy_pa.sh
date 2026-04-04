@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# À lancer sur PythonAnywhere (Bash) OU via : Get-Content deploy_pa.sh | ssh senedoo@ssh.pythonanywhere.com bash
+# À lancer sur PythonAnywhere (Bash) OU via deploy_pa.ps1 (scp + ssh) — pas de tube stdin vers ssh.
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Support-Senedoo/pythonanywhere.git}"

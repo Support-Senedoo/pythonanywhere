@@ -1,0 +1,17 @@
+MCP SSH corrigé (remplace le paquet npm ssh-mcp-server qui casse l’auth).
+
+1) Si npm install sur « Mon Drive » affiche TAR_ENTRY_ERROR / EBADF : ne pas insister.
+   Lancer depuis ce dossier :  .\install_mcp_deps_local.ps1
+   (copie package.json + index.mjs vers C:\tools\mcp-pa-ssh et npm install là).
+
+   Sinon : npm install ici sur disque local uniquement.
+
+2) Si erreur ERR_MODULE_NOT_FOUND sur …\sdk\server\index.js : mettre à jour le dépôt
+   (import corrigé : @modelcontextprotocol/sdk/server sans /index.js) puis npm install.
+
+3) Cursor → Settings → MCP → pythonanywhere-ssh :
+   command : C:\Program Files\nodejs\node.exe
+   args    : un seul argument = chemin ABSOLU vers index.mjs (même dossier que node_modules)
+
+4) Redémarrer le serveur MCP. Clé publique déjà sur PA (install_pa_ssh_key.ps1).
+   privateKeyPath dans l’outil = chemin vers id_ed25519.
