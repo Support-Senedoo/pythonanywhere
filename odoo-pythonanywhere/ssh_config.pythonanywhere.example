@@ -6,6 +6,12 @@
 Host pa
     HostName ssh.pythonanywhere.com
     User senedoo
-    IdentityFile ~/.ssh/id_ed25519
+    # Préférer la clé sans phrase pour l’automatisation (voir setup_pa_automation_key.ps1) :
+    IdentityFile ~/.ssh/id_ed25519_pa_cursor
     IdentitiesOnly yes
     StrictHostKeyChecking accept-new
+
+# Host pa-main
+#     HostName ssh.pythonanywhere.com
+#     User senedoo
+#     IdentityFile ~/.ssh/id_ed25519

@@ -14,6 +14,15 @@ Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte 
 - Dépôt Git cible du script de déploiement : `Support-Senedoo/pythonanywhere` → clone sous `~/pythonanywhere`, appli dans `~/pythonanywhere/odoo-pythonanywhere`.
 - WSGI PA (référence) : `.../odoo-pythonanywhere/pythonanywhere_wsgi.py`.
 
+## Automatisation sans toi (agent + MCP, sans phrase secrète à chaque fois)
+
+Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **jamais dans Git**.
+
+1. **`setup_pa_automation_key.ps1`** → crée `%USERPROFILE%\.ssh\id_ed25519_pa_cursor` (+ `.pub`).
+2. **`install_pa_ssh_key.ps1 -IdentityFile "%USERPROFILE%\.ssh\id_ed25519_pa_cursor"`** → mot de passe **compte PA une dernière fois** pour ajouter cette `.pub` dans `authorized_keys`.
+3. **`deploy_pa.ps1`** choisit **automatiquement** `id_ed25519_pa_cursor` s’il existe (sinon `id_ed25519`).
+4. **MCP** `execute_command` : `privateKeyPath` = **`C:\Users\<user>\.ssh\id_ed25519_pa_cursor`** (adapter `<user>` ; clé **non** chiffrée sinon erreur « passphrase »).
+
 ## Connexion SSH « comme la dernière fois » (PC utilisateur)
 
 1. **Une fois** si mot de passe demandé à chaque fois : depuis `odoo-pythonanywhere`, lancer **`install_pa_ssh_key.ps1`** (mot de passe compte PA une fois ; `PubkeyAuthentication=no` pour éviter les essais de clés inutiles).

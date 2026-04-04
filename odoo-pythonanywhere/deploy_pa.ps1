@@ -7,18 +7,30 @@
 # Pour réutiliser la même cible (alias « pa ») : fusionner ssh_config.pythonanywhere.example
 # dans %USERPROFILE%\.ssh\config puis : .\deploy_pa.ps1 -UserHost pa
 #
+# Clé sans phrase (agent / MCP) : exécuter une fois  .\setup_pa_automation_key.ps1
+# puis  .\install_pa_ssh_key.ps1 -IdentityFile "$env:USERPROFILE\.ssh\id_ed25519_pa_cursor"
+# Si ce fichier existe, il est utilisé automatiquement à la place de id_ed25519.
+#
 # Usage (depuis ce dossier odoo-pythonanywhere) :
 #   .\deploy_pa.ps1
-# Autre clé :
-#   .\deploy_pa.ps1 -IdentityFile "C:\Users\patri\.ssh\autre_cle"
+# Forcer ta clé personnelle :
+#   .\deploy_pa.ps1 -IdentityFile "C:\Users\patri\.ssh\id_ed25519"
 
 param(
-    [string]$IdentityFile = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
+    [string]$IdentityFile,
     [string]$UserHost = "senedoo@ssh.pythonanywhere.com"
 )
 
 $ErrorActionPreference = "Stop"
-if (-not (Test-Path $IdentityFile)) {
+$cursorKey = Join-Path $env:USERPROFILE ".ssh\id_ed25519_pa_cursor"
+if (-not $PSBoundParameters.ContainsKey("IdentityFile") -or [string]::IsNullOrWhiteSpace($IdentityFile)) {
+    if (Test-Path -LiteralPath $cursorKey) {
+        $IdentityFile = $cursorKey
+    } else {
+        $IdentityFile = Join-Path $env:USERPROFILE ".ssh\id_ed25519"
+    }
+}
+if (-not (Test-Path -LiteralPath $IdentityFile)) {
     Write-Error "Clé introuvable : $IdentityFile"
 }
 $deploySh = Join-Path $PSScriptRoot "deploy_pa.sh"

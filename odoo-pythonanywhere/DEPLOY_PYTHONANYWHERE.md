@@ -42,6 +42,12 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 **Option A — Git (recommandé)**  
 Si le dépôt est cloné sur PA : `git pull` dans le dossier du projet, puis `pip install …`, puis **Reload** du site web.
 
+### Déploiement sans saisie de phrase secrète (agent / MCP)
+
+1. `.\setup_pa_automation_key.ps1` — crée `%USERPROFILE%\.ssh\id_ed25519_pa_cursor` (sans passphrase, **ne pas commiter**).
+2. `.\install_pa_ssh_key.ps1 -IdentityFile "$env:USERPROFILE\.ssh\id_ed25519_pa_cursor"` — mot de passe **compte PA une fois** pour enregistrer la clé sur le serveur.
+3. Ensuite **`deploy_pa.ps1`** utilise cette clé tout seul si le fichier existe ; pour MCP, `privateKeyPath` doit pointer vers ce même fichier.
+
 ### Déployer / mettre à jour Flask depuis votre PC (avec votre clé SSH)
 
 **Forcer l’usage de la clé privée** (recommandé si plusieurs clés ou agent absent) :
