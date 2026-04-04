@@ -11,7 +11,12 @@ Sources supportées :
     l’écart avec une balance 4 colonnes « native » peut varier.
 
 Odoo Enterprise (balance d’essai) : le handler attache des totaux « unaffected earnings » à chaque
-``expression_label``. Les colonnes ``sn_*`` peuvent provoquer un ``KeyError`` à l’affichage.
+``expression_label``. Les colonnes ``sn_*`` provoquaient un ``KeyError`` si la copie restait une
+**variante** (``root_report_id``) : le post-processeur semble caler les clés sur le schéma racine
+(4 colonnes) alors que l’affichage utilise les 6 colonnes de la copie. Après transformation, la toolbox
+**détache** la copie de la racine pour les handlers « trial balance », en recopiant les options de
+filtre depuis la racine pour limiter les écarts de comportement.
+
 **Ne pas** retirer ``custom_handler_model_name`` sur la copie : les lignes au moteur « custom »
 ``_report_custom_engine_trial_balance`` exigent ce handler ; sans lui, Odoo affiche « Méthode invalide ».
 """
@@ -26,6 +31,172 @@ _SN_OPEN_DEB = "sn_open_deb"
 _SN_OPEN_CRE = "sn_open_cred"
 _SN_END_DEB = "sn_end_deb"
 _SN_END_CRE = "sn_end_cre"
+
+# Champs account.report recalculés depuis root_report_id (addons/account/models/account_report.py).
+_ROOT_MIRROR_OPTION_FIELDS: tuple[str, ...] = (
+    "only_tax_exigible",
+    "allow_foreign_vat",
+    "default_opening_date_filter",
+    "currency_translation",
+    "filter_multi_company",
+    "filter_date_range",
+    "filter_show_draft",
+    "filter_unreconciled",
+    "filter_unfold_all",
+    "filter_hide_0_lines",
+    "filter_period_comparison",
+    "filter_growth_comparison",
+    "filter_journals",
+    "filter_analytic",
+    "filter_hierarchy",
+    "filter_account_type",
+    "filter_partner",
+    "filter_aml_ir_filters",
+    "filter_budgets",
+)
+
+
+def _account_report_field_names(models: Any, db: str, uid: int, password: str) -> set[str]:
+    fg = execute_kw(models, db, uid, password, "account.report", "fields_get", [], {})
+    return set(fg.keys())
+
+
+def _handler_looks_like_trial_balance(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    handler_value: Any,
+) -> bool:
+    """True si le handler Enterprise ressemble à celui de la balance d’essai (trial balance)."""
+    if handler_value in (None, False):
+        return False
+    if isinstance(handler_value, str):
+        s = handler_value.lower().replace(".", "_")
+        return "trial_balance" in s or "trialbalance" in s
+    if isinstance(handler_value, (list, tuple)) and handler_value:
+        try:
+            mid = int(handler_value[0])
+        except (TypeError, ValueError):
+            return False
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.model",
+            "read",
+            [[mid]],
+            {"fields": ["model"]},
+        )
+        if not rows:
+            return False
+        mod = (rows[0].get("model") or "").lower().replace(".", "_")
+        return "trial_balance" in mod or "trialbalance" in mod
+    return False
+
+
+def _detach_trial_balance_variant_after_six_columns(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> dict[str, Any]:
+    """
+    Coupe ``root_report_id`` sur une copie « trial balance » après ajout des colonnes ``sn_*``,
+    puis réécrit les options héritées de la racine (sinon elles retombent sur les défauts du cœur).
+    """
+    names = _account_report_field_names(models, db, uid, password)
+    if "root_report_id" not in names:
+        return {"detached_from_root": False, "detach_note": "champ root_report_id absent"}
+    handler_field: str | None = None
+    for key in ("custom_handler_model_name", "custom_handler_model_id"):
+        if key in names:
+            handler_field = key
+            break
+    read_fields = ["root_report_id"]
+    if handler_field:
+        read_fields.append(handler_field)
+    row = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[report_id]],
+        {"fields": read_fields},
+    )[0]
+    root = row.get("root_report_id")
+    root_id: int | None = None
+    if isinstance(root, (list, tuple)) and root and root[0]:
+        try:
+            root_id = int(root[0])
+        except (TypeError, ValueError):
+            root_id = None
+    if root_id is None:
+        return {"detached_from_root": False, "detach_note": "déjà autonome (sans root_report_id)"}
+    if not handler_field:
+        return {
+            "detached_from_root": False,
+            "detach_note": "champ handler absent — pas de détachement automatique",
+        }
+    handler_val = row.get(handler_field)
+    if handler_val in (None, False, "") and root_id:
+        root_h = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "read",
+            [[root_id]],
+            {"fields": [handler_field]},
+        )
+        if root_h:
+            handler_val = root_h[0].get(handler_field)
+    if not _handler_looks_like_trial_balance(models, db, uid, password, handler_val):
+        return {"detached_from_root": False, "detach_note": "handler différent de la balance d’essai"}
+    option_fields = [f for f in _ROOT_MIRROR_OPTION_FIELDS if f in names]
+    snap_fields = list(option_fields)
+    for extra in ("availability_condition", "country_id"):
+        if extra in names and extra not in snap_fields:
+            snap_fields.append(extra)
+    root_snap = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[root_id]],
+        {"fields": snap_fields},
+    )[0]
+    vals = {k: root_snap[k] for k in snap_fields if k in root_snap}
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[report_id], {"root_report_id": False}],
+        )
+        if vals:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "write",
+                [[report_id], vals],
+            )
+    except Exception as e:
+        return {"detached_from_root": False, "detach_error": str(e)}
+    return {"detached_from_root": True}
 
 
 def _split_sum_subformula(subformula: str | bool | None) -> tuple[str, str]:
@@ -152,7 +323,8 @@ def personalize_balance_six_columns(
     uid: int,
     password: str,
     report_id: int,
-) -> None:
+) -> dict[str, Any]:
+    """Retourne entre autres ``detached_from_root`` / ``detach_error`` après détachement racine éventuel."""
     rep_rows = execute_kw(
         models,
         db,
@@ -424,3 +596,6 @@ def personalize_balance_six_columns(
     ]
     for cv in to_create:
         execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
+    return _detach_trial_balance_variant_after_six_columns(
+        models, db, uid, password, report_id
+    )

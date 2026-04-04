@@ -52,9 +52,11 @@ from web_app.odoo_account_reports import (
     UTILITY_TITLE_BALANCE,
     UTILITY_TITLE_PL_BUDGET,
     UTILITY_VERSION,
+    account_report_execution_url,
     account_report_odoo_form_url,
-    account_report_odoo_runner_url,
     duplicate_account_report,
+    ensure_account_report_client_action,
+    find_account_report_client_action_id,
     probe_odoo_reports_access,
     read_account_report_label,
     search_account_reports,
@@ -574,15 +576,21 @@ def _accounting_reports_page(accounting_mode: str):
                     pwd,
                     rid,
                     name_suffix=" — copie Senedoo (6 col.)",
+                    attach_to_root=False,
                 )
-                personalize_balance_six_columns(models, db, uid, pwd, new_rid)
+                bal_meta = personalize_balance_six_columns(models, db, uid, pwd, new_rid)
                 src_label = read_account_report_label(models, db, uid, pwd, rid)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
-                flash(
+                msg = (
                     f"Balance : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »), "
-                    f"6 colonnes (débit/crédit initiaux et finaux). L’original n’a pas été modifié.",
-                    "success",
+                    f"6 colonnes (débit/crédit initiaux et finaux). Copie autonome (sans lien racine Odoo), "
+                    f"pour l’affichage comme rapport distinct sous Comptabilité / Analyse. L’original n’a pas été modifié."
                 )
+                if bal_meta.get("detach_error"):
+                    msg += (
+                        f" Note : post-traitement racine Enterprise : {bal_meta['detach_error']!s}."
+                    )
+                flash(msg, "success")
             except Exception as e:
                 flash(f"Échec personnalisation balance : {e!s}", "danger")
                 return redirect(
@@ -815,18 +823,50 @@ def _accounting_reports_page(accounting_mode: str):
         "true",
         "yes",
     )
-    balance_runner_url = ""
+    # Lien « exécution » Odoo : ne pas exiger selected_client — la sélection peut être vidée si
+    # filter_host ne correspond pas au netloc enregistré, alors que client_id reste valide dans l’URL.
+    cid_param = (request.args.get("client_id") or "").strip().lower()
+    runner_client = selected if selected in reg else ""
     if (
         accounting_mode == "balance"
         and balance_done_q
-        and selected
+        and not runner_client
+        and cid_param in reg
+    ):
+        runner_client = cid_param
+    balance_show_links = (
+        accounting_mode == "balance"
+        and balance_done_q
+        and runner_client
         and prefill_rid
         and prefill_rid > 0
-        and selected in reg
-    ):
-        balance_runner_url = account_report_odoo_runner_url(
-            reg[selected].url, int(prefill_rid)
-        )
+    )
+    balance_exec_url = ""
+    balance_form_url = ""
+    balance_exec_action_created = False
+    if balance_show_links:
+        bu = reg[runner_client].url
+        brid = int(prefill_rid)
+        balance_form_url = account_report_odoo_form_url(bu, brid)
+        try:
+            m, dbn, u, p = get_xmlrpc_for_staff_client_id(runner_client)
+            aid = find_account_report_client_action_id(m, dbn, u, p, brid)
+            if not aid:
+                act_name = (prefill_report_name or f"Balance id={brid}").strip()[:240]
+                aid = ensure_account_report_client_action(
+                    m,
+                    dbn,
+                    u,
+                    p,
+                    brid,
+                    action_name=act_name or f"Rapport {brid}",
+                )
+                if aid:
+                    balance_exec_action_created = True
+            if aid:
+                balance_exec_url = account_report_execution_url(bu, aid)
+        except Exception:
+            pass
 
     return render_template(
         "staff/accounting_reports_utility.html",
@@ -842,7 +882,10 @@ def _accounting_reports_page(accounting_mode: str):
         reports=reports,
         prefill_report_id=prefill_rid,
         prefill_report_name=prefill_report_name,
-        balance_runner_url=balance_runner_url,
+        balance_show_links=balance_show_links,
+        balance_exec_url=balance_exec_url,
+        balance_form_url=balance_form_url,
+        balance_exec_action_created=balance_exec_action_created,
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,

@@ -121,8 +121,8 @@
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le rapport peut combiner un <strong>handler</strong> et des lignes moteur « custom » (<code>_report_custom_engine_trial_balance</code>). Il ne faut <strong>pas</strong> vider le handler sur la copie : sinon erreur « Méthode invalide » à l’ouverture.
-    Avec le handler conservé, l’ajout de colonnes <code>sn_*</code> peut encore provoquer un <code>KeyError</code> côté Odoo (totaux « unaffected earnings ») : dans ce cas, dupliquer plutôt une balance <strong>générique</strong> sans ce moteur custom, ou adapter le rapport dans Odoo.
-    Si une copie a été cassée en ayant retiré le handler : dupliquer à nouveau depuis l’original ou réaligner les champs handler comme sur le rapport source (mode développeur).
+    La copie créée ici est <strong>autonome</strong> (pas de <code>root_report_id</code>) : elle évite les conflits de colonnes avec la racine (ex. <code>KeyError</code> sur <code>sn_*</code> / totaux « unaffected earnings ») et se comporte comme un rapport à part entière dans le menu Comptabilité / Analyse. Les options de filtre du modèle source sont recopiées sur la copie.
+    Le lien proposé après succès ouvre l’<strong>analyse</strong> du rapport (<code>web#action=…</code>), pas la simple fiche <code>account.report</code>. Si une copie ancienne pose encore problème : la regénérer avec cet utilitaire.
   </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -198,6 +198,32 @@
     </div>
 </div>
 
+{% if balance_show_links %}
+<div class="sn-card sn-card--accent" style="margin-bottom:0.85rem;border-left:4px solid var(--sn-primary-bright);">
+  <p style="margin:0 0 0.65rem;line-height:1.45;"><strong>Personnalisation terminée.</strong> La copie est un rapport <strong>autonome</strong> (sans <code>root_report_id</code>) : elle se distingue des variantes liées à la balance racine Odoo et doit apparaître avec les autres rapports sous <strong>Comptabilité</strong> › <strong>Analyse</strong> (libellé selon votre version / traduction).</p>
+  {% if balance_exec_url %}
+  <p style="margin:0 0 0.5rem;line-height:1.45;">Lien vers l’<strong>écran d’analyse</strong> (grille du rapport, résultat pour l’utilisateur) :</p>
+  <p style="margin:0 0 0.65rem;">
+    <a class="sn-btn" href="{{ balance_exec_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le rapport (analyse)</a>
+  </p>
+  {% if balance_exec_action_created %}
+  <p class="sn-muted" style="margin:0 0 0.65rem;font-size:0.88rem;line-height:1.4;">Une action client <code>account_report</code> a été créée dans la base (droits API suffisants) pour pouvoir ouvrir ce rapport ; elle n’ajoute pas automatiquement une ligne de menu.</p>
+  {% endif %}
+  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL d’exécution (copier-coller) :</p>
+  <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_exec_url }}</code></p>
+  {% else %}
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;">Impossible de résoudre ou de créer l’action d’exécution via l’API (droits ou version Odoo). Ouvrez le rapport depuis le menu <strong>Comptabilité</strong> › <strong>Analyse</strong> / rapports{% if prefill_report_name %} — cherchez « {{ prefill_report_name }} »{% endif %} (id <code>{{ prefill_report_id }}</code>).</p>
+  {% endif %}
+  <hr style="margin:0.85rem 0;border:none;border-top:1px solid var(--sn-border);">
+  <p style="margin:0 0 0.5rem;line-height:1.45;" class="sn-muted">Fiche technique (configuration du modèle <code>account.report</code>, réservée admin / Studio) :</p>
+  <p style="margin:0 0 0.65rem;">
+    <a class="sn-btn sn-btn--ghost" href="{{ balance_form_url }}" target="_blank" rel="noopener noreferrer">Ouvrir la fiche technique</a>
+  </p>
+  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL (copier-coller) :</p>
+  <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_form_url }}</code></p>
+</div>
+{% endif %}
+
 {% if not selected_client and label_picker_rows %}
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">{% if filter_host %}Bases sur « {{ filter_host }} »{% else %}Toutes les bases du registre{% endif %}</h2>
@@ -240,12 +266,6 @@
 
 {% if selected_client %}
 {% set cfg = clients[selected_client] %}
-{% if balance_runner_url %}
-<div class="sn-card sn-card--accent" style="margin-bottom:0.85rem;border-left:4px solid var(--sn-primary-bright);">
-  <p style="margin:0 0 0.65rem;line-height:1.45;"><strong>Personnalisation terminée.</strong> Ouvrir la balance dans Odoo (écran d’exécution, pas la fiche de configuration du rapport).</p>
-  <a class="sn-btn" href="{{ balance_runner_url }}" target="_blank" rel="noopener noreferrer">Voir la balance modifiée</a>
-</div>
-{% endif %}
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.1rem;">Connexion à la base</h2>
   <p class="sn-muted" style="margin:0 0 0.65rem;">

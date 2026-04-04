@@ -24,14 +24,193 @@ def account_report_odoo_form_url(base_url: str, report_id: int) -> str:
 
 def account_report_odoo_runner_url(base_url: str, report_id: int) -> str:
     """
-    Lien Odoo vers l’écran d’exécution du rapport (balance / menu comptable), pas la fiche de configuration.
+    Ancienne forme d’URL « courte » vers un enregistrement ``account.report``.
 
-    Exemple SaaS (Odoo 19) :
-    ``https://instance.odoo.com/odoo/account.report/31?model=account.report&resId=31``
+    Sur Odoo 17+, ce lien ouvre surtout la **vue fiche / backend**, pas l’écran d’analyse (grille du rapport).
+    Préférer :func:`account_report_execution_url` (action client ``account_report``).
     """
     base = normalize_odoo_base_url(base_url).rstrip("/")
     rid = int(report_id)
     return f"{base}/odoo/account.report/{rid}?model=account.report&resId={rid}"
+
+
+# Champs ``account.report`` recalculés depuis ``root_report_id`` (addons/account/models/account_report.py).
+ACCOUNT_REPORT_OPTION_FIELDS_FROM_VARIANT: tuple[str, ...] = (
+    "only_tax_exigible",
+    "allow_foreign_vat",
+    "default_opening_date_filter",
+    "currency_translation",
+    "filter_multi_company",
+    "filter_date_range",
+    "filter_show_draft",
+    "filter_unreconciled",
+    "filter_unfold_all",
+    "filter_hide_0_lines",
+    "filter_period_comparison",
+    "filter_growth_comparison",
+    "filter_journals",
+    "filter_analytic",
+    "filter_hierarchy",
+    "filter_account_type",
+    "filter_partner",
+    "filter_aml_ir_filters",
+    "filter_budgets",
+)
+
+
+def copy_account_report_options_from_source(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    source_report_id: int,
+    target_report_id: int,
+) -> None:
+    """Recopie les options de filtre / disponibilité du rapport source vers la cible (copie autonome)."""
+    try:
+        fg = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "fields_get",
+            [],
+            {"attributes": ["type"]},
+        )
+    except Exception:
+        return
+    names = set(fg.keys())
+    fields = [f for f in ACCOUNT_REPORT_OPTION_FIELDS_FROM_VARIANT if f in names]
+    for extra in ("availability_condition", "country_id"):
+        if extra in names:
+            fields.append(extra)
+    if not fields:
+        return
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[int(source_report_id)]],
+        {"fields": fields},
+    )
+    if not rows:
+        return
+    vals = {k: rows[0][k] for k in fields if k in rows[0]}
+    if vals:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[int(target_report_id)], vals],
+        )
+
+
+def find_account_report_client_action_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> int | None:
+    """
+    Retourne l’id ``ir.actions.client`` (tag ``account_report``) dont le contexte fixe ce ``report_id``.
+
+    Odoo teste ainsi l’accessibilité menu : ``('context', 'ilike', \"'report_id': %s\")``.
+    """
+    rid = int(report_id)
+    needles = (
+        f"'report_id': {rid}",
+        f'"report_id": {rid}',
+        f"'report_id':{rid}",
+    )
+    for needle in needles:
+        try:
+            aids = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.actions.client",
+                "search",
+                [[("tag", "=", "account_report"), ("context", "ilike", needle)]],
+                {"limit": 40},
+            )
+        except Exception:
+            continue
+        if not aids:
+            continue
+        if len(aids) == 1:
+            return int(aids[0])
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.actions.client",
+            "read",
+            [aids],
+            {"fields": ["id", "context"]},
+        )
+        for row in rows:
+            ctx = row.get("context") or ""
+            if f"{rid}" in str(ctx) and "report_id" in str(ctx):
+                return int(row["id"])
+    return None
+
+
+def ensure_account_report_client_action(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    *,
+    action_name: str,
+) -> int | None:
+    """
+    Garantit une action client ``account_report`` pour ce rapport (création si aucune trouvée).
+
+    Les droits d’écriture sur ``ir.actions.client`` sont requis pour la création.
+    """
+    found = find_account_report_client_action_id(models, db, uid, password, report_id)
+    if found:
+        return found
+    ctx = repr({"report_id": int(report_id)})
+    name = (action_name or f"Rapport comptable {report_id}").strip()[:255] or f"Rapport {report_id}"
+    vals: dict[str, Any] = {
+        "name": name,
+        "tag": "account_report",
+        "target": "current",
+        "context": ctx,
+    }
+    try:
+        return int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.actions.client",
+                "create",
+                [vals],
+            )
+        )
+    except Exception:
+        return None
+
+
+def account_report_execution_url(base_url: str, client_action_id: int) -> str:
+    """URL vers l’écran d’exécution du rapport (client action), pas la fiche ``account.report``."""
+    base = normalize_odoo_base_url(base_url).rstrip("/")
+    aid = int(client_action_id)
+    return f"{base}/web#action={aid}"
 
 
 def format_report_name(val: Any) -> str:
@@ -464,15 +643,16 @@ def duplicate_account_report(
     source_report_id: int,
     *,
     name_suffix: str = " — copie Senedoo",
+    attach_to_root: bool = True,
 ) -> int:
     """
-    Duplique un account.report (API ``copy``), rattache la copie au même ``root_report_id``
-    que la balance / le rapport d’origine (racine remontée), puis renomme avec suffixe Senedoo.
+    Duplique un account.report (API ``copy``), puis renomme avec suffixe Senedoo.
 
-    Si le nom existe déjà (autre rapport ou autre variante sous la même racine), le suffixe est
-    incrémenté : ``… (2)``, ``… (3)``, etc.
-
-    La personnalisation Senedoo doit toujours s’appliquer sur cette copie, pas sur l’original.
+    Par défaut, rattache la copie au même ``root_report_id`` racine que l’original (variante Odoo).
+    Avec ``attach_to_root=False`` (balance 6 colonnes), la copie reste **autonome** : elle apparaît
+    comme un rapport à part (menu Comptabilité / Analyse selon la version) et évite les effets de
+    bord liés au schéma « racine » (ex. totaux trial balance Enterprise). Les options de filtre
+    visibles sur le modèle source sont recopiées sur la copie.
     """
     rows = execute_kw(
         models,
@@ -506,7 +686,19 @@ def duplicate_account_report(
     else:
         new_id = int(new_res)
 
-    _link_report_copy_to_root(models, db, uid, password, new_id, root_target)
+    root_for_unique: int | None = root_target
+    if attach_to_root:
+        _link_report_copy_to_root(models, db, uid, password, new_id, root_target)
+    else:
+        root_for_unique = None
+        copy_account_report_options_from_source(
+            models,
+            db,
+            uid,
+            password,
+            int(source_report_id),
+            new_id,
+        )
     _write_duplicate_unique_name(
         models,
         db,
@@ -515,6 +707,6 @@ def duplicate_account_report(
         new_id,
         raw_name,
         name_suffix,
-        root_for_uniqueness=root_target,
+        root_for_uniqueness=root_for_unique,
     )
     return new_id
