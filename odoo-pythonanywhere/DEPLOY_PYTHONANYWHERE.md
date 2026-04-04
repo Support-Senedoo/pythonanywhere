@@ -64,7 +64,7 @@ Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le di
 
 **À chaque publication** : **commit** + **push**, puis sur votre PC **`.\deploy_pa.ps1`** (ou **`.\deploy.ps1`** depuis la racine du dépôt). Cela pousse le code sur GitHub, se connecte en SSH à PA et lance **`deploy_pa.sh`** : **`git pull`**, **`pip`**, puis **reload du site** (voir paragraphe précédent : fichier **`~/.pythonanywhere_api_token`** sur PA). Sans ce fichier token, le script vous le rappelle : il faut alors cliquer **Reload** à la main dans l’onglet **Web**.
 
-**L’assistant IA** ne peut pas recharger votre site PythonAnywhere à votre place (pas d’accès à votre compte). Seul **le script sur PA** (avec token) ou **vous** (bouton Reload) le font.
+**Sur la machine du développeur** (PC avec Git + clé SSH PA sans passphrase, ex. `%USERPROFILE%\.ssh\id_ed25519_pa_cursor`) : l’assistant Cursor peut lancer **`.\deploy_pa.ps1 -SkipGitPush`** depuis `odoo-pythonanywhere/` après un **`git push`** — cela exécute sur PA **`deploy_pa.sh`** : **`git pull`**, **`pip`**, **reload API** si `~/.pythonanywhere_api_token` existe. **Sans** cette machine / cette clé, seul **vous** (PowerShell local, Bash PA, ou bouton Reload) déclenchez la mise à jour effective du worker WSGI.
 
 ### Si `deploy_pa.ps1` plante au démarrage (ParserError, accents « cassés »)
 
@@ -171,7 +171,7 @@ Host pythonanywhere
 ## Checklist « reprise après une pause »
 
 - [ ] Code **commit + push GitHub** (sinon le `git pull` sur PA ne ramène rien)
-- [ ] Déploiement : **`deploy_pa.ps1`** depuis `odoo-pythonanywhere/` **ou**, si le `.ps1` casse (ParserError), **`git pull` sur PA** / **scp+ssh** / **MCP SSH** (voir section « Si deploy_pa.ps1 plante »)
+- [ ] Déploiement : **`deploy_pa.ps1`** depuis `odoo-pythonanywhere/` (après push) ; si le code est déjà sur GitHub : **`.\deploy_pa.ps1 -SkipGitPush`**. Si le `.ps1` casse (ParserError), **`git pull` sur PA** / **scp+ssh** / **MCP SSH** (voir section « Si deploy_pa.ps1 plante »)
 - [ ] `requirements.txt` réinstallé avec la **bonne** version Python du web app
 - [ ] `toolbox_users.json` et `toolbox_clients.json` toujours présents sur le serveur
 - [ ] Staff production : `TOOLBOX_DISABLE_DEV_LOGIN=1` + compte(s) staff dans le JSON avec `password_hash`
@@ -204,11 +204,16 @@ Host pythonanywhere
 - **Mot de passe** et **cookie** : non réinjectés dans le HTML après POST ; le login peut être mémorisé côté navigateur (localStorage) pour la sonde.
 - Version / date affichées : **`app_version.TOOLBOX_APP_VERSION`** / **`TOOLBOX_APP_DATE`**, injectées par **`web_app/blueprints/staff.py`** (`util_version`, `util_date`).
 
+### Métadonnées instance Odoo (version de la **base**)
+
+- Fichier : **`web_app/odoo_instance_info.py`** — fonction **`collect_authenticated_instance_metadata`** (appelée depuis les écrans rapports staff quand la connexion XML-RPC est OK).
+- **Version « officielle » installée en base** : module **`base`** (`ir.module.module`, état installé), champ **`latest_version`** — affichée comme *« Version Odoo (module base, installée en base) »*. Compléments : **`common.version()`** (`server_version`, `server_version_info` formaté), **`web_enterprise`** si présent, **`ir.config_parameter`** (UUID, expiration, etc.).
+
 ### Utilitaires personnalisation rapports (`account.report`)
 
 - Fichier principal : **`web_app/odoo_account_reports.py`**. Métadonnées **version** / **date** / **auteur** : **`web_app/app_version.py`** (et env `TOOLBOX_APP_*`, voir **`toolbox-env-exemple.txt`**).
 - **Compte de résultat personnalisé (SYSCOHADA / détail comptes)** : `/staff/utilities/rapports-comptables` (alias `/staff/utilities/personalize-report`) — copie + [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py).
-- **Balance 6 colonnes** : `/staff/utilities/personalize-balance` — [`personalize_balance_6cols.py`](personalize_balance_6cols.py).
+- **Balance 6 colonnes** : `/staff/utilities/personalize-balance` — [`personalize_balance_6cols.py`](personalize_balance_6cols.py). La copie est **`attach_to_root=False`** (rapport **autonome**, évite les `KeyError` Enterprise type `sn_*` / trial balance). Après succès : création **`ir.actions.client`** + entrée **`ir.ui.menu`** sous **Reporting** (xmlid parent `account.account_reports_legal_statements_menu` ou repli `account.menu_finance_reports`), lien d’exécution **`/web#menu_id=…&action=…`**, lien liste **`account.report`** en secours. Voir aussi détachement racine dans `personalize_balance_6cols.py` pour d’anciennes copies encore variantes.
 - **P&L analytique et budget (Odoo SaaS)** : `/staff/utilities/personalize-pl-budget` — même détail comptes, puis options `filter_analytic` / `filter_budget` via [`personalize_pl_analytic_budget.py`](personalize_pl_analytic_budget.py). **Sonde budget / analytique** (lecture seule) sur cette page uniquement.
 - **CLI (hors Flask)** : `python personalize_pl_analytic_budget.py --report-id <id>` sur une copie déjà créée ; `--probe-only` pour la sonde seule.
 
@@ -226,7 +231,7 @@ Host pythonanywhere
 
 ---
 
-*Dernière mise à jour de cette section : avril 2026 — trois écrans staff (P&L SYSCOHADA, balance 6 col., P&L budget) ; sonde budget sur l’écran budget ; rappel Reload Web après `git pull`.*
+*Dernière mise à jour de cette section : avril 2026 — balance 6 col. autonome + menu Reporting + URLs exécution ; métadonnées version base (`odoo_instance_info.py`) ; déploiement : l’agent peut lancer `deploy_pa.ps1 -SkipGitPush` depuis le PC développeur ; rappel Reload Web si pas de token API reload.*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 

@@ -21,8 +21,9 @@ Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **j
 1. **`setup_pa_automation_key.ps1`** → crée `%USERPROFILE%\.ssh\id_ed25519_pa_cursor` (+ `.pub`).
 2. **`install_pa_ssh_key.ps1 -IdentityFile "%USERPROFILE%\.ssh\id_ed25519_pa_cursor"`** → mot de passe **compte PA une dernière fois** pour ajouter cette `.pub` dans `authorized_keys`.
 3. **`deploy_pa.ps1`** choisit **automatiquement** `id_ed25519_pa_cursor` s’il existe (sinon `id_ed25519`).
-4. **MCP** `execute_command` : `privateKeyPath` = **`C:\Users\<user>\.ssh\id_ed25519_pa_cursor`** (adapter `<user>` ; clé **non** chiffrée sinon erreur « passphrase »).
-5. Si **`deploy_pa.ps1`** échoue avec **ParserError** : le script dans le dépôt utilise des **messages ASCII** pour éviter l’encodage sur Mon Drive ; si ça persiste, **`git pull`** sur PA (Bash) ou **MCP SSH** (voir **`DEPLOY_PYTHONANYWHERE.md`**) ; puis **Reload** Web.
+4. Après **`git push`**, l’agent sur le **PC développeur** peut exécuter **`deploy_pa.ps1 -SkipGitPush`** pour **`git pull`** sur PA + **`pip`** + reload (si token `~/.pythonanywhere_api_token` sur PA). Voir **`DEPLOY_PYTHONANYWHERE.md`** (mémoire de reprise à tenir à jour en parallèle des évolutions toolbox).
+5. **MCP** `execute_command` : `privateKeyPath` = **`C:\Users\<user>\.ssh\id_ed25519_pa_cursor`** (adapter `<user>` ; clé **non** chiffrée sinon erreur « passphrase »).
+6. Si **`deploy_pa.ps1`** échoue avec **ParserError** : le script dans le dépôt utilise des **messages ASCII** pour éviter l’encodage sur Mon Drive ; si ça persiste, **`git pull`** sur PA (Bash) ou **MCP SSH** (voir **`DEPLOY_PYTHONANYWHERE.md`**) ; puis **Reload** Web.
 
 ## Connexion SSH « comme la dernière fois » (PC utilisateur)
 
