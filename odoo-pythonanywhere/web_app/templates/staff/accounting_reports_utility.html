@@ -20,7 +20,7 @@
     (ex. <code>client_prod</code> / <code>client_test</code>) et indiquez <strong>production</strong> ou <strong>test</strong> pour chaque entrée.
   </p>
   <ul>
-    <li><strong>Nouvelle base</strong> : dans la carte ci-dessous, dépliez « Ajouter une base au registre » → enregistrement puis rechargement avec la base présélectionnée.</li>
+    <li><strong>Nouvelle base</strong> : dans la carte ci-dessous, cliquez sur le bouton « Ajouter une base au registre » pour afficher le formulaire → enregistrement puis rechargement avec la base présélectionnée.</li>
     <li><strong>Client (libellé)</strong> : choisissez d’abord un libellé puis <strong>Actualiser</strong> pour voir <strong>toutes les bases</strong> (prod / test) avec l’état de connexion ; cliquez sur <strong>Utiliser cette base</strong> pour la suite. Vous pouvez aussi choisir directement une base dans la liste déroulante.</li>
     <li>Après sélection d’une base, le <strong>voyant</strong> et les <strong>informations instance</strong> (version, expiration, édition, etc.) s’affichent lorsque la connexion Odoo réussit.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
@@ -72,9 +72,11 @@
     <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
   </form>
 
-  <details id="ajouter-base-odoo" style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
-    <summary style="cursor:pointer;font-weight:600;">Ajouter une base au registre (<code>toolbox_clients.json</code>)</summary>
-    <div style="margin-top:0.85rem;">
+  <div id="ajouter-base-odoo" style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
+    <button type="button" class="sn-btn sn-btn--ghost" id="btn-show-add-base" aria-expanded="false" aria-controls="panel-add-base-odoo" style="margin-top:0;">
+      Ajouter une base au registre (<code>toolbox_clients.json</code>)
+    </button>
+    <div id="panel-add-base-odoo" class="sn-panel-add-base" hidden style="margin-top:0.85rem;padding:0.85rem 0 0;border-top:1px dashed var(--sn-border);">
       <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
         Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
       </p>
@@ -105,8 +107,9 @@
         <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
         <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
       </form>
+      <button type="button" class="sn-btn sn-btn--ghost" id="btn-hide-add-base" style="margin-top:0.65rem;">Fermer le formulaire</button>
     </div>
-  </details>
+  </div>
 </div>
 
 {% if filter_label and not selected_client and label_picker_rows %}
@@ -322,7 +325,7 @@
   </form>
 </div>
 {% else %}
-<p class="sn-muted">Choisissez un <strong>libellé client</strong> puis « Actualiser » pour lister toutes les bases, ou sélectionnez directement une base dans la carte ci-dessus (ou dépliez « Ajouter une base au registre »).</p>
+<p class="sn-muted">Choisissez un <strong>libellé client</strong> puis « Actualiser » pour lister toutes les bases, ou sélectionnez directement une base dans la carte ci-dessus (bouton « Ajouter une base au registre » si besoin).</p>
 {% endif %}
 
 <div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">
@@ -345,11 +348,33 @@
 
 <script>
 (function(){
-  var detailsAdd = document.getElementById('ajouter-base-odoo');
-  if (location.hash === '#ajouter-base-odoo' && detailsAdd) {
-    detailsAdd.open = true;
-    detailsAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    try { var ni = document.getElementById('new_client_id'); if (ni) ni.focus(); } catch (x) {}
+  var anchorAdd = document.getElementById('ajouter-base-odoo');
+  var panelAdd = document.getElementById('panel-add-base-odoo');
+  var btnShowAdd = document.getElementById('btn-show-add-base');
+  var btnHideAdd = document.getElementById('btn-hide-add-base');
+  function openAddBasePanel() {
+    if (!panelAdd || !btnShowAdd) return;
+    panelAdd.hidden = false;
+    btnShowAdd.setAttribute('aria-expanded', 'true');
+  }
+  function closeAddBasePanel() {
+    if (!panelAdd || !btnShowAdd) return;
+    panelAdd.hidden = true;
+    btnShowAdd.setAttribute('aria-expanded', 'false');
+  }
+  if (btnShowAdd) {
+    btnShowAdd.addEventListener('click', function () {
+      openAddBasePanel();
+      try { var ni = document.getElementById('new_client_id'); if (ni) ni.focus(); } catch (x) {}
+    });
+  }
+  if (btnHideAdd) {
+    btnHideAdd.addEventListener('click', closeAddBasePanel);
+  }
+  if (location.hash === '#ajouter-base-odoo' && anchorAdd && panelAdd) {
+    openAddBasePanel();
+    anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try { var ni2 = document.getElementById('new_client_id'); if (ni2) ni2.focus(); } catch (x) {}
   }
   var form = document.getElementById('form-personalize-report');
   var overlay = document.getElementById('sn-personalize-overlay');
