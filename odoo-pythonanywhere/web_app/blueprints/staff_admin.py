@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import os
+import re
+import xmlrpc.client
+from typing import Any
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
@@ -14,9 +18,11 @@ from flask import (
     url_for,
 )
 
+from odoo_client import normalize_odoo_base_url
+
 from web_app.blueprints.public import login_required_staff
 from web_app.client_apps import KNOWN_APPS, apps_for_template
-from web_app.odoo_db_list import managed_databases_from_env, merge_database_suggestions
+from web_app.odoo_account_probe import format_db_list_error
 from web_app.odoo_registry import delete_client, load_clients_registry, upsert_client
 from web_app.users_store import (
     count_users_for_client,
@@ -27,6 +33,51 @@ from web_app.users_store import (
     upsert_client_user,
     upsert_staff_user,
 )
+
+
+def managed_databases_from_env(raw: str | None) -> list[str]:
+    """Parse TOOLBOX_ODOO_MANAGED_DATABASES : noms séparés par virgule, point-virgule ou saut de ligne."""
+    if not (raw or "").strip():
+        return []
+    parts = re.split(r"[\n;,]+", raw)
+    return sorted({p.strip() for p in parts if p.strip()}, key=str.lower)
+
+
+def _fetch_databases_from_server(base_url: str) -> tuple[list[str], str | None]:
+    u = normalize_odoo_base_url((base_url or "").strip())
+    if not u:
+        return [], "URL vide."
+    parsed = urlparse(u)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return [], "URL invalide (http/https requis)."
+    endpoint = f"{u}/xmlrpc/2/db"
+    try:
+        proxy = xmlrpc.client.ServerProxy(endpoint, allow_none=True)
+        raw_list: Any = proxy.list()
+        if not isinstance(raw_list, list):
+            return [], "Le serveur n’a pas renvoyé une liste de bases."
+        names = [str(x).strip() for x in raw_list if str(x).strip()]
+        return sorted(set(names), key=str.lower), None
+    except xmlrpc.client.Fault as e:
+        return [], format_db_list_error(e)
+    except OSError as e:
+        return [], f"Réseau / SSL : {e!s}"
+    except Exception as e:
+        return [], format_db_list_error(e)
+
+
+def merge_database_suggestions(
+    *,
+    url: str,
+    env_managed_raw: str | None,
+) -> tuple[list[str], str | None]:
+    from_env = managed_databases_from_env(env_managed_raw)
+    u = normalize_odoo_base_url((url or "").strip())
+    if not u:
+        return sorted(from_env, key=str.lower), None
+    from_server, err = _fetch_databases_from_server(u)
+    merged = sorted(set(from_server) | set(from_env), key=str.lower)
+    return merged, err
 
 
 def _client_id_in_registry(reg: dict, client_id: str) -> bool:
@@ -95,7 +146,7 @@ def client_new():
     if request.method == "POST":
         cid = (request.form.get("client_id") or "").strip()
         label = (request.form.get("label") or "").strip()
-        url = (request.form.get("url") or "").strip()
+        url = normalize_odoo_base_url((request.form.get("url") or "").strip())
         db = (request.form.get("db") or "").strip()
         user = (request.form.get("odoo_user") or "").strip()
         password = (request.form.get("odoo_password") or "").strip() or None
@@ -136,7 +187,7 @@ def client_edit(client_id: str):
     cfg = reg[cid_key]
     if request.method == "POST":
         label = (request.form.get("label") or "").strip()
-        url = (request.form.get("url") or "").strip()
+        url = normalize_odoo_base_url((request.form.get("url") or "").strip())
         db = (request.form.get("db") or "").strip()
         user = (request.form.get("odoo_user") or "").strip()
         pw = (request.form.get("odoo_password") or "").strip()

@@ -31,6 +31,7 @@ from web_app.odoo_account_reports import (
     UTILITY_TITLE,
     UTILITY_VERSION,
     probe_odoo_reports_access,
+    read_account_report_label,
     search_account_reports,
     unlink_account_report,
 )
@@ -180,8 +181,8 @@ def utilities_home():
     return render_template("staff/utilities.html", clients=reg)
 
 
-_ODOO_PROBE_UTIL_VERSION = "1.0.0"
-_ODOO_PROBE_UTIL_DATE = "2026-04-04"
+_ODOO_PROBE_UTIL_VERSION = "1.2.2"
+_ODOO_PROBE_UTIL_DATE = "2026-04-03"
 
 
 @bp.route("/utilities/odoo-compte-bases", methods=["GET", "POST"])
@@ -192,11 +193,15 @@ def odoo_account_databases_probe():
         url = (request.form.get("odoo_url") or "").strip()
         login = (request.form.get("odoo_login") or "").strip()
         password = (request.form.get("odoo_password") or "").strip()
-        extra = (request.form.get("extra_databases") or "").strip()
-        if not url or not login:
-            flash("URL et login sont requis.", "warning")
+        if not login:
+            flash("Login requis.", "warning")
+        elif not url and not password:
+            flash(
+                "Sans URL d’instance : indiquez le mot de passe pour vous connecter au portail Odoo.com (Mes bases).",
+                "warning",
+            )
         else:
-            result = probe_account_databases(url, login, password, extra)
+            result = probe_account_databases(url, login, password)
     return render_template(
         "staff/odoo_account_probe.html",
         result=result,
@@ -254,8 +259,9 @@ def rapports_comptables():
                 return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
             try:
                 personalize_fix_detail_complete(models, db, uid, pwd, rid)
+                rlabel = read_account_report_label(models, db, uid, pwd, rid)
                 flash(
-                    f"Personnalisation appliquée sur « {reg[cid].label} » pour le rapport id={rid}.",
+                    f"Personnalisation appliquée sur « {reg[cid].label} » pour le rapport « {rlabel} » (id={rid}).",
                     "success",
                 )
             except Exception as e:
@@ -276,8 +282,9 @@ def rapports_comptables():
                 flash("Identifiant de rapport invalide.", "danger")
                 return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
             try:
+                rlabel = read_account_report_label(models, db, uid, pwd, rid)
                 unlink_account_report(models, db, uid, pwd, rid)
-                flash(f"Rapport id={rid} supprimé.", "success")
+                flash(f"Rapport « {rlabel} » (id={rid}) supprimé.", "success")
             except Exception as e:
                 flash(f"Suppression impossible : {e!s}", "danger")
             return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))

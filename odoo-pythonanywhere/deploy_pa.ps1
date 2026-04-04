@@ -1,6 +1,10 @@
 # Déploie la toolbox Flask sur PythonAnywhere via SSH (clé privée locale).
 # À lancer dans PowerShell sur VOTRE PC (pas uniquement via un agent distant sans accès SSH).
 #
+# Après chaque modification du code : commit + push sur GitHub, puis lancer ce script.
+# Sur le serveur, deploy_pa.sh exécute systématiquement « git pull » dans le clone PA
+# (alignement sur la branche distante), puis pip et vous rappelle de faire « Reload » Web.
+#
 # Si SSH/scp demande encore le mot de passe PA à chaque fois : une fois seulement
 #   .\install_pa_ssh_key.ps1
 #
@@ -65,7 +69,8 @@ try {
     Remove-Item -LiteralPath $tmpUnix -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ">>> Exécution sur PA..."
+Write-Host ">>> Exécution sur PA (git pull + pip dans le clone)..."
+Write-Host "    Vérifiez que vos commits sont bien poussés sur GitHub avant de compter sur la mise à jour."
 & ssh.exe @sshOpts $UserHost "chmod +x ~/${remoteName} && bash ~/${remoteName}; ec=`$?; rm -f ~/${remoteName}; exit `$ec"
 $code = $LASTEXITCODE
 Write-Host ">>> Terminé (code $code)."

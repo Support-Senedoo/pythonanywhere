@@ -7,14 +7,21 @@ from personalize_syscohada_detail import execute_kw
 
 # Métadonnées affichées dans l’interface (à jour à chaque évolution fonctionnelle).
 UTILITY_TITLE = "Rapports comptables Odoo"
-UTILITY_VERSION = "1.1.0"
-UTILITY_DATE = "2026-04-04"
+UTILITY_VERSION = "1.2.0"
+UTILITY_DATE = "2026-04-03"
 UTILITY_AUTHOR = "Senedoo"
 
 
 def format_report_name(val: Any) -> str:
+    """Affichage prioritaire en français (traductions Odoo sur account.report.name)."""
     if isinstance(val, dict):
-        for k in ("fr_FR", "en_US", "fr_BE"):
+        for k in ("fr_FR", "fr_BE", "fr_CA", "fr_CH", "fr_LU"):
+            if val.get(k):
+                return str(val[k])
+        for key in sorted(val.keys()):
+            if isinstance(key, str) and key.startswith("fr_") and val.get(key):
+                return str(val[key])
+        for k in ("en_US", "en_GB"):
             if val.get(k):
                 return str(val[k])
         for v in val.values():
@@ -24,6 +31,29 @@ def format_report_name(val: Any) -> str:
     if val is None:
         return "—"
     return str(val)
+
+
+def read_account_report_label(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> str:
+    """Libellé du rapport en français (via contexte RPC)."""
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[report_id]],
+        {"fields": ["name"]},
+    )
+    if not rows:
+        return f"#{report_id}"
+    return format_report_name(rows[0].get("name"))
 
 
 def probe_odoo_reports_access(

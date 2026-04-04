@@ -7,17 +7,18 @@
 <details class="sn-doc" open>
   <summary>But &amp; principe</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    Cet utilitaire interroge le serveur Odoo indiqué avec un <strong>login</strong> et un <strong>mot de passe</strong>
-    (non enregistrés : traitement immédiat puis oubli côté application). Il récupère d’abord la liste des bases
-    via <code>/xmlrpc/2/db</code> <code>list()</code> lorsque le serveur l’autorise, fusionne avec des noms que vous
-    ajoutez manuellement, puis tente une <strong>authentification</strong> sur chaque base. Pour les accès réussis,
-    il affiche des <strong>indications</strong> : sociétés (<code>res.company</code>), version du module <code>base</code>,
-    et informations sur l’utilisateur connecté.
+    Deux modes (non enregistrés côté appli ; login et mot de passe <strong>masqués</strong> à l’écran) :
+    <strong>(1)</strong> laissez l’URL vide : connexion au <strong>portail Odoo.com</strong> (page « Mes bases »), liste des
+    instances <code>*.odoo.com</code> liées au compte, puis test XML-RPC sur chacune.
+    <strong>(2)</strong> URL d’une instance : <code>db.list()</code> sur cette instance si le service <code>db</code> existe,
+    puis authentification sur chaque base listée.
+    Indications si accès OK : sociétés, module <code>base</code>, utilisateur.
   </p>
   <ul>
-    <li>Odoo SaaS / hébergements fermés peuvent <strong>désactiver</strong> <code>db.list()</code> : utilisez alors la zone « Bases supplémentaires ».</li>
+    <li>Mode portail : dépend du HTML de <code>odoo.com</code> — en cas d’échec, vérifiez langue (variables d’environnement <code>TOOLBOX_ODOO_PORTAL_LANG</code>, <code>TOOLBOX_ODOO_PORTAL_ORIGIN</code>).</li>
+    <li>Mode URL : si <code>db.list()</code> est absent (souvent Odoo SaaS 19+), la liste reste vide — utilisez alors le mode sans URL.</li>
     <li>Maximum <strong>{{ max_probe }}</strong> bases testées par requête (sécurité / performance).</li>
-    <li>Ne pas utiliser sur une machine partagée sans confiance : le mot de passe transite vers le serveur Odoo cible.</li>
+    <li>Ne pas utiliser sur une machine partagée sans confiance : identifiants transmis à odoo.com et aux instances.</li>
   </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> Senedoo · <strong>Version :</strong> {{ util_version }} · <strong>Date :</strong> {{ util_date }}
@@ -25,25 +26,30 @@
 </details>
 
 <div class="sn-card sn-card--accent">
-  <form method="post" autocomplete="off">
-    <label for="odoo_url">URL du serveur Odoo</label>
-    <input type="url" id="odoo_url" name="odoo_url" required
+  {# type="text" et non "url" : sinon le navigateur impose souvent une URL valide et bloque l’envoi si le champ est vide (mode portail sans URL). #}
+  <form method="post" autocomplete="off" novalidate data-sn-probe="odoo-bases">
+    <label for="odoo_login">Login Odoo <span class="sn-muted">(saisie masquée)</span></label>
+    <input type="password" id="odoo_login" name="odoo_login" required
+           value="{{ request.form.get('odoo_login', '') }}"
+           autocomplete="username" inputmode="email"
+           spellcheck="false"
+           aria-label="Login Odoo, affichage masqué">
+
+    <label for="odoo_password">Mot de passe <span class="sn-muted">(obligatoire si URL vide — portail Mes bases)</span></label>
+    <input type="password" id="odoo_password" name="odoo_password" value="" autocomplete="current-password"
+           placeholder="Obligatoire pour le mode sans URL (odoo.com)">
+
+    <label for="odoo_url">URL de l’instance Odoo <span class="sn-muted">(facultatif)</span></label>
+    <p class="sn-muted" style="margin:-0.35rem 0 0.5rem;font-size:0.88rem;">
+      <strong>Laissez ce champ vide</strong> pour utiliser uniquement le portail <strong>odoo.com</strong> (Mes bases).
+      Remplissez-le seulement pour appeler <code>db.list()</code> sur une instance précise.
+    </p>
+    <input type="text" id="odoo_url" name="odoo_url" autocapitalize="none" spellcheck="false" aria-required="false"
            value="{{ request.form.get('odoo_url', '') }}"
-           placeholder="https://votre-instance.odoo.com">
+           placeholder="Laisser vide = liste via Mes bases (odoo.com)">
 
-    <label for="odoo_login">Login Odoo</label>
-    <input type="text" id="odoo_login" name="odoo_login" required
-           value="{{ request.form.get('odoo_login', '') }}" autocomplete="off">
-
-    <label for="odoo_password">Mot de passe</label>
-    <input type="password" id="odoo_password" name="odoo_password" value="" autocomplete="new-password"
-           placeholder="Saisie à chaque analyse (non mémorisée par l’appli)">
-
-    <label for="extra_databases">Bases supplémentaires à tester (optionnel)</label>
-    <textarea id="extra_databases" name="extra_databases" rows="3"
-              placeholder="Une base par ligne, ou séparées par virgule / point-virgule">{{ request.form.get('extra_databases', '') }}</textarea>
-
-    <button type="submit">Analyser les bases</button>
+    {# formnovalidate : certains navigateurs ignorent novalidate sur <form> dans des cas limites #}
+    <button type="submit" formnovalidate>Analyser les bases</button>
     <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
   </form>
 </div>
@@ -59,7 +65,15 @@
   <pre class="sn-pre" style="max-height:10rem;">{{ result.server_version | tojson(indent=2) }}</pre>
   {% endif %}
   {% if result.db_list_error %}
-  <p class="sn-muted"><strong>db.list() :</strong> {{ result.db_list_error }} — poursuite avec les bases saisies manuellement éventuelles.</p>
+  <p class="sn-flash warning" style="margin:0.75rem 0;">
+    <strong>{% if result.probe_mode == 'odoo_com_portal' %}Portail Odoo.com :{% else %}Liste des bases (db.list) :{% endif %}</strong>
+    {{ result.db_list_error }}
+  </p>
+  {% endif %}
+  {% if result.candidate_names|length == 0 and result.probe_mode == 'instance_xmlrpc' and not result.db_list_error %}
+  <p class="sn-flash danger" style="margin:0.75rem 0;">
+    <strong>Aucune base listée.</strong> Le serveur n’a renvoyé aucun nom via <code>db.list()</code>, ou liste vide.
+  </p>
   {% endif %}
   {% if result.truncated %}
   <p class="sn-flash warning">Liste tronquée à {{ max_probe }} bases.</p>
@@ -73,6 +87,9 @@
   <table class="sn-table">
     <thead>
       <tr>
+        {% if result.probe_mode == 'odoo_com_portal' %}
+        <th>Instance</th>
+        {% endif %}
         <th>Base</th>
         <th>Accès</th>
         <th>UID</th>
@@ -84,6 +101,9 @@
     <tbody>
       {% for r in result.rows %}
       <tr>
+        {% if result.probe_mode == 'odoo_com_portal' %}
+        <td style="font-size:0.8rem;max-width:10rem;"><a href="{{ r.instance_url }}" target="_blank" rel="noopener noreferrer">{{ r.instance_url }}</a></td>
+        {% endif %}
         <td><code>{{ r.database }}</code></td>
         <td>{% if r.accessible %}<span class="sn-pill" style="background:rgba(52,211,153,0.2);color:var(--sn-success);">OK</span>{% else %}<span class="sn-muted">Non</span>{% endif %}</td>
         <td>{% if r.uid %}{{ r.uid }}{% else %}—{% endif %}</td>

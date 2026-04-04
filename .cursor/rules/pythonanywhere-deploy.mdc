@@ -5,7 +5,7 @@ alwaysApply: true
 
 # PythonAnywhere (budget-financier) — mémoire opérationnelle
 
-Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte utile est **ici** et dans **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)**.
+Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte utile est **ici** et dans **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)** — en particulier la section **« Reprise technique — toolbox odoo-pythonanywhere »** et la checklist « reprise après une pause ».
 
 ## Compte et hôtes
 

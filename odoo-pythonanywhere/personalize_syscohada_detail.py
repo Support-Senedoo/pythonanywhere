@@ -63,6 +63,22 @@ def _progress(it: Iterable[_T], desc: str, *, unit: str = "lig") -> Iterable[_T]
     )
 
 
+def _rpc_context(kwargs: dict[str, Any] | None) -> dict[str, Any]:
+    """Fusionne le contexte Odoo ; langue française par défaut (libellés account.report, etc.)."""
+    kw = dict(kwargs or {})
+    raw = kw.get("context")
+    if raw is None or raw is False:
+        ctx: dict[str, Any] = {}
+    elif isinstance(raw, dict):
+        ctx = dict(raw)
+    else:
+        ctx = {}
+    if "lang" not in ctx:
+        ctx["lang"] = (os.environ.get("TOOLBOX_ODOO_LANG") or "fr_FR").strip() or "fr_FR"
+    kw["context"] = ctx
+    return kw
+
+
 def execute_kw(
     models: Any,
     db: str,
@@ -73,7 +89,7 @@ def execute_kw(
     args: list[Any],
     kwargs: dict[str, Any] | None = None,
 ) -> Any:
-    return models.execute_kw(db, uid, password, model, method, args, kwargs or {})
+    return models.execute_kw(db, uid, password, model, method, args, _rpc_context(kwargs))
 
 
 def connect(url: str, db: str, user: str, password: str) -> tuple[Any, int]:

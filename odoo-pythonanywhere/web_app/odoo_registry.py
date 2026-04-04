@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from odoo_client import normalize_odoo_base_url
+
 from web_app.client_apps import normalize_app_ids
 
 _CLIENT_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
@@ -31,7 +33,7 @@ def _row_to_config(row: dict[str, Any]) -> ClientOdooConfig:
     return ClientOdooConfig(
         id=cid,
         label=str(row.get("label") or cid),
-        url=str(row["url"]).rstrip("/"),
+        url=normalize_odoo_base_url(str(row["url"])),
         db=str(row["db"]).strip(),
         user=str(row["user"]).strip(),
         password=str(row["password"]),
@@ -150,7 +152,7 @@ def delete_client(path: str | Path, client_id: str) -> None:
 
 def connect_xmlrpc(cfg: ClientOdooConfig) -> tuple[Any, str, int, str]:
     """Retourne (models_proxy, db, uid, password) pour les scripts type personalize_syscohada."""
-    base = cfg.url.rstrip("/")
+    base = normalize_odoo_base_url(cfg.url).rstrip("/")
     common = xmlrpc.client.ServerProxy(f"{base}/xmlrpc/2/common", allow_none=True)
     uid = common.authenticate(cfg.db, cfg.user, cfg.password, {})
     if not uid:

@@ -3,11 +3,46 @@ from __future__ import annotations
 
 import xmlrpc.client
 from typing import Any
+from urllib.parse import urlparse, urlunparse
+
+
+def normalize_odoo_base_url(raw: str) -> str:
+    """
+    Évite les 301 « Moved Permanently » sur XML-RPC (ServerProxy ne les suit pas toujours) :
+    - https://odoo.com → https://www.odoo.com
+    - http://*.odoo.com → https://… (hébergement SaaS)
+    - schéma absent → https://
+    """
+    s = (raw or "").strip().rstrip("/")
+    if not s:
+        return ""
+    if "://" not in s:
+        s = "https://" + s.lstrip("/")
+    p = urlparse(s)
+    host = (p.hostname or "").lower()
+    scheme = (p.scheme or "https").lower()
+    netloc = p.netloc
+
+    if host == "odoo.com":
+        port = p.port
+        if port and port not in (80, 443):
+            netloc = f"www.odoo.com:{port}"
+        else:
+            netloc = "www.odoo.com"
+
+    if host == "odoo.com" or host.endswith(".odoo.com"):
+        if scheme == "http":
+            scheme = "https"
+            if netloc.endswith(":80"):
+                netloc = netloc[:-3]
+
+    out = urlunparse((scheme, netloc, p.path or "", "", "", ""))
+    return out.rstrip("/")
 
 
 class OdooClient:
     def __init__(self, url: str, db: str, username: str, password: str) -> None:
-        self.url = url.rstrip("/")
+        self.url = normalize_odoo_base_url(url).rstrip("/")
         self.db = db
         self.username = username
         self.password = password

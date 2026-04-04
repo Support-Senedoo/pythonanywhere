@@ -39,8 +39,10 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 
 ## Déploiement / mise à jour du code
 
+**À chaque modification** : enregistrer le code dans Git, **pousser sur GitHub**, puis mettre à jour PythonAnywhere (voir ci‑dessous). Sans push, le `git pull` côté PA ne récupère rien de nouveau.
+
 **Option A — Git (recommandé)**  
-Si le dépôt est cloné sur PA : `git pull` dans le dossier du projet, puis `pip install …`, puis **Reload** du site web.
+Si le dépôt est cloné sur PA : `git pull` dans le dossier du projet, puis `pip install …`, puis **Reload** du site web. Le script **`deploy_pa.sh`** (via **`deploy_pa.ps1`**) exécute ce `pull` automatiquement à chaque lancement.
 
 ### Déploiement sans saisie de phrase secrète (agent / MCP)
 
@@ -132,12 +134,45 @@ Host pythonanywhere
 
 ## Checklist « reprise après une pause »
 
-- [ ] Dépôt à jour sur PA (`git pull` ou upload)
+- [ ] Code **commit + push GitHub** (sinon le `git pull` sur PA ne ramène rien)
+- [ ] Déploiement : **`deploy_pa.ps1`** depuis `odoo-pythonanywhere/` (ou `git pull` + `bash deploy_pa.sh` sur PA)
 - [ ] `requirements.txt` réinstallé avec la **bonne** version Python du web app
 - [ ] `toolbox_users.json` et `toolbox_clients.json` toujours présents sur le serveur
 - [ ] `TOOLBOX_SECRET_KEY` toujours défini dans l’onglet Web
 - [ ] WSGI pointe toujours vers `pythonanywhere_wsgi.py` (ou `pa_wsgi.py`)
-- [ ] **Reload** du site
+- [ ] **Reload** du site (onglet Web PythonAnywhere)
+
+## Reprise technique — toolbox `odoo-pythonanywhere` (avril 2026)
+
+À lire par l’assistant au prochain fil : évite de réinventer ce qui est déjà en place.
+
+### Déploiement & WSGI
+
+- Racine projet sur PA : typiquement `/home/senedoo/pythonanywhere` ; appli Flask : **`odoo-pythonanywhere/`**. `pythonanywhere_wsgi.py` insère ce dossier dans `sys.path` puis `create_app()`.
+- Erreurs applicatives : journal **`/var/log/senedoo.pythonanywhere.com.error.log`** (attention : **point** avant `pythonanywhere` dans le nom du fichier).
+
+### Admin staff (`/staff/admin/…`)
+
+- Plus de module **`web_app.odoo_db_list`** : la logique liste bases / `db.list()` pour les suggestions JSON est **inlinée** dans **`web_app/blueprints/staff_admin.py`** (`managed_databases_from_env`, `_fetch_databases_from_server`, `merge_database_suggestions`) pour éviter tout `ModuleNotFoundError` si un fichier manque au pull.
+- Endpoint JSON suggestions bases : route existante sous le blueprint admin (URL préfixée `/admin`).
+
+### Utilitaire « Sonde bases Odoo par compte » (`/staff/utilities/odoo-compte-bases`)
+
+- **Deux modes** (voir **`web_app/odoo_account_probe.py`**) :
+  - **Sans URL** : session HTTP sur **www.odoo.com** (login + mot de passe + CSRF), page **Mes bases**, extraction des liens `https://*.odoo.com`, déduction du nom de base PostgreSQL depuis l’hôte, puis **XML-RPC** `authenticate` / `object` sur chaque instance.
+  - **Avec URL** : `db.list()` sur cette instance si le service `db` existe ; sinon liste vide et message via **`format_db_list_error`** / **`_is_odoo_db_service_disabled`** (dont `KeyError: 'db'` / `repr(Fault)` avec `\'db\'`).
+- Variables optionnelles : **`TOOLBOX_ODOO_PORTAL_ORIGIN`**, **`TOOLBOX_ODOO_PORTAL_LANG`** (défaut `https://www.odoo.com`, `/fr_FR`) — voir **`toolbox-env-exemple.txt`**.
+- **Login** et **mot de passe** : champs masqués ; mot de passe non réinjecté dans le HTML après POST.
+- Version page : **`_ODOO_PROBE_UTIL_VERSION`** dans **`web_app/blueprints/staff.py`**.
+
+### Pistes « demain » possibles
+
+- Fragilité du **parsing HTML** du portail si Odoo change la page Mes bases ; instances hors `*.odoo.com` non détectées par ce mode.
+- Vérifier sur PA que le **venv / version Python** de l’onglet Web correspond à celle utilisée pour `pip` dans `deploy_pa.sh` (`PYTHONANYWHERE_PYTHON` si besoin).
+
+---
+
+*Dernière mise à jour de cette section : 3 avril 2026 (mode portail odoo.com + URL optionnelle).*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 
@@ -149,4 +184,4 @@ Coller le résultat dans `toolbox_users.json` (`password_hash`).
 
 ---
 
-*Dernière intention documentée : toolbox Flask unifiée (client La Ripaille + staff Senedoo + personnalisation rapport), registre multi-bases, auth par fichier JSON.*
+*Intention globale : toolbox Flask unifiée (portails client / staff Senedoo, admin clients & comptes, utilitaires Odoo), registre multi-bases, auth par fichiers JSON.*
