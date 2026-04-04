@@ -1,11 +1,11 @@
 """Espace client : appli La Ripaille (MVP) + liens outils catalogue."""
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, flash, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 
 from web_app.blueprints.public import login_required_client
 from web_app.client_apps import apps_for_template
-from web_app.odoo_registry import client_has_app, load_clients_registry
+from web_app.odoo_registry import client_has_app, configs_for_label, load_clients_registry
 from web_app.pointage_import_util import (
     ALLOWED_SUFFIX,
     parse_pointage_csv,
@@ -14,6 +14,26 @@ from web_app.pointage_import_util import (
 from web_app.session_odoo import get_odoo_client_for_browser_client
 
 bp = Blueprint("legacy", __name__)
+
+
+@bp.route("/select-base", methods=["POST"])
+@login_required_client
+def select_client_base():
+    reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
+    cur = (session.get("client_id") or "").strip().lower()
+    picked = (request.form.get("client_id") or "").strip().lower()
+    if cur not in reg or picked not in reg:
+        flash("Choix de base invalide.", "danger")
+        return redirect(url_for("legacy.client_home"))
+    if reg[picked].label != reg[cur].label:
+        flash("Cette base n’est pas autorisée pour votre compte.", "danger")
+        return redirect(url_for("legacy.client_home"))
+    session["client_id"] = picked
+    flash("Base active mise à jour.", "success")
+    nxt = (request.form.get("next") or "").strip()
+    if nxt.startswith("/client/") and not nxt.startswith("//"):
+        return redirect(nxt)
+    return redirect(url_for("legacy.client_home"))
 
 
 @bp.route("/")
@@ -25,12 +45,32 @@ def client_home():
     client_label = cfg.label if cfg else (cid or "—")
     registry_ok = bool(cfg)
     client_apps = apps_for_template(cfg.apps) if cfg else []
+    base_choices: list[dict] = []
+    if cfg:
+        sibs = configs_for_label(reg, cfg.label)
+        if len(sibs) > 1:
+            for sid, scfg in sorted(
+                sibs,
+                key=lambda x: (
+                    0 if x[1].environment == "production" else 1,
+                    x[0].lower(),
+                ),
+            ):
+                base_choices.append(
+                    {
+                        "id": sid,
+                        "environment": scfg.environment,
+                        "db": scfg.db,
+                        "current": sid == cid,
+                    }
+                )
     return render_template(
         "client/home.html",
         client_label=client_label,
         client_id=cid,
         registry_ok=registry_ok,
         client_apps=client_apps,
+        base_choices=base_choices,
     )
 
 

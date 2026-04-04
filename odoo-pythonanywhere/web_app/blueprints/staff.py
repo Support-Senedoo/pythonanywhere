@@ -575,6 +575,13 @@ def rapports_comptables():
                         sr["msg"] = str(e)
                 sibling_rows.append(sr)
 
+    prefill_new_label = (request.args.get("prefill_label") or "").strip()
+    open_add_base_panel = (request.args.get("open_add") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
@@ -590,6 +597,8 @@ def rapports_comptables():
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,
+        prefill_new_label=prefill_new_label,
+        open_add_base_panel=open_add_base_panel,
         utility_title=UTILITY_TITLE,
         utility_version=UTILITY_VERSION,
         utility_date=UTILITY_DATE,

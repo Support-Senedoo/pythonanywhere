@@ -68,6 +68,11 @@
 </div>
 
 {% if mode == 'edit' %}
+<div class="sn-card" style="margin-top:1.25rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">Autre base (même client)</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Pour enregistrer une <strong>deuxième</strong> entrée (ex. recette) avec le même nom affiché qu’ici, ouvrez l’utilitaire rapports comptables : le libellé sera prérempli.</p>
+  <a class="sn-btn" href="{{ url_for('staff.rapports_comptables', filter_label=client.label, prefill_label=client.label, open_add='1') }}">Ajouter une nouvelle base pour « {{ client.label }} »</a>
+</div>
 <div class="sn-card" style="border-color:var(--sn-danger);margin-top:1.5rem;">
   <h2 style="color:var(--sn-danger);margin-top:0;">Supprimer ce client</h2>
   <p class="sn-muted">Impossible s’il reste des comptes portail liés. Tapez l’identifiant <code>{{ client.id }}</code> pour confirmer.</p>

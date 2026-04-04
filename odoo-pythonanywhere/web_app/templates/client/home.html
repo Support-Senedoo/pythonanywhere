@@ -9,7 +9,27 @@
 <div class="sn-flash warning">
   Aucune configuration trouvée pour ce compte (<code>{{ client_id }}</code>). Contactez Senedoo.
 </div>
-{% elif not client_apps %}
+{% else %}
+{% if base_choices %}
+<div class="sn-card sn-card--accent" style="margin-bottom:1.25rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">Base Odoo utilisée</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Plusieurs bases partagent le même client : choisissez la <strong>production</strong> ou une base de <strong>test / recette</strong>.</p>
+  <form method="post" action="{{ url_for('legacy.select_client_base') }}" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:0.65rem;">
+    <div style="flex:1;min-width:12rem;">
+      <label for="sel-client-base">Environnement</label>
+      <select id="sel-client-base" name="client_id" required>
+        {% for b in base_choices %}
+        <option value="{{ b.id }}" {% if b.current %}selected{% endif %}>
+          {% if b.environment == 'test' %}Test / recette{% else %}Production{% endif %} — {{ b.db }} ({{ b.id }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit">Appliquer</button>
+  </form>
+</div>
+{% endif %}
+{% if not client_apps %}
 <div class="sn-flash warning">
   Aucune application n’est activée pour ce client. L’équipe Senedoo peut l’ajouter depuis l’administration.
 </div>
@@ -22,5 +42,6 @@
   </a>
   {% endfor %}
 </div>
+{% endif %}
 {% endif %}
 {% endblock %}

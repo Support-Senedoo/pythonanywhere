@@ -92,7 +92,7 @@
                title="Lettre minuscule, puis lettres, chiffres ou _ (max 63 car.)"
                spellcheck="false" autocapitalize="none">
         <label for="new_label">Libellé affiché (peut être identique pour prod et test)</label>
-        <input type="text" id="new_label" name="new_label" placeholder="ex. Société XYZ">
+        <input type="text" id="new_label" name="new_label" value="{{ prefill_new_label }}" placeholder="ex. Société XYZ">
         <label for="new_environment">Environnement</label>
         <select id="new_environment" name="new_environment">
           <option value="production" selected>Production</option>
@@ -376,6 +376,15 @@
     anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     try { var ni2 = document.getElementById('new_client_id'); if (ni2) ni2.focus(); } catch (x) {}
   }
+  {% if open_add_base_panel %}
+  if (panelAdd && btnShowAdd) {
+    openAddBasePanel();
+    if (anchorAdd) {
+      try { anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+    }
+    try { var ni3 = document.getElementById('new_client_id'); if (ni3) ni3.focus(); } catch (x) {}
+  }
+  {% endif %}
   var form = document.getElementById('form-personalize-report');
   var overlay = document.getElementById('sn-personalize-overlay');
   if (!form || !overlay) return;

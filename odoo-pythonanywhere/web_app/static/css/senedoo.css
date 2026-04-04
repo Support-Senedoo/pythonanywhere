@@ -287,6 +287,11 @@ h2 {
 .sn-progress-overlay[hidden] {
   display: none !important;
 }
+
+/* Panneau « ajouter base » : rester masqué tant que [hidden] (évite tout affichage résiduel). */
+.sn-panel-add-base[hidden] {
+  display: none !important;
+}
 .sn-progress-overlay__box {
   max-width: 26rem;
   margin: 1rem;

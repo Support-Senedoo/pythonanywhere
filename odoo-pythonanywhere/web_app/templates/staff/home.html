@@ -25,7 +25,10 @@
 <div class="sn-card sn-card--accent">
   <h2>Administration</h2>
   <p class="sn-muted">Créer des clients Odoo, comptes portail, bases et applications visibles.</p>
-  <a class="sn-btn" href="{{ url_for('staff_admin.clients_list') }}">Gérer clients &amp; accès</a>
+  <p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin:0.75rem 0 0;">
+    <a class="sn-btn" href="{{ url_for('staff_admin.clients_list') }}">Gérer clients &amp; accès</a>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.rapports_comptables', open_add='1') }}">Ajouter une base Odoo</a>
+  </p>
 </div>
 
 <div class="sn-card">
