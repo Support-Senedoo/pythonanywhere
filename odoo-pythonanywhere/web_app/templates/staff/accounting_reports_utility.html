@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ utility_title }} — Senedoo{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>{{ utility_title }}</h1>
+
+<details class="sn-doc" open>
+  <summary>Descriptif &amp; mode d’emploi</summary>
+  <p style="margin:0.65rem 0 0;line-height:1.5;">
+    <strong>But.</strong> Cet utilitaire permet de vérifier la connexion à la base Odoo choisie (identifiants du registre client),
+    de <strong>lister et filtrer</strong> les rapports comptables (<code>account.report</code>), d’en
+    <strong>personnaliser</strong> une copie (logique Senedoo : suppression des notes « custom » sur les lignes feuilles,
+    regroupement par compte, hiérarchie des groupes de comptes, désactivation du « tout déplier ») comme l’outil
+    <code>personalize_syscohada_detail.py --fix-detail</code>, ou d’en <strong>supprimer</strong> une instance
+    (uniquement si Odoo et vos droits l’autorisent — les rapports système sont souvent protégés).
+  </p>
+  <ul>
+    <li>Choisissez le <strong>client / base</strong>, puis cliquez sur <strong>Actualiser</strong> : le <strong>voyant</strong> indique si l’API répond.</li>
+    <li>Saisissez un filtre (ex. <code>compte</code>, <code>SYSCOHADA</code>, <code>P&amp;L</code>) pour réduire la liste.</li>
+    <li><strong>Personnaliser</strong> : renseignez l’id du rapport (souvent une <em>copie</em> du rapport standard), tapez <strong>OUI</strong> pour confirmer — l’opération modifie le rapport sur la base.</li>
+    <li><strong>Supprimer</strong> : recopiez exactement la phrase demandée (<code>SUPPRIMER-&lt;id&gt;</code>) — irréversible si Odoo accepte la suppression.</li>
+  </ul>
+  <p class="sn-meta-line">
+    <strong>Auteur :</strong> {{ utility_author }} ·
+    <strong>Version :</strong> {{ utility_version }} ·
+    <strong>Date :</strong> {{ utility_date }}
+  </p>
+</details>
+
+<form method="get" class="sn-card sn-card--accent" action="{{ url_for('staff.rapports_comptables') }}">
+  <label for="client_id">Base Odoo (client)</label>
+  <select id="client_id" name="client_id" required>
+    <option value="">— Choisir —</option>
+    {% for cid, c in clients.items() %}
+    <option value="{{ cid }}" {% if selected_client == cid %}selected{% endif %}>{{ c.label }} [{{ cid }}]</option>
+    {% endfor %}
+  </select>
+
+  <label for="q">Filtrer les rapports (libellé / nom technique)</label>
+  <input type="text" id="q" name="q" value="{{ filter_q }}" placeholder="ex. compte, bilan, SYSCOHADA…">
+
+  <button type="submit">Actualiser la liste</button>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+</form>
+
+{% if selected_client %}
+<div class="sn-card">
+  <h2 style="margin-top:0;font-size:1.1rem;">Connexion à la base</h2>
+  <div class="sn-status">
+    {% if conn_status == 'ok' %}
+    <span class="sn-dot sn-dot--ok" title="OK"></span>
+    <span><strong>Opérationnel</strong> — {{ conn_detail }}</span>
+    {% elif conn_status == 'error' %}
+    <span class="sn-dot sn-dot--fail" title="Erreur"></span>
+    <span><strong>Indisponible</strong> — {{ conn_detail }}</span>
+    {% else %}
+    <span class="sn-dot sn-dot--idle"></span>
+    <span class="sn-muted">Sélectionnez une base et actualisez.</span>
+    {% endif %}
+  </div>
+
+  {% if conn_status == 'ok' %}
+  <h2 style="font-size:1.1rem;">Rapports ({{ reports|length }} affiché(s), max 400)</h2>
+  {% if not reports %}
+  <p class="sn-muted">Aucun rapport ne correspond au filtre.</p>
+  {% else %}
+  <div class="sn-scroll-x">
+  <table class="sn-table">
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Nom</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      <tr>
+        <td><code>{{ r.id }}</code></td>
+        <td>{{ r.name }}</td>
+        <td>
+          <form method="post" action="{{ url_for('staff.rapports_comptables') }}" style="display:inline;margin:0;">
+            <input type="hidden" name="client_id" value="{{ selected_client }}">
+            <input type="hidden" name="filter_q" value="{{ filter_q }}">
+            <input type="hidden" name="action" value="prefill">
+            <input type="hidden" name="report_id" value="{{ r.id }}">
+            <button type="submit" class="sn-btn" style="margin-top:0;padding:0.35rem 0.75rem;font-size:0.85rem;">Personnaliser</button>
+          </form>
+          <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
+            <summary style="cursor:pointer;color:var(--sn-danger);font-size:0.88rem;">Supprimer…</summary>
+            <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
+              <form method="post" action="{{ url_for('staff.rapports_comptables') }}">
+                <input type="hidden" name="client_id" value="{{ selected_client }}">
+                <input type="hidden" name="filter_q" value="{{ filter_q }}">
+                <input type="hidden" name="action" value="unlink">
+                <input type="hidden" name="report_id" value="{{ r.id }}">
+                <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Tapez exactement : <code>SUPPRIMER-{{ r.id }}</code></p>
+                <input type="text" name="confirm_delete" required placeholder="SUPPRIMER-{{ r.id }}" autocomplete="off" style="margin-top:0;">
+                <button type="submit" style="margin-top:0.5rem;background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer définitivement</button>
+              </form>
+            </div>
+          </details>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="sn-card" id="personalize">
+  <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation (détail comptes / SYSCOHADA)</h2>
+  <p class="sn-muted">Même traitement que <code>personalize_syscohada_detail.py</code> — à utiliser sur une <strong>copie</strong> du rapport, pas sur l’original éditeur sans sauvegarde.</p>
+  <form method="post" action="{{ url_for('staff.rapports_comptables') }}">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="action" value="personalize">
+    <label for="report_id_p">ID du rapport (<code>account.report</code>)</label>
+    <input type="number" id="report_id_p" name="report_id" min="1" required value="{{ prefill_report_id or '' }}" placeholder="ex. 32">
+
+    <label for="confirm_p">Confirmation</label>
+    <input type="text" id="confirm_p" name="confirm" required placeholder="Tapez OUI en majuscules">
+    <button type="submit">Lancer la personnalisation</button>
+  </form>
+</div>
+{% else %}
+<p class="sn-muted">Choisissez une base ci-dessus pour afficher le voyant et les rapports.</p>
+{% endif %}
+
+{% endblock %}

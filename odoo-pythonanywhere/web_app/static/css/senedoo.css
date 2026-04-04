@@ -360,3 +360,56 @@ pre,
   gap: 1.25rem;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
+
+/* Voyant connexion (utilitaires Odoo) */
+.sn-status {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.85rem 0 1rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--sn-radius);
+  border: 1px solid var(--sn-border);
+  background: var(--sn-surface);
+}
+.sn-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sn-dot--ok {
+  background: var(--sn-success);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
+}
+.sn-dot--fail {
+  background: var(--sn-danger);
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.45);
+}
+.sn-dot--idle {
+  background: var(--sn-muted);
+  opacity: 0.55;
+}
+
+.sn-doc {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--sn-primary-bright);
+  background: rgba(111, 45, 168, 0.08);
+  border-radius: 0 var(--sn-radius) var(--sn-radius) 0;
+  font-size: 0.92rem;
+}
+.sn-doc summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--sn-text);
+}
+.sn-doc ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+.sn-meta-line {
+  font-size: 0.85rem;
+  color: var(--sn-muted);
+  margin-top: 0.75rem;
+}

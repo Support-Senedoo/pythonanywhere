@@ -24,6 +24,15 @@ from web_app.pointage_import_util import (
 from odoo_client import OdooClient
 from personalize_syscohada_detail import personalize_fix_detail_complete
 
+from web_app.odoo_account_reports import (
+    UTILITY_AUTHOR,
+    UTILITY_DATE,
+    UTILITY_TITLE,
+    UTILITY_VERSION,
+    probe_odoo_reports_access,
+    search_account_reports,
+    unlink_account_report,
+)
 from web_app.session_odoo import get_config_by_id, get_xmlrpc_for_staff_client_id
 
 bp = Blueprint("staff", __name__)
@@ -99,8 +108,6 @@ def staff_apps_odoo_status():
     try:
         cfg = get_config_by_id(cid)
         if not client_has_app(cfg, "odoo_status"):
-            from flask import abort
-
             abort(404)
         c = OdooClient(cfg.url, cfg.db, cfg.user, cfg.password)
         ver = c.version()
@@ -173,34 +180,117 @@ def utilities_home():
 
 
 @bp.route("/utilities/personalize-report", methods=["GET", "POST"])
+@bp.route("/utilities/rapports-comptables", methods=["GET", "POST"])
 @login_required_staff
-def personalize_report():
+def rapports_comptables():
     reg = _registry()
+
     if request.method == "POST":
-        cid = (request.form.get("client_id") or "").strip()
-        try:
-            rid = int(request.form.get("report_id") or "0")
-        except ValueError:
-            rid = 0
-        confirm = (request.form.get("confirm") or "").strip()
+        cid = (request.form.get("client_id") or "").strip().lower()
+        action = (request.form.get("action") or "").strip()
+        filter_q = (request.form.get("filter_q") or "").strip()
         if cid not in reg:
             flash("Base / client inconnu.", "danger")
-            return redirect(url_for("staff.personalize_report"))
-        if rid <= 0:
-            flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
-            return redirect(url_for("staff.personalize_report"))
-        if confirm != "OUI":
-            flash("Tapez OUI en majuscules pour confirmer.", "warning")
-            return redirect(url_for("staff.personalize_report"))
+            return redirect(url_for("staff.rapports_comptables"))
+        if action == "prefill":
+            rid = (request.form.get("report_id") or "").strip()
+            return redirect(
+                url_for(
+                    "staff.rapports_comptables",
+                    client_id=cid,
+                    q=filter_q,
+                    report_id=rid or None,
+                )
+            )
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(cid)
-            personalize_fix_detail_complete(models, db, uid, pwd, rid)
-            flash(
-                f"Personnalisation appliquée sur « {reg[cid].label} » pour le rapport id={rid}.",
-                "success",
-            )
         except Exception as e:
-            flash(f"Échec : {e!s}", "danger")
-        return redirect(url_for("staff.personalize_report"))
+            flash(f"Connexion impossible : {e!s}", "danger")
+            return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+        if action == "personalize":
+            try:
+                rid = int(request.form.get("report_id") or "0")
+            except ValueError:
+                rid = 0
+            if (request.form.get("confirm") or "").strip() != "OUI":
+                flash("Tapez OUI en majuscules pour confirmer la personnalisation.", "warning")
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=rid if rid > 0 else None,
+                    )
+                )
+            if rid <= 0:
+                flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
+                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+            try:
+                personalize_fix_detail_complete(models, db, uid, pwd, rid)
+                flash(
+                    f"Personnalisation appliquée sur « {reg[cid].label} » pour le rapport id={rid}.",
+                    "success",
+                )
+            except Exception as e:
+                flash(f"Échec personnalisation : {e!s}", "danger")
+            return redirect(
+                url_for("staff.rapports_comptables", client_id=cid, q=filter_q, report_id=rid)
+            )
+        if action == "unlink":
+            try:
+                rid = int(request.form.get("report_id") or "0")
+            except ValueError:
+                rid = 0
+            expected = f"SUPPRIMER-{rid}"
+            if (request.form.get("confirm_delete") or "").strip() != expected:
+                flash("Confirmation de suppression incorrecte.", "danger")
+                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+            if rid <= 0:
+                flash("Identifiant de rapport invalide.", "danger")
+                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+            try:
+                unlink_account_report(models, db, uid, pwd, rid)
+                flash(f"Rapport id={rid} supprimé.", "success")
+            except Exception as e:
+                flash(f"Suppression impossible : {e!s}", "danger")
+            return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+        flash("Action non reconnue.", "warning")
+        return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
 
-    return render_template("staff/personalize_report.html", clients=reg)
+    selected = (request.args.get("client_id") or "").strip().lower()
+    if selected not in reg:
+        selected = ""
+    filter_q = (request.args.get("q") or "").strip()
+    prefill_rid = request.args.get("report_id", type=int)
+
+    conn_status = "idle"
+    conn_detail = ""
+    reports: list = []
+    if selected:
+        try:
+            models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
+            ok, msg = probe_odoo_reports_access(models, db, uid, pwd)
+            conn_detail = msg
+            if ok:
+                conn_status = "ok"
+                reports = search_account_reports(models, db, uid, pwd, filter_q)
+            else:
+                conn_status = "error"
+        except Exception as e:
+            conn_status = "error"
+            conn_detail = str(e)
+
+    return render_template(
+        "staff/accounting_reports_utility.html",
+        clients=reg,
+        selected_client=selected,
+        filter_q=filter_q,
+        conn_status=conn_status,
+        conn_detail=conn_detail,
+        reports=reports,
+        prefill_report_id=prefill_rid,
+        utility_title=UTILITY_TITLE,
+        utility_version=UTILITY_VERSION,
+        utility_date=UTILITY_DATE,
+        utility_author=UTILITY_AUTHOR,
+    )
