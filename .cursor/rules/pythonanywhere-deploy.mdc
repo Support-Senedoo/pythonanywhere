@@ -56,3 +56,7 @@ Fichiers : `odoo-pythonanywhere/install_pa_ssh_key.ps1`, `deploy_pa.ps1`, `deplo
 ## Quand la procédure change
 
 Après changement de chemins, version Python PA, fichier WSGI ou étapes de déploiement : **mettre à jour** `DEPLOY_PYTHONANYWHERE.md` **et** cette règle si besoin.
+
+## Version toolbox (affichée dans l’interface)
+
+À **chaque** ajout ou évolution de fonctionnalité visible : modifier **`odoo-pythonanywhere/web_app/app_version.py`** — `_DEFAULT_VERSION` (ex. patch `1.4.0` → `1.4.1`, minor → `1.5.0`) et `_DEFAULT_DATE` (date de livraison). Ne pas oublier **commit** + **push** avec le reste du changement. Sur PA, si **`TOOLBOX_APP_VERSION`** est défini dans l’onglet Web, il peut **masquer** le défaut du dépôt : aligner ou retirer la variable après une montée de version.

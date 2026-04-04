@@ -20,6 +20,7 @@ si vous clonez le repo dans `/home/senedoo/pythonanywhere`. (Si vous ne gardez q
   - `toolbox_users.json` — comptes + `password_hash` (Werkzeug)
   - `toolbox_clients.json` — URL / base / user API Odoo par `client_id`
   - Variable **`TOOLBOX_SECRET_KEY`** (onglet Web PythonAnywhere)
+- **Version affichée** : incrémenter **`web_app/app_version.py`** (`_DEFAULT_VERSION`, `_DEFAULT_DATE`) à **chaque** livraison avec nouvelle fonctionnalité ou correctif notable — source unique pour l’UI et les utilitaires staff (surcharge possible par **`TOOLBOX_APP_VERSION`** / **`TOOLBOX_APP_DATE`** sur PA, voir ci-dessous).
 
 Si l’interface affiche une **version « 1 »**, **« 1.0.0 »** ou autre valeur incohérente : onglet Web — supprimez **`TOOLBOX_APP_VERSION`** ou mettez une vraie livraison (ex. `1.3.3`). Le code **ignore** `1`, `1.0`, `1.0.0` et toute valeur **sans point**, puis reprend le défaut du dépôt. Après déploiement : **Reload** le site + rechargement forcé du navigateur (**Ctrl+Shift+R**) sur les pages `/staff/…` pour éviter un vieux HTML en cache.
 
