@@ -10,6 +10,8 @@ __pycache__/
 .env
 .env.*
 !.env.example
+.pythonanywhere_api_token
+.pythonanywhere_api_host
 
 # Node (MCP SSH local)
 **/node_modules/

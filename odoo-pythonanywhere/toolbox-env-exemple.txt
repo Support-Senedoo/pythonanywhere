@@ -10,10 +10,11 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 # Désactiver le cache LRU Jinja (déjà activé via pythonanywhere_wsgi.py / pa_wsgi.py sur PA) :
 # TOOLBOX_JINJA_NO_CACHE=1
 #
-# Sur PA, en Bash uniquement (pas l’onglet Web — secret) : après git pull, reload automatique du site :
-#   export PYTHONANYWHERE_API_TOKEN='…'   # Account → API token sur pythonanywhere.com
-# Compte hébergé en Europe : export PYTHONANYWHERE_API_HOST=https://eu.pythonanywhere.com
-# Optionnel : PYTHONANYWHERE_WEBAPP_HOST=senedoo.pythonanywhere.com  PYTHONANYWHERE_API_USER=senedoo
+# Reload auto après deploy_pa.sh (token jamais ici ni dans Git) :
+# Sur PA : echo 'VOTRE_TOKEN' > ~/.pythonanywhere_api_token && chmod 600 ~/.pythonanywhere_api_token
+# EU : echo 'https://eu.pythonanywhere.com' > ~/.pythonanywhere_api_host && chmod 600 ~/.pythonanywhere_api_host
+# Ou : export PYTHONANYWHERE_API_TOKEN=…  et  export PYTHONANYWHERE_API_HOST=…  (Bash interactif)
+# Optionnel : PYTHONANYWHERE_WEBAPP_HOST  PYTHONANYWHERE_API_USER
 # TOOLBOX_APP_DATE=2026-04-03
 # TOOLBOX_APP_LABEL=Toolbox Senedoo
 # TOOLBOX_APP_AUTHOR=Senedoo

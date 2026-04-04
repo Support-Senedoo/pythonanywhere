@@ -7,6 +7,19 @@ REPO_URL="${REPO_URL:-https://github.com/Support-Senedoo/pythonanywhere.git}"
 TARGET="${HOME}/pythonanywhere"
 APP_DIR="${TARGET}/odoo-pythonanywhere"
 
+# Token API PA : ne jamais commiter. SSH non interactif ne charge pas toujours .bashrc → fichier home dédié.
+PA_TOKEN_FILE="${HOME}/.pythonanywhere_api_token"
+if [[ -z "${PYTHONANYWHERE_API_TOKEN:-}" ]] && [[ -f "${PA_TOKEN_FILE}" ]]; then
+  PYTHONANYWHERE_API_TOKEN="$(head -n 1 "${PA_TOKEN_FILE}" | tr -d '\r\n')"
+  export PYTHONANYWHERE_API_TOKEN
+fi
+# Compte Europe : une ligne https://eu.pythonanywhere.com (optionnel, sinon www).
+PA_API_HOST_FILE="${HOME}/.pythonanywhere_api_host"
+if [[ -z "${PYTHONANYWHERE_API_HOST:-}" ]] && [[ -f "${PA_API_HOST_FILE}" ]]; then
+  PYTHONANYWHERE_API_HOST="$(head -n 1 "${PA_API_HOST_FILE}" | tr -d '\r\n')"
+  export PYTHONANYWHERE_API_HOST
+fi
+
 if [[ -d "${TARGET}/.git" ]]; then
   echo ">>> git fetch + pull --ff-only dans ${TARGET}"
   git -C "${TARGET}" fetch origin
@@ -28,9 +41,10 @@ fi
 echo ">>> pip (${PY}) install --user"
 "${PY}" -m pip install --user -r requirements.txt
 
-# Reload Web optionnel : token API PythonAnywhere (Account → API token), jamais dans Git.
-# Sur PA (Bash) : export PYTHONANYWHERE_API_TOKEN='votre_token'
-# Compte EU : définir aussi PYTHONANYWHERE_API_HOST=https://eu.pythonanywhere.com
+# Reload Web optionnel : token API (Account → API token). Fichiers home (chmod 600) :
+#   ~/.pythonanywhere_api_token   → une ligne = token
+#   ~/.pythonanywhere_api_host    → une ligne = https://eu.pythonanywhere.com (EU seulement)
+# Ou variables d’environnement PYTHONANYWHERE_API_TOKEN / PYTHONANYWHERE_API_HOST.
 if [[ -n "${PYTHONANYWHERE_API_TOKEN:-}" ]]; then
   PA_USER="${PYTHONANYWHERE_API_USER:-${USER}}"
   PA_HOST="${PYTHONANYWHERE_WEBAPP_HOST:-${PA_USER}.pythonanywhere.com}"
@@ -47,7 +61,7 @@ if [[ -n "${PYTHONANYWHERE_API_TOKEN:-}" ]]; then
     echo ">>> ATTENTION : Reload API a échoué (token, domaine ou hôte API). Rechargez à la main dans l’onglet Web." >&2
   fi
 else
-  echo ">>> Pas de PYTHONANYWHERE_API_TOKEN : pensez à cliquer Reload dans l’onglet Web."
+  echo ">>> Pas de token API (~/.pythonanywhere_api_token ou PYTHONANYWHERE_API_TOKEN) : Reload manuel (onglet Web)."
 fi
 
 echo ""

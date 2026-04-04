@@ -57,7 +57,7 @@ Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le di
 
 **Templates HTML** : Jinja mettait en cache les gabarits. Les entrées **`pythonanywhere_wsgi.py`** / **`pa_wsgi.py`** définissent **`TOOLBOX_JINJA_NO_CACHE`** et **`create_app`** applique **`jinja_options["cache_size"] = 0`** sur PythonAnywhere pour que les `.html` sur disque soient pris en compte sans rester « figés ». **Les changements de fichiers `.py`** exigent tout de même un **Reload** du worker (ou le reload API ci-dessous).
 
-**Reload automatique après `deploy_pa.sh`** : sur la console **Bash** PA uniquement, définir **`PYTHONANYWHERE_API_TOKEN`** (token créé sous Account → API token). Le script appelle alors l’API **reload** du site. Ne jamais mettre ce token dans Git ni dans l’onglet Web. Compte **EU** : définir aussi **`PYTHONANYWHERE_API_HOST=https://eu.pythonanywhere.com`**.
+**Reload automatique après `deploy_pa.sh`** : le script appelle l’API **reload** si un token est disponible. **Recommandé (SSH / agent sans `.bashrc`)** : sur PA, créer **`~/.pythonanywhere_api_token`** (une ligne = token, `chmod 600`). Compte **EU** : fichier optionnel **`~/.pythonanywhere_api_host`** contenant une ligne `https://eu.pythonanywhere.com`. Alternative : variables d’environnement **`PYTHONANYWHERE_API_TOKEN`** et **`PYTHONANYWHERE_API_HOST`**. Token créé sous **Account → API token** — **jamais** dans Git, l’onglet Web, ni le chat.
 
 ## Déploiement / mise à jour du code
 
