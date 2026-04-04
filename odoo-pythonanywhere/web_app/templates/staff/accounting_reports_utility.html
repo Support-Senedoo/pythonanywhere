@@ -61,7 +61,7 @@
     <li>Choisissez le <strong>client / base</strong> (regroupement par libellé ; précision prod/test dans la liste), puis cliquez sur <strong>Actualiser</strong> : le <strong>voyant</strong> indique si l’API répond.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
     <li>Saisissez un filtre (ex. <code>compte</code>, <code>SYSCOHADA</code>, <code>résultat</code>) pour réduire la liste.</li>
-    <li><strong>Personnaliser</strong> : indiquez l’<strong>id du rapport source</strong> (standard ou existant), tapez <strong>OUI</strong> — une <strong>copie</strong> est créée dans Odoo puis seule cette copie est personnalisée (barre de progression pendant l’opération).</li>
+    <li><strong>Personnaliser</strong> : indiquez l’<strong>id du rapport source</strong> (standard ou existant), tapez <strong>OUI</strong> — une <strong>copie</strong> est créée dans Odoo puis seule cette copie est personnalisée ; la barre de progression s’affiche pendant l’envoi du formulaire (navigation classique).</li>
     <li><strong>Supprimer</strong> : recopiez exactement la phrase demandée (<code>SUPPRIMER-&lt;id&gt;</code>) — irréversible si Odoo accepte la suppression.</li>
   </ul>
   <p class="sn-meta-line">
@@ -229,53 +229,26 @@
   var form = document.getElementById('form-personalize-report');
   var overlay = document.getElementById('sn-personalize-overlay');
   if (!form || !overlay) return;
-  form.addEventListener('submit', function(ev) {
+  /* Soumission HTML native (pas fetch) : le navigateur attend la 302/200 jusqu’à la fin du traitement Odoo ;
+     l’overlay reste visible pendant tout le POST (comme les autres formulaires longs de l’outil). */
+  form.addEventListener('submit', function (ev) {
+    if (form.getAttribute('data-sn-native-personalize') === '1') {
+      return;
+    }
     ev.preventDefault();
     overlay.hidden = false;
     overlay.setAttribute('aria-hidden', 'false');
-    var ctrl = new AbortController();
-    var t = setTimeout(function() { ctrl.abort(); }, 900000);
-    fetch(form.action, {
-      method: 'POST',
-      headers: { 'X-Toolbox-Ajax': '1' },
-      body: new FormData(form),
-      credentials: 'same-origin',
-      cache: 'no-store',
-      signal: ctrl.signal
-    }).then(function(resp) {
-      clearTimeout(t);
-      var ct = (resp.headers.get('Content-Type') || '');
-      if (resp.ok && ct.indexOf('application/json') !== -1) {
-        return resp.json().then(function(data) {
-          if (data && typeof data.redirect === 'string') {
-            window.location.href = data.redirect;
-            return;
-          }
-          overlay.hidden = true;
-          overlay.setAttribute('aria-hidden', 'true');
-          window.alert('Réponse serveur inattendue (pas d’URL de redirection).');
-        });
-      }
-      overlay.hidden = true;
-      overlay.setAttribute('aria-hidden', 'true');
-      if (resp.ok) {
-        window.location.reload();
-        return;
-      }
-      window.alert(
-        'La personnalisation a échoué ou la réponse du serveur est inattendue (HTTP ' + resp.status + '). ' +
-        'Si le traitement était long, rechargez la page : la copie a peut‑être quand même été créée dans Odoo.'
-      );
-    }).catch(function(err) {
-      clearTimeout(t);
-      overlay.hidden = true;
-      overlay.setAttribute('aria-hidden', 'true');
-      if (err && err.name === 'AbortError') {
-        window.alert('Délai dépassé (15 min). Rechargez la page et vérifiez dans Odoo si une copie a été créée.');
-      } else {
-        window.alert('Erreur réseau pendant la personnalisation.');
-      }
+    form.setAttribute('data-sn-native-personalize', '1');
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        HTMLFormElement.prototype.submit.call(form);
+      });
     });
+  });
+  window.addEventListener('pageshow', function (ev) {
+    if (ev.persisted && form) {
+      form.removeAttribute('data-sn-native-personalize');
+    }
   });
 })();
 </script>

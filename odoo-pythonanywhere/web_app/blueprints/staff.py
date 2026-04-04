@@ -6,7 +6,6 @@ from flask import (
     abort,
     current_app,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -232,15 +231,6 @@ def odoo_account_databases_probe():
     )
 
 
-def _rapports_utility_redirect(**kwargs):
-    """Redirection après personnalisation ; JSON si X-Toolbox-Ajax (évite fetch+302 après POST long / proxies)."""
-    filtered = {k: v for k, v in kwargs.items() if v is not None}
-    target = url_for("staff.rapports_comptables", **filtered)
-    if (request.headers.get("X-Toolbox-Ajax") or "").strip() == "1":
-        return jsonify({"redirect": target}), 200
-    return redirect(target)
-
-
 @bp.route("/utilities/personalize-report", methods=["GET", "POST"])
 @bp.route("/utilities/rapports-comptables", methods=["GET", "POST"])
 @login_required_staff
@@ -314,14 +304,17 @@ def rapports_comptables():
                 rid = 0
             if (request.form.get("confirm") or "").strip() != "OUI":
                 flash("Tapez OUI en majuscules pour confirmer la personnalisation.", "warning")
-                return _rapports_utility_redirect(
-                    client_id=cid,
-                    q=filter_q,
-                    report_id=rid if rid > 0 else None,
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=rid if rid > 0 else None,
+                    )
                 )
             if rid <= 0:
                 flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
-                return _rapports_utility_redirect(client_id=cid, q=filter_q)
+                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
             try:
                 new_rid = duplicate_account_report(models, db, uid, pwd, rid)
                 personalize_fix_detail_complete(models, db, uid, pwd, new_rid)
@@ -334,15 +327,21 @@ def rapports_comptables():
                 )
             except Exception as e:
                 flash(f"Échec personnalisation : {e!s}", "danger")
-                return _rapports_utility_redirect(
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=rid if rid > 0 else None,
+                    )
+                )
+            return redirect(
+                url_for(
+                    "staff.rapports_comptables",
                     client_id=cid,
                     q=filter_q,
-                    report_id=rid if rid > 0 else None,
+                    report_id=new_rid,
                 )
-            return _rapports_utility_redirect(
-                client_id=cid,
-                q=filter_q,
-                report_id=new_rid,
             )
         if action == "unlink":
             try:
