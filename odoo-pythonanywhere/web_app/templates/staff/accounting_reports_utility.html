@@ -121,8 +121,7 @@
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le rapport peut combiner un <strong>handler</strong> et des lignes moteur « custom » (<code>_report_custom_engine_trial_balance</code>). Il ne faut <strong>pas</strong> vider le handler sur la copie : sinon erreur « Méthode invalide » à l’ouverture.
-    La copie créée ici est <strong>autonome</strong> (pas de <code>root_report_id</code>) : elle évite les conflits de colonnes avec la racine (ex. <code>KeyError</code> sur <code>sn_*</code> / totaux « unaffected earnings ») et se comporte comme un rapport à part entière dans le menu Comptabilité / Analyse. Les options de filtre du modèle source sont recopiées sur la copie.
-    Le lien proposé après succès ouvre l’<strong>analyse</strong> du rapport (<code>web#action=…</code>), pas la simple fiche <code>account.report</code>. Si une copie ancienne pose encore problème : la regénérer avec cet utilitaire.
+    La copie est <strong>autonome</strong> (sans <code>root_report_id</code>) pour éviter les erreurs sur les colonnes <code>sn_*</code>. La toolbox tente de créer une <strong>entrée de menu</strong> sous <strong>Facturation › Reporting › États / déclarations légaux</strong> (libellés selon langue) et un lien liste « rapports comptables » en configuration. Les options de filtre du modèle source sont recopiées sur la copie.
   </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -200,22 +199,32 @@
 
 {% if balance_show_links %}
 <div class="sn-card sn-card--accent" style="margin-bottom:0.85rem;border-left:4px solid var(--sn-primary-bright);">
-  <p style="margin:0 0 0.65rem;line-height:1.45;"><strong>Personnalisation terminée.</strong> La copie est un rapport <strong>autonome</strong> (sans <code>root_report_id</code>) : elle se distingue des variantes liées à la balance racine Odoo et doit apparaître avec les autres rapports sous <strong>Comptabilité</strong> › <strong>Analyse</strong> (libellé selon votre version / traduction).</p>
+  <p style="margin:0 0 0.65rem;line-height:1.45;"><strong>Personnalisation terminée.</strong> La copie est <strong>autonome</strong> (sans <code>root_report_id</code>) : elle n’apparaît plus sous la même entrée que la balance générale standard.</p>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;"><strong>Comment lancer le rapport pour les utilisateurs :</strong> (1) menu <strong>Facturation</strong> (ou <strong>Comptabilité</strong>) › <strong>Reporting</strong> › <strong>États / déclarations légaux</strong> — chercher la ligne au <strong>nom du rapport</strong> créé par la toolbox ; (2) sinon lien « Liste des rapports » ci‑dessous puis recherche par nom ou id <code>{{ prefill_report_id }}</code> ; (3) en dernier recours, fiche technique puis bouton d’exécution dans Odoo si présent.</p>
+  {% if balance_menu_id %}
+  <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.88rem;line-height:1.4;">Entrée de menu Odoo créée ou détectée (id <code>{{ balance_menu_id }}</code>) — le lien ci‑dessous inclut <code>menu_id</code> pour un chargement fiable du client web.</p>
+  {% endif %}
   {% if balance_exec_url %}
-  <p style="margin:0 0 0.5rem;line-height:1.45;">Lien vers l’<strong>écran d’analyse</strong> (grille du rapport, résultat pour l’utilisateur) :</p>
+  <p style="margin:0 0 0.5rem;line-height:1.45;">Lien vers l’<strong>écran d’analyse</strong> (grille du rapport) :</p>
   <p style="margin:0 0 0.65rem;">
     <a class="sn-btn" href="{{ balance_exec_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le rapport (analyse)</a>
   </p>
-  {% if balance_exec_action_created %}
-  <p class="sn-muted" style="margin:0 0 0.65rem;font-size:0.88rem;line-height:1.4;">Une action client <code>account_report</code> a été créée dans la base (droits API suffisants) pour pouvoir ouvrir ce rapport ; elle n’ajoute pas automatiquement une ligne de menu.</p>
-  {% endif %}
-  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL d’exécution (copier-coller) :</p>
+  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL (copier-coller) :</p>
   <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_exec_url }}</code></p>
   {% else %}
-  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;">Impossible de résoudre ou de créer l’action d’exécution via l’API (droits ou version Odoo). Ouvrez le rapport depuis le menu <strong>Comptabilité</strong> › <strong>Analyse</strong> / rapports{% if prefill_report_name %} — cherchez « {{ prefill_report_name }} »{% endif %} (id <code>{{ prefill_report_id }}</code>).</p>
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;">L’API n’a pas pu créer l’action / menu (droits utilisateur Odoo insuffisants sur <code>ir.actions.client</code> ou <code>ir.ui.menu</code>). Utilisez le menu Reporting ou la liste des rapports.</p>
+  {% endif %}
+  {% if balance_list_url %}
+  <hr style="margin:0.85rem 0;border:none;border-top:1px solid var(--sn-border);">
+  <p style="margin:0 0 0.5rem;line-height:1.45;">Liste backend des <code>account.report</code> (recherche par nom, ouverture depuis Odoo) :</p>
+  <p style="margin:0 0 0.65rem;">
+    <a class="sn-btn sn-btn--ghost" href="{{ balance_list_url }}" target="_blank" rel="noopener noreferrer">Ouvrir la liste des rapports</a>
+  </p>
+  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL (copier-coller) :</p>
+  <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_list_url }}</code></p>
   {% endif %}
   <hr style="margin:0.85rem 0;border:none;border-top:1px solid var(--sn-border);">
-  <p style="margin:0 0 0.5rem;line-height:1.45;" class="sn-muted">Fiche technique (configuration du modèle <code>account.report</code>, réservée admin / Studio) :</p>
+  <p style="margin:0 0 0.5rem;line-height:1.45;" class="sn-muted">Fiche technique (configuration <code>account.report</code>, admin / Studio) :</p>
   <p style="margin:0 0 0.65rem;">
     <a class="sn-btn sn-btn--ghost" href="{{ balance_form_url }}" target="_blank" rel="noopener noreferrer">Ouvrir la fiche technique</a>
   </p>

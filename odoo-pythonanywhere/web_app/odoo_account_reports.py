@@ -206,11 +206,191 @@ def ensure_account_report_client_action(
         return None
 
 
-def account_report_execution_url(base_url: str, client_action_id: int) -> str:
-    """URL vers l’écran d’exécution du rapport (client action), pas la fiche ``account.report``."""
+def account_report_execution_url(
+    base_url: str,
+    client_action_id: int,
+    *,
+    menu_id: int | None = None,
+) -> str:
+    """
+    URL vers l’écran d’exécution du rapport (client action ``account_report``).
+
+    Avec ``menu_id`` (entrée ``ir.ui.menu`` pointant sur la même action), le client web
+    Odoo charge correctement le fil d’Ariane / le menu — souvent nécessaire sur SaaS récents.
+    """
     base = normalize_odoo_base_url(base_url).rstrip("/")
     aid = int(client_action_id)
+    mid = int(menu_id) if menu_id is not None else None
+    if mid is not None and mid > 0:
+        return f"{base}/web#menu_id={mid}&action={aid}"
     return f"{base}/web#action={aid}"
+
+
+def _ir_ui_menu_id_from_xmlid(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    module: str,
+    name: str,
+) -> int | None:
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "ir.model.data",
+        "search_read",
+        [[("module", "=", module), ("name", "=", name), ("model", "=", "ir.ui.menu")]],
+        {"fields": ["res_id"], "limit": 1},
+    )
+    if not rows or not rows[0].get("res_id"):
+        return None
+    return int(rows[0]["res_id"])
+
+
+# Parents possibles pour accrocher un rapport « autonome » (sans root_report_id).
+_ACCOUNT_REPORT_MENU_PARENT_XMLIDS: tuple[str, ...] = (
+    "account.account_reports_legal_statements_menu",
+    "account.menu_finance_reports",
+)
+
+
+def resolve_parent_menu_for_account_report(models: Any, db: str, uid: int, password: str) -> int | None:
+    """Retourne l’id ``ir.ui.menu`` parent (ex. Reporting > Statement Reports)."""
+    for xmlid in _ACCOUNT_REPORT_MENU_PARENT_XMLIDS:
+        mod, _, name = xmlid.partition(".")
+        if not name:
+            continue
+        mid = _ir_ui_menu_id_from_xmlid(models, db, uid, password, mod, name)
+        if mid:
+            return mid
+    return None
+
+
+def find_menu_id_for_client_action(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    client_action_id: int,
+) -> int | None:
+    ref = f"ir.actions.client,{int(client_action_id)}"
+    try:
+        mids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "search",
+            [[("action", "=", ref)]],
+            {"limit": 5, "order": "id desc"},
+        )
+    except Exception:
+        return None
+    return int(mids[0]) if mids else None
+
+
+def find_account_report_backend_list_action_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> int | None:
+    """Action « liste » des rapports comptables (trouver la copie dans la configuration)."""
+    try:
+        aids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.actions.act_window",
+            "search",
+            [[("res_model", "=", "account.report")]],
+            {"limit": 40, "order": "id asc"},
+        )
+    except Exception:
+        return None
+    if not aids:
+        return None
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "ir.actions.act_window",
+        "read",
+        [aids],
+        {"fields": ["id", "name"]},
+    )
+    for r in rows:
+        n = str(r.get("name") or "").lower()
+        if any(k in n for k in ("financial", "report", "statement", "rapport", "compta")):
+            return int(r["id"])
+    return int(rows[0]["id"])
+
+
+def account_report_backend_list_url(base_url: str, act_window_id: int) -> str:
+    """URL backend vers la liste des ``account.report`` (recherche par nom / id)."""
+    base = normalize_odoo_base_url(base_url).rstrip("/")
+    return f"{base}/web#action={int(act_window_id)}"
+
+
+def ensure_account_report_reporting_menu(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    menu_title: str,
+) -> tuple[int | None, int | None]:
+    """
+    Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu`` sous Reporting.
+
+    Retourne ``(client_action_id, menu_id)``. Si aucun parent menu n’est résolu, retourne
+    ``(action_id, None)`` — l’URL ``web#action=`` peut rester insuffisante selon la version Odoo.
+    """
+    title = (menu_title or f"Rapport {report_id}").strip()
+    if len(title) > 120:
+        title = title[:117] + "…"
+    aid = ensure_account_report_client_action(
+        models,
+        db,
+        uid,
+        password,
+        int(report_id),
+        action_name=title,
+    )
+    if not aid:
+        return None, None
+    ref = f"ir.actions.client,{int(aid)}"
+    existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
+    if existing_mid:
+        return aid, existing_mid
+    parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
+    if not parent_id:
+        return aid, None
+    try:
+        new_mid = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "create",
+            [
+                {
+                    "name": title,
+                    "parent_id": int(parent_id),
+                    "action": ref,
+                    "sequence": 500,
+                }
+            ],
+        )
+        return aid, int(new_mid)
+    except Exception:
+        return aid, None
 
 
 def format_report_name(val: Any) -> str:

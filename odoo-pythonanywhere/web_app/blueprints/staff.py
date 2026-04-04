@@ -52,11 +52,12 @@ from web_app.odoo_account_reports import (
     UTILITY_TITLE_BALANCE,
     UTILITY_TITLE_PL_BUDGET,
     UTILITY_VERSION,
+    account_report_backend_list_url,
     account_report_execution_url,
     account_report_odoo_form_url,
     duplicate_account_report,
-    ensure_account_report_client_action,
-    find_account_report_client_action_id,
+    ensure_account_report_reporting_menu,
+    find_account_report_backend_list_action_id,
     probe_odoo_reports_access,
     read_account_report_label,
     search_account_reports,
@@ -584,12 +585,28 @@ def _accounting_reports_page(accounting_mode: str):
                 msg = (
                     f"Balance : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »), "
                     f"6 colonnes (débit/crédit initiaux et finaux). Copie autonome (sans lien racine Odoo), "
-                    f"pour l’affichage comme rapport distinct sous Comptabilité / Analyse. L’original n’a pas été modifié."
+                    f"pour éviter les erreurs Enterprise sur les colonnes supplémentaires. L’original n’a pas été modifié."
                 )
                 if bal_meta.get("detach_error"):
                     msg += (
                         f" Note : post-traitement racine Enterprise : {bal_meta['detach_error']!s}."
                     )
+                try:
+                    _ba, menu_mid = ensure_account_report_reporting_menu(
+                        models,
+                        db,
+                        uid,
+                        pwd,
+                        new_rid,
+                        rlabel,
+                    )
+                    if menu_mid:
+                        msg += (
+                            " Une entrée de menu a été créée sous Facturation › Reporting "
+                            "(États / déclarations légaux) avec le nom du rapport — ouvrez-la pour lancer l’analyse."
+                        )
+                except Exception:
+                    pass
                 flash(msg, "success")
             except Exception as e:
                 flash(f"Échec personnalisation balance : {e!s}", "danger")
@@ -843,28 +860,31 @@ def _accounting_reports_page(accounting_mode: str):
     )
     balance_exec_url = ""
     balance_form_url = ""
-    balance_exec_action_created = False
+    balance_list_url = ""
+    balance_menu_id: int | None = None
     if balance_show_links:
         bu = reg[runner_client].url
         brid = int(prefill_rid)
         balance_form_url = account_report_odoo_form_url(bu, brid)
         try:
             m, dbn, u, p = get_xmlrpc_for_staff_client_id(runner_client)
-            aid = find_account_report_client_action_id(m, dbn, u, p, brid)
-            if not aid:
-                act_name = (prefill_report_name or f"Balance id={brid}").strip()[:240]
-                aid = ensure_account_report_client_action(
-                    m,
-                    dbn,
-                    u,
-                    p,
-                    brid,
-                    action_name=act_name or f"Rapport {brid}",
-                )
-                if aid:
-                    balance_exec_action_created = True
+            list_aid = find_account_report_backend_list_action_id(m, dbn, u, p)
+            if list_aid:
+                balance_list_url = account_report_backend_list_url(bu, list_aid)
+            act_name = (prefill_report_name or f"Balance id={brid}").strip()[:240] or f"Rapport {brid}"
+            aid, menu_mid = ensure_account_report_reporting_menu(
+                m,
+                dbn,
+                u,
+                p,
+                brid,
+                act_name,
+            )
+            balance_menu_id = menu_mid
             if aid:
-                balance_exec_url = account_report_execution_url(bu, aid)
+                balance_exec_url = account_report_execution_url(
+                    bu, aid, menu_id=menu_mid
+                )
         except Exception:
             pass
 
@@ -885,7 +905,8 @@ def _accounting_reports_page(accounting_mode: str):
         balance_show_links=balance_show_links,
         balance_exec_url=balance_exec_url,
         balance_form_url=balance_form_url,
-        balance_exec_action_created=balance_exec_action_created,
+        balance_list_url=balance_list_url,
+        balance_menu_id=balance_menu_id,
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,
