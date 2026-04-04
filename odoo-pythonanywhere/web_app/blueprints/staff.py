@@ -181,7 +181,7 @@ def utilities_home():
     return render_template("staff/utilities.html", clients=reg)
 
 
-_ODOO_PROBE_UTIL_VERSION = "1.2.2"
+_ODOO_PROBE_UTIL_VERSION = "1.2.3"
 _ODOO_PROBE_UTIL_DATE = "2026-04-03"
 
 
@@ -195,12 +195,8 @@ def odoo_account_databases_probe():
         password = (request.form.get("odoo_password") or "").strip()
         if not login:
             flash("Login requis.", "warning")
-        elif not url and not password:
-            flash(
-                "Sans URL d’instance : indiquez le mot de passe pour vous connecter au portail Odoo.com (Mes bases).",
-                "warning",
-            )
         else:
+            # URL vide = portail Mes bases : le mot de passe est requis (erreur claire dans le résultat si oubli).
             result = probe_account_databases(url, login, password)
     return render_template(
         "staff/odoo_account_probe.html",

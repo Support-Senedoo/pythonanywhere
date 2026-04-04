@@ -89,7 +89,11 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
     login_c = (login or "").strip()
     pwd = password or ""
     if not login_c or not pwd:
-        return [], "Login et mot de passe sont requis pour le mode sans URL (portail Odoo.com)."
+        return [], (
+            "Pour lister les bases via le portail Odoo.com (sans URL d’instance), "
+            "le mot de passe est obligatoire — l’URL n’est pas requise dans ce mode. "
+            "Remplissez le mot de passe puis renvoyez le formulaire."
+        )
 
     origin = (os.environ.get("TOOLBOX_ODOO_PORTAL_ORIGIN") or "https://www.odoo.com").rstrip("/")
     lang = (os.environ.get("TOOLBOX_ODOO_PORTAL_LANG") or "/fr_FR").strip()
