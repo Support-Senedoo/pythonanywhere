@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0d9488">
+  <meta name="theme-color" content="#6f2da8">
   <title>{% block title %}Senedoo{% endblock %}</title>
-  <link rel="icon" href="{{ url_for('static', filename='senedoo-logo.svg') }}" type="image/svg+xml">
+  <link rel="icon" href="{{ url_for('static', filename='senedoo-logo.png') }}" type="image/png">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/senedoo.css') }}">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="senedoo-app">
   <header class="sn-header">
     <a class="sn-brand" href="{{ url_for('public.index') }}">
-      <img src="{{ url_for('static', filename='senedoo-logo.svg') }}" width="160" height="34" alt="Senedoo">
+      <span class="sn-brand-logo">
+        <img src="{{ url_for('static', filename='senedoo-logo.png') }}" width="180" height="40" alt="Senedoo">
+      </span>
     </a>
     <nav class="sn-nav">
       <ul>

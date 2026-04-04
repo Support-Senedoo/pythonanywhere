@@ -1,4 +1,4 @@
-/* Senedoo — palette sobre (teal / slate), lisible en mode sombre */
+/* Senedoo — fond sombre, violet marque #6F2DA8 (logo officiel) */
 :root {
   --sn-bg: #0a0f1a;
   --sn-surface: #121a2b;
@@ -6,13 +6,14 @@
   --sn-border: #243044;
   --sn-text: #e8eef7;
   --sn-muted: #8b9cb8;
-  --sn-primary: #0d9488;
-  --sn-primary-bright: #14b8a6;
-  --sn-primary-dim: #0f766e;
+  --sn-primary: #6f2da8;
+  --sn-primary-bright: #9b4ddc;
+  --sn-primary-dim: #552080;
   --sn-accent: #f0b429;
   --sn-danger: #f87171;
   --sn-success: #34d399;
   --sn-radius: 10px;
+  --sn-radius-btn: 6px;
   --sn-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
@@ -22,7 +23,7 @@
 
 body.senedoo-app {
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: radial-gradient(1200px 600px at 10% -10%, rgba(13, 148, 136, 0.18), transparent),
+  background: radial-gradient(1200px 600px at 10% -10%, rgba(111, 45, 168, 0.22), transparent),
     radial-gradient(800px 400px at 100% 0%, rgba(240, 180, 41, 0.06), transparent),
     var(--sn-bg);
   color: var(--sn-text);
@@ -68,9 +69,19 @@ a:hover {
   opacity: 0.92;
 }
 
+.sn-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.65rem;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(111, 45, 168, 0.2);
+}
+
 .sn-brand img,
 .sn-brand svg {
-  height: 36px;
+  height: 32px;
   width: auto;
   display: block;
 }
@@ -86,11 +97,21 @@ a:hover {
   margin-bottom: 1.75rem;
 }
 
-.sn-hero .sn-logo-hero {
-  height: 52px;
-  width: auto;
+.sn-logo-official-wrap {
   display: inline-block;
-  filter: drop-shadow(0 4px 20px rgba(13, 148, 136, 0.25));
+  padding: 0.85rem 1.35rem;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 6px 28px rgba(111, 45, 168, 0.25);
+}
+
+.sn-hero .sn-logo-hero {
+  height: auto;
+  max-height: 56px;
+  width: auto;
+  max-width: min(100%, 280px);
+  display: block;
+  margin: 0 auto;
 }
 
 .sn-hero-tagline {
@@ -105,11 +126,17 @@ a:hover {
   margin-bottom: 1.25rem;
 }
 
+.sn-auth-brand .sn-logo-official-wrap {
+  padding: 0.75rem 1.2rem;
+}
+
 .sn-auth-brand .sn-logo-xl {
-  height: 56px;
+  height: auto;
+  max-height: 52px;
   width: auto;
-  display: inline-block;
-  filter: drop-shadow(0 4px 24px rgba(13, 148, 136, 0.3));
+  max-width: 260px;
+  display: block;
+  margin: 0 auto;
 }
 
 .sn-scroll-x {
@@ -136,7 +163,7 @@ a:hover {
 }
 
 .sn-table tbody tr:hover {
-  background: rgba(20, 184, 166, 0.06);
+  background: rgba(155, 77, 220, 0.08);
 }
 
 .sn-nav ul {
@@ -186,7 +213,7 @@ h2 {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .sn-card:hover {
-  border-color: rgba(20, 184, 166, 0.35);
+  border-color: rgba(155, 77, 220, 0.4);
 }
 
 .sn-card--accent {
@@ -217,8 +244,8 @@ h2 {
   border-color: var(--sn-success);
 }
 .sn-flash.info {
-  background: rgba(20, 184, 166, 0.08);
-  border-color: var(--sn-primary);
+  background: rgba(111, 45, 168, 0.12);
+  border-color: var(--sn-primary-bright);
 }
 
 label {
@@ -252,12 +279,12 @@ button,
   background: linear-gradient(165deg, var(--sn-primary-bright), var(--sn-primary-dim));
   color: #fff !important;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--sn-radius-btn);
   cursor: pointer;
   text-decoration: none !important;
   font-weight: 600;
   font-size: 0.95rem;
-  box-shadow: 0 2px 12px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 2px 14px rgba(111, 45, 168, 0.45);
 }
 button:hover,
 .sn-btn:hover {
@@ -324,8 +351,8 @@ pre,
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
-  background: rgba(20, 184, 166, 0.2);
-  color: var(--sn-primary-bright);
+  background: rgba(155, 77, 220, 0.22);
+  color: #d4b4f0;
 }
 
 .sn-portal-row {
