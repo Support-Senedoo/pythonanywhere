@@ -37,11 +37,13 @@
     </nav>
   </header>
   <main class="sn-main {% block main_class %}{% endblock %}">
+    {% block flash_zone %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}
         <div class="sn-flash {{ cat }}">{{ msg }}</div>
       {% endfor %}
     {% endwith %}
+    {% endblock %}
     {% block body %}{% endblock %}
   </main>
 </body>

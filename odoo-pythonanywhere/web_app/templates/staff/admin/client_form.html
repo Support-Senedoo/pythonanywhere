@@ -18,6 +18,13 @@
     <label for="label">Nom affiché</label>
     <input type="text" id="label" name="label" required value="{{ client.label if client else '' }}" placeholder="Ex. La Ripaille">
 
+    <label for="environment">Environnement</label>
+    <select id="environment" name="environment">
+      <option value="production" {% if not client or client.environment != 'test' %}selected{% endif %}>Production</option>
+      <option value="test" {% if client and client.environment == 'test' %}selected{% endif %}>Test / recette</option>
+    </select>
+    <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">Plusieurs entrées peuvent partager le même nom affiché (ex. prod + test) avec des identifiants techniques distincts.</p>
+
     <label for="url">URL Odoo</label>
     <input type="url" id="url" name="url" required value="{{ client.url if client else '' }}" placeholder="https://xxx.odoo.com">
 

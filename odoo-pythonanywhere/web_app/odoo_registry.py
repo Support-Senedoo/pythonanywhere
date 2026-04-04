@@ -16,6 +16,11 @@ from web_app.client_apps import normalize_app_ids
 _CLIENT_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
+def _normalize_environment(raw: Any) -> str:
+    s = str(raw or "production").strip().lower()
+    return s if s in ("production", "test") else "production"
+
+
 @dataclass(frozen=True)
 class ClientOdooConfig:
     id: str
@@ -25,6 +30,7 @@ class ClientOdooConfig:
     user: str
     password: str
     apps: tuple[str, ...]
+    environment: str = "production"
 
 
 def _row_to_config(row: dict[str, Any]) -> ClientOdooConfig:
@@ -38,7 +44,29 @@ def _row_to_config(row: dict[str, Any]) -> ClientOdooConfig:
         user=str(row["user"]).strip(),
         password=str(row["password"]),
         apps=apps,
+        environment=_normalize_environment(row.get("environment")),
     )
+
+
+def clients_grouped_for_select(reg: dict[str, ClientOdooConfig]) -> list[tuple[str, list[tuple[str, ClientOdooConfig]]]]:
+    """Regroupe les entrées par libellé affiché pour <optgroup> (plusieurs bases / même client)."""
+    items = sorted(
+        reg.items(),
+        key=lambda x: (x[1].label.lower(), 0 if x[1].environment == "production" else 1, x[0].lower()),
+    )
+    groups: list[tuple[str, list[tuple[str, ClientOdooConfig]]]] = []
+    cur_label: str | None = None
+    bucket: list[tuple[str, ClientOdooConfig]] = []
+    for cid, cfg in items:
+        if cur_label is None or cfg.label != cur_label:
+            if bucket and cur_label is not None:
+                groups.append((cur_label, bucket))
+            bucket = []
+            cur_label = cfg.label
+        bucket.append((cid, cfg))
+    if bucket and cur_label is not None:
+        groups.append((cur_label, bucket))
+    return groups
 
 
 def load_clients_registry(path: str | Path) -> dict[str, ClientOdooConfig]:
@@ -95,6 +123,8 @@ def upsert_client(
     user: str,
     password: str | None,
     apps: list[str],
+    *,
+    environment: str | None = None,
 ) -> None:
     cid = validate_client_id(client_id)
     data = read_clients_raw(path)
@@ -109,6 +139,11 @@ def upsert_client(
     for i, row in enumerate(clients):
         if str(row.get("id", "")).strip().lower() == cid:
             pwd = password if password is not None else str(row.get("password", ""))
+            env_use = (
+                _normalize_environment(environment)
+                if environment is not None
+                else _normalize_environment(row.get("environment"))
+            )
             clients[i] = {
                 "id": cid,
                 "label": label,
@@ -117,12 +152,14 @@ def upsert_client(
                 "user": user,
                 "password": pwd,
                 "apps": app_ids,
+                "environment": env_use,
             }
             found = True
             break
     if not found:
         if not password:
             raise ValueError("Mot de passe Odoo requis pour un nouveau client.")
+        env_use = _normalize_environment(environment or "production")
         clients.append(
             {
                 "id": cid,
@@ -132,6 +169,7 @@ def upsert_client(
                 "user": user,
                 "password": password,
                 "apps": app_ids,
+                "environment": env_use,
             }
         )
     data["clients"] = clients

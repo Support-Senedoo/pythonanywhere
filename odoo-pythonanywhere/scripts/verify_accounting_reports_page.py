@@ -29,9 +29,11 @@ if str(_ROOT) not in sys.path:
 REQUIRED_ALWAYS = [
     'id="ajouter-base-odoo"',
     'name="new_client_id"',
+    'name="new_environment"',
     'value="add_client"',
     "Ajouter une base Odoo au registre",
     "Enregistrer la base",
+    "sn-page-bottom-flash",
     "copie automatique",
     # Apostrophes typographiques du gabarit Jinja
     "le rapport d\u2019origine n\u2019est pas modifié",
@@ -40,6 +42,8 @@ REQUIRED_ALWAYS = [
 # Uniquement si ?client_id=… pointe vers un client connu du registre
 REQUIRED_WITH_CLIENT = [
     'id="report_id_p"',
+    'id="form-personalize-report"',
+    "sn-personalize-overlay",
     "Créer la copie et personnaliser",
 ]
 

@@ -133,6 +133,7 @@ def clients_list():
                 "label": cfg.label,
                 "url": cfg.url,
                 "db": cfg.db,
+                "environment": cfg.environment,
                 "apps": ", ".join(cfg.apps),
                 "users_count": count_users_for_client(_users_path(), cid),
             }
@@ -161,6 +162,7 @@ def client_new():
                 user,
                 password,
                 apps,
+                environment=(request.form.get("environment") or "production"),
             )
             flash(f"Client « {label} » créé.", "success")
             return redirect(url_for("staff_admin.clients_list"))
@@ -203,6 +205,7 @@ def client_edit(client_id: str):
                 user,
                 password,
                 apps,
+                environment=(request.form.get("environment") or "production"),
             )
             flash("Client mis à jour.", "success")
             return redirect(url_for("staff_admin.clients_list"))

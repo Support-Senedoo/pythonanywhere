@@ -16,7 +16,13 @@ from flask import (
 from web_app.blueprints.public import login_required_staff
 from web_app import app_version
 from web_app.client_apps import apps_for_template
-from web_app.odoo_registry import client_has_app, load_clients_registry, upsert_client, validate_client_id
+from web_app.odoo_registry import (
+    client_has_app,
+    clients_grouped_for_select,
+    load_clients_registry,
+    upsert_client,
+    validate_client_id,
+)
 from web_app.odoo_account_probe import MAX_DATABASES_TO_PROBE, probe_account_databases
 from web_app.pointage_import_util import (
     ALLOWED_SUFFIX,
@@ -250,6 +256,8 @@ def rapports_comptables():
             if not url or not db or not user:
                 flash("URL, nom de base (db) et utilisateur Odoo sont requis.", "danger")
                 return redirect(url_for("staff.rapports_comptables", q=filter_q or None))
+            env_raw = (request.form.get("new_environment") or "").strip().lower()
+            env_kw = env_raw if env_raw in ("production", "test") else None
             try:
                 upsert_client(
                     clients_path,
@@ -260,6 +268,7 @@ def rapports_comptables():
                     user,
                     password,
                     [],
+                    environment=env_kw,
                 )
                 flash(f"Base enregistrée : {label} (identifiant {new_cid}).", "success")
             except ValueError as e:
@@ -382,6 +391,7 @@ def rapports_comptables():
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
+        clients_grouped=clients_grouped_for_select(reg),
         selected_client=selected,
         filter_q=filter_q,
         conn_status=conn_status,

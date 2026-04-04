@@ -1,43 +1,52 @@
 {% extends "base.html" %}
 {% block title %}{{ utility_title }} — Senedoo{% endblock %}
 {% block main_class %}sn-main--wide{% endblock %}
+{% block flash_zone %}{# Messages flash affichés en bas de page pour cette utilitaire #}{% endblock %}
 {% block body %}
 <h1>{{ utility_title }}</h1>
-<p style="margin:0.5rem 0 1rem;padding:0.65rem 0.85rem;background:rgba(111,45,168,0.18);border-radius:8px;line-height:1.5;font-size:0.95rem;">
-  <strong>Ajouter une base Odoo</strong> : utilisez le formulaire dans la carte juste ci-dessous (enregistrement dans <code>toolbox_clients.json</code>), sans passer par l’administration.
-  <a href="#ajouter-base-odoo" style="white-space:nowrap;">Aller au formulaire</a>
+
+<p class="sn-muted" style="margin:0.5rem 0 1rem;line-height:1.45;font-size:0.95rem;">
+  Plusieurs bases peuvent partager le même <strong>libellé</strong> : utilisez un <strong>identifiant</strong> distinct par base
+  (ex. <code>client_prod</code> / <code>client_test</code>) et indiquez <strong>production</strong> ou <strong>test</strong> pour chaque entrée.
+  <a href="#ajouter-base-odoo" id="link-open-add-base">Ouvrir le formulaire d’ajout</a>
 </p>
 
-<div class="sn-card sn-card--accent" id="ajouter-base-odoo" style="scroll-margin-top:1rem;">
-  <h2 style="margin-top:0;font-size:1.1rem;">Ajouter une base Odoo au registre</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
-    Même fichier que les autres utilitaires staff (<code>toolbox_clients.json</code> sur le serveur). Après enregistrement,
-    la page se recharge avec cette base présélectionnée — vous ne quittez pas l’utilitaire.
-  </p>
-  <form method="post" action="{{ url_for('staff.rapports_comptables') }}" autocomplete="off" novalidate>
-    <input type="hidden" name="action" value="add_client">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
-    <label for="new_client_id">Identifiant client</label>
-    <input type="text" id="new_client_id" name="new_client_id" required
-           pattern="[a-z][a-z0-9_]{0,62}"
-           placeholder="ex. la_ripaille"
-           title="Lettre minuscule, puis lettres, chiffres ou _ (max 63 car.)"
-           spellcheck="false" autocapitalize="none">
-    <label for="new_label">Libellé affiché</label>
-    <input type="text" id="new_label" name="new_label" placeholder="ex. Société XYZ">
-    <label for="new_url">URL Odoo (https://…)</label>
-    <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
-    <label for="new_db">Nom de la base (db)</label>
-    <input type="text" id="new_db" name="new_db" required placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
-    <label for="new_user">Utilisateur / e-mail API</label>
-    <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
-    <label for="new_password">Mot de passe ou clé API</label>
-    <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
-    <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
-  </form>
-</div>
+<details class="sn-card sn-card--accent" id="ajouter-base-odoo" style="scroll-margin-top:1rem;">
+  <summary style="cursor:pointer;font-weight:600;padding:0.15rem 0;">Ajouter une base Odoo au registre (<code>toolbox_clients.json</code>)</summary>
+  <div style="margin-top:0.85rem;">
+    <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
+      Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
+    </p>
+    <form method="post" action="{{ url_for('staff.rapports_comptables') }}" autocomplete="off" novalidate>
+      <input type="hidden" name="action" value="add_client">
+      <input type="hidden" name="filter_q" value="{{ filter_q }}">
+      <label for="new_client_id">Identifiant technique (unique par base)</label>
+      <input type="text" id="new_client_id" name="new_client_id" required
+             pattern="[a-z][a-z0-9_]{0,62}"
+             placeholder="ex. la_ripaille_prod"
+             title="Lettre minuscule, puis lettres, chiffres ou _ (max 63 car.)"
+             spellcheck="false" autocapitalize="none">
+      <label for="new_label">Libellé affiché (peut être identique pour prod et test)</label>
+      <input type="text" id="new_label" name="new_label" placeholder="ex. Société XYZ">
+      <label for="new_environment">Environnement</label>
+      <select id="new_environment" name="new_environment">
+        <option value="production" selected>Production</option>
+        <option value="test">Test / recette</option>
+      </select>
+      <label for="new_url">URL Odoo (https://…)</label>
+      <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
+      <label for="new_db">Nom de la base (db)</label>
+      <input type="text" id="new_db" name="new_db" required placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
+      <label for="new_user">Utilisateur / e-mail API</label>
+      <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
+      <label for="new_password">Mot de passe ou clé API</label>
+      <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
+      <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
+    </form>
+  </div>
+</details>
 
-<details class="sn-doc" open>
+<details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
     <strong>But.</strong> Cet utilitaire permet d’<strong>ajouter une base</strong> au registre sans quitter cet écran,
@@ -48,11 +57,11 @@
     (si Odoo et vos droits l’autorisent).
   </p>
   <ul>
-    <li><strong>Nouvelle base</strong> : formulaire « Ajouter une base » <strong>au-dessus</strong> de ce descriptif → enregistrement puis rechargement avec la base sélectionnée.</li>
-    <li>Choisissez le <strong>client / base</strong>, puis cliquez sur <strong>Actualiser</strong> : le <strong>voyant</strong> indique si l’API répond.</li>
+    <li><strong>Nouvelle base</strong> : dépliez « Ajouter une base Odoo au registre » ci-dessus → enregistrement puis rechargement avec la base sélectionnée.</li>
+    <li>Choisissez le <strong>client / base</strong> (regroupement par libellé ; précision prod/test dans la liste), puis cliquez sur <strong>Actualiser</strong> : le <strong>voyant</strong> indique si l’API répond.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
     <li>Saisissez un filtre (ex. <code>compte</code>, <code>SYSCOHADA</code>, <code>résultat</code>) pour réduire la liste.</li>
-    <li><strong>Personnaliser</strong> : indiquez l’<strong>id du rapport source</strong> (standard ou existant), tapez <strong>OUI</strong> — une <strong>copie</strong> est créée dans Odoo puis seule cette copie est personnalisée.</li>
+    <li><strong>Personnaliser</strong> : indiquez l’<strong>id du rapport source</strong> (standard ou existant), tapez <strong>OUI</strong> — une <strong>copie</strong> est créée dans Odoo puis seule cette copie est personnalisée (barre de progression pendant l’opération).</li>
     <li><strong>Supprimer</strong> : recopiez exactement la phrase demandée (<code>SUPPRIMER-&lt;id&gt;</code>) — irréversible si Odoo accepte la suppression.</li>
   </ul>
   <p class="sn-meta-line">
@@ -68,8 +77,14 @@
   <label for="client_id">Base Odoo (client)</label>
   <select id="client_id" name="client_id">
     <option value="">— Choisir —</option>
-    {% for cid, c in clients.items() %}
-    <option value="{{ cid }}" {% if selected_client == cid %}selected{% endif %}>{{ c.label }} [{{ cid }}]</option>
+    {% for label, items in clients_grouped %}
+    <optgroup label="{{ label }}">
+      {% for cid, c in items %}
+      <option value="{{ cid }}" {% if selected_client == cid %}selected{% endif %}>
+        {{ c.db }} — {% if c.environment == 'test' %}Test{% else %}Prod{% endif %} [{{ cid }}]
+      </option>
+      {% endfor %}
+    </optgroup>
     {% endfor %}
   </select>
 
@@ -81,8 +96,13 @@
 </form>
 
 {% if selected_client %}
+{% set cfg = clients[selected_client] %}
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.1rem;">Connexion à la base</h2>
+  <p class="sn-muted" style="margin:0 0 0.65rem;">
+    <span class="sn-env-badge sn-env-badge--{{ cfg.environment }}">{% if cfg.environment == 'test' %}Test / recette{% else %}Production{% endif %}</span>
+    <span> — {{ cfg.label }} · <code>{{ cfg.db }}</code></span>
+  </p>
   <div class="sn-status">
     {% if conn_status == 'ok' %}
     <span class="sn-dot sn-dot--ok" title="OK"></span>
@@ -149,8 +169,14 @@
 
 <div class="sn-card" id="personalize">
   <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation (détail comptes / SYSCOHADA)</h2>
-  <p class="sn-muted">Une <strong>copie</strong> du rapport est créée dans Odoo (<code>account.report.copy</code>), puis la personnalisation Senedoo est appliquée <strong>uniquement sur cette copie</strong> — comme l’usage recommandé de <code>personalize_syscohada_detail.py</code> sur une copie.</p>
-  <form method="post" action="{{ url_for('staff.rapports_comptables') }}" novalidate>
+  <details class="sn-muted" style="margin-bottom:0.85rem;">
+    <summary style="cursor:pointer;font-weight:600;color:var(--sn-muted);">Explications (replier pour gagner de la place)</summary>
+    <p class="sn-muted" style="margin:0.5rem 0 0;line-height:1.5;">
+      Une <strong>copie</strong> du rapport est créée dans Odoo (<code>account.report.copy</code>), puis la personnalisation Senedoo est appliquée <strong>uniquement sur cette copie</strong>
+      — comme l’usage recommandé de <code>personalize_syscohada_detail.py</code> sur une copie.
+    </p>
+  </details>
+  <form id="form-personalize-report" method="post" action="{{ url_for('staff.rapports_comptables') }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q }}">
     <input type="hidden" name="action" value="personalize">
@@ -167,4 +193,81 @@
 <p class="sn-muted">Choisissez une base dans la liste (ou ajoutez-en une ci-dessus) pour afficher le voyant et les rapports.</p>
 {% endif %}
 
+<div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">
+  <div class="sn-progress-overlay__box" role="status" aria-live="polite">
+    <p style="margin:0 0 0.75rem;font-weight:600;">Personnalisation en cours…</p>
+    <p class="sn-muted" style="margin:0 0 0.85rem;font-size:0.88rem;line-height:1.45;">Création de la copie et application des réglages sur Odoo — merci de patienter (cela peut prendre plusieurs minutes).</p>
+    <div class="sn-progress-bar" aria-label="Progression">
+      <div class="sn-progress-bar__indeterminate"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sn-page-bottom-flash" role="region" aria-label="Messages">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="sn-flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+</div>
+
+<script>
+(function(){
+  var details = document.getElementById('ajouter-base-odoo');
+  var link = document.getElementById('link-open-add-base');
+  if (link && details) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      details.open = true;
+      details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try { document.getElementById('new_client_id').focus(); } catch (x) {}
+    });
+  }
+  if (location.hash === '#ajouter-base-odoo' && details) {
+    details.open = true;
+  }
+  var form = document.getElementById('form-personalize-report');
+  var overlay = document.getElementById('sn-personalize-overlay');
+  if (!form || !overlay) return;
+  form.addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    overlay.hidden = false;
+    overlay.setAttribute('aria-hidden', 'false');
+    var ctrl = new AbortController();
+    var t = setTimeout(function() { ctrl.abort(); }, 900000);
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      credentials: 'same-origin',
+      redirect: 'manual',
+      signal: ctrl.signal
+    }).then(function(resp) {
+      clearTimeout(t);
+      if (resp.status >= 300 && resp.status < 400) {
+        var loc = resp.headers.get('Location');
+        if (loc) {
+          window.location.href = new URL(loc, window.location.href).href;
+          return;
+        }
+      }
+      overlay.hidden = true;
+      overlay.setAttribute('aria-hidden', 'true');
+      if (resp.ok) {
+        window.location.reload();
+        return;
+      }
+      window.alert('La personnalisation a échoué ou la réponse du serveur est inattendue (HTTP ' + resp.status + ').');
+    }).catch(function(err) {
+      clearTimeout(t);
+      overlay.hidden = true;
+      overlay.setAttribute('aria-hidden', 'true');
+      if (err && err.name === 'AbortError') {
+        window.alert('Délai dépassé (15 min). Rechargez la page et vérifiez dans Odoo si une copie a été créée.');
+      } else {
+        window.alert('Erreur réseau pendant la personnalisation.');
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

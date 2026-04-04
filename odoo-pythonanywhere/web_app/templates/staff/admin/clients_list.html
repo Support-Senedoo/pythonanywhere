@@ -17,6 +17,7 @@
     <tr>
       <th>Id</th>
       <th>Nom</th>
+      <th>Env.</th>
       <th>Base Odoo</th>
       <th>URL</th>
       <th>Apps</th>
@@ -29,6 +30,7 @@
     <tr>
       <td><code>{{ c.id }}</code></td>
       <td>{{ c.label }}</td>
+      <td>{% if c.environment == 'test' %}Test{% else %}Prod{% endif %}</td>
       <td><code>{{ c.db }}</code></td>
       <td class="sn-muted" style="max-width:12rem;overflow:hidden;text-overflow:ellipsis;">{{ c.url }}</td>
       <td class="sn-muted" style="font-size:0.85rem;">{{ c.apps }}</td>
