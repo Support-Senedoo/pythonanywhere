@@ -29,8 +29,9 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 |--------|--------|
 | Utilisateur PA | `senedoo` |
 | SSH (Bash / terminal) | `ssh senedoo@ssh.pythonanywhere.com` |
-| Répertoire projet | `/home/senedoo/odoo-pythonanywhere` |
-| Fichier WSGI (onglet Web) | `/home/senedoo/odoo-pythonanywhere/pythonanywhere_wsgi.py` |
+| Dépôt Git (clone) | `/home/senedoo/pythonanywhere` |
+| Appli Flask | `/home/senedoo/pythonanywhere/odoo-pythonanywhere` |
+| Fichier WSGI (onglet Web) | `/home/senedoo/pythonanywhere/odoo-pythonanywhere/pythonanywhere_wsgi.py` |
 | Commande `pip` | adapter à la **même** version Python que le site web (ex. `pip3.10 install --user -r requirements.txt`) |
 | URL publique du site | `https://senedoo.pythonanywhere.com/` |
 
