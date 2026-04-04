@@ -55,6 +55,8 @@ Donc : **pull sans Reload** = disque à jour, **interface encore ancienne** (ex.
 
 Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le disque à la requête) : si elle est récente mais la ligne « Version » semble fausse, un **Reload** est nécessaire pour réimporter le code Python.
 
+**Templates HTML** : sans redémarrage du worker, Jinja peut **mettre en cache** les gabarits. Le code active **`TEMPLATES_AUTO_RELOAD`** lorsqu’une variable d’environnement `PYTHONANYWHERE*` est présente (onglet Web PA), pour que les changements de `.html` après `git pull` s’affichent **sans** Reload. **Un Reload reste nécessaire** pour les changements de **fichiers `.py`**.
+
 ## Déploiement / mise à jour du code
 
 **À chaque modification** : **commit** puis lancer **`deploy_pa.ps1`** depuis votre PC. Le script fait d’abord un **`git push`** vers `origin` (sauf si `-SkipGitPush`), puis sur PA **`deploy_pa.sh`** exécute **`git fetch` + `git pull --ff-only`**, `pip`, et vous rappelle le **Reload**. Sans commit / sans push réussi, le serveur ne verra pas les derniers fichiers.

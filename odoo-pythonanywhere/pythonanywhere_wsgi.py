@@ -28,3 +28,5 @@ if _PROJECT_ROOT not in sys.path:
 from web_app import create_app
 
 application = create_app()
+# Sans ceci, Jinja garde les .html en mémoire : git pull ne met pas à jour l’accueil tant que le worker tourne.
+application.config["TEMPLATES_AUTO_RELOAD"] = True

@@ -25,6 +25,12 @@ def create_app() -> Flask:
     app.config["DEBUG"] = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
     app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
 
+    # Sans ceci, Jinja garde les gabarits compilés en mémoire : après un git pull sur PA, l’accueil
+    # peut rester figé jusqu’à un Reload Web. On recharge les templates si les fichiers changent.
+    _on_pa = any(k.startswith("PYTHONANYWHERE") for k in os.environ)
+    _force_tpl = os.environ.get("TOOLBOX_TEMPLATE_AUTO_RELOAD", "").lower() in ("1", "true", "yes")
+    app.config["TEMPLATES_AUTO_RELOAD"] = bool(app.config["DEBUG"] or _on_pa or _force_tpl)
+
     from web_app.blueprints.public import bp as public_bp
     from web_app.blueprints.legacy_client import bp as legacy_bp
     from web_app.blueprints.staff import bp as staff_bp

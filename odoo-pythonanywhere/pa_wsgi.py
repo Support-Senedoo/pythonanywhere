@@ -30,3 +30,5 @@ if _HERE not in sys.path:
 from web_app import create_app
 
 application = create_app()
+# PA : recharger les gabarits si les fichiers .html changent sur disque (voir pythonanywhere_wsgi.py).
+application.config["TEMPLATES_AUTO_RELOAD"] = True
