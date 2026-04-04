@@ -21,6 +21,7 @@
             <li><a href="{{ url_for('staff.staff_home') }}">Tableau de bord</a></li>
             <li><a href="{{ url_for('staff.apps_home') }}">Applications</a></li>
             <li><a href="{{ url_for('staff.utilities_home') }}">Utilitaires</a></li>
+            <li><a href="{{ url_for('staff_admin.clients_list') }}">Administration</a></li>
           {% endif %}
           <li><span class="sn-muted">{{ session.get('login') }} · {{ session.get('role') }}</span></li>
           <li><a href="{{ url_for('public.logout') }}" class="sn-btn sn-btn--ghost" style="margin-top:0;padding:0.35rem 0.75rem;">Déconnexion</a></li>

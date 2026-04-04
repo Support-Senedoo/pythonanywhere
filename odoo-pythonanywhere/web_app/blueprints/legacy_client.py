@@ -4,7 +4,8 @@ from __future__ import annotations
 from flask import Blueprint, current_app, render_template, session
 
 from web_app.blueprints.public import login_required_client
-from web_app.odoo_registry import load_clients_registry
+from web_app.client_apps import apps_for_template
+from web_app.odoo_registry import client_has_app, load_clients_registry
 from web_app.session_odoo import get_odoo_client_for_browser_client
 
 bp = Blueprint("legacy", __name__)
@@ -18,11 +19,13 @@ def client_home():
     cfg = reg.get(cid) if cid else None
     client_label = cfg.label if cfg else (cid or "—")
     registry_ok = bool(cfg)
+    client_apps = apps_for_template(cfg.apps) if cfg else []
     return render_template(
         "client/home.html",
         client_label=client_label,
         client_id=cid,
         registry_ok=registry_ok,
+        client_apps=client_apps,
     )
 
 
@@ -32,6 +35,10 @@ def client_odoo_status():
     cid = session.get("client_id")
     reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
     cfg = reg.get(cid) if cid else None
+    if not cfg or not client_has_app(cfg, "odoo_status"):
+        from flask import abort
+
+        abort(404)
     client_label = cfg.label if cfg else (cid or "client")
     try:
         c = get_odoo_client_for_browser_client()

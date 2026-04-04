@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Comptes — administration{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>Comptes portail</h1>
+<p class="sn-muted">Connexion web (client ou équipe Senedoo).</p>
+<p>
+  <a class="sn-btn" href="{{ url_for('staff_admin.user_new') }}">+ Nouveau compte</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.clients_list') }}">Clients Odoo</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.staff_home') }}">← Tableau de bord</a>
+</p>
+
+{% if not users %}
+<p class="sn-muted">Aucun compte (hors comptes de démo code si activés).</p>
+{% else %}
+<div style="overflow-x:auto;">
+<table class="sn-table">
+  <thead>
+    <tr>
+      <th>Identifiant</th>
+      <th>Rôle</th>
+      <th>Client lié</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td><strong>{{ u.login }}</strong></td>
+      <td>{{ u.role }}</td>
+      <td>
+        {% if u.role == 'client' %}
+          <code>{{ u.client_id }}</code>
+          {% if u.client_id in client_labels %} — {{ client_labels[u.client_id] }}{% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td><a href="{{ url_for('staff_admin.user_edit', login=u.login) }}">Modifier</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<style>
+.sn-table { width:100%; border-collapse:collapse; font-size:0.92rem; }
+.sn-table th, .sn-table td { padding:0.5rem 0.65rem; border-bottom:1px solid var(--sn-border); text-align:left; }
+.sn-table th { color:var(--sn-muted); font-weight:600; }
+</style>
+{% endblock %}

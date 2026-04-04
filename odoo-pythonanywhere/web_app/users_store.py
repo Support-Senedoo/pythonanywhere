@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+
+_LOGIN_RE = re.compile(r"^[a-zA-Z0-9._@+-]{2,80}$")
 
 
 @dataclass(frozen=True)
@@ -16,11 +20,29 @@ class ToolboxUser:
     client_id: str | None  # obligatoire si role=client
 
 
-def load_users(path: str | Path) -> dict[str, dict[str, Any]]:
+def read_users_file(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     if not p.is_file():
-        return {}
-    data = json.loads(p.read_text(encoding="utf-8"))
+        return {"users": []}
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def write_users_file(path: str | Path, data: dict[str, Any]) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    fd, tmp = tempfile.mkstemp(suffix=".json", dir=str(p.parent))
+    try:
+        with open(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        Path(tmp).replace(p)
+    except Exception:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def load_users(path: str | Path) -> dict[str, dict[str, Any]]:
+    data = read_users_file(path)
     by_login: dict[str, dict[str, Any]] = {}
     for row in data.get("users", []):
         login = str(row["login"]).strip()
@@ -45,3 +67,140 @@ def verify_user(path: str | Path, login: str, password: str) -> ToolboxUser | No
             return None
         return ToolboxUser(login=login, role=role, client_id=str(cid).strip())
     return ToolboxUser(login=login, role=role, client_id=None)
+
+
+def validate_login(login: str) -> str:
+    s = (login or "").strip()
+    if not _LOGIN_RE.match(s):
+        raise ValueError(
+            "Identifiant : 2–80 car., lettres, chiffres, . _ @ + -"
+        )
+    return s
+
+
+def list_user_rows(path: str | Path) -> list[dict[str, Any]]:
+    data = read_users_file(path)
+    rows = []
+    for row in data.get("users", []):
+        login = str(row.get("login", "")).strip()
+        if not login:
+            continue
+        rows.append(
+            {
+                "login": login,
+                "role": str(row.get("role", "")).strip().lower(),
+                "client_id": row.get("client_id"),
+            }
+        )
+    return sorted(rows, key=lambda r: (r["role"], r["login"].lower()))
+
+
+def count_users_for_client(path: str | Path, client_id: str) -> int:
+    n = 0
+    for row in list_user_rows(path):
+        if row["role"] == "client" and str(row.get("client_id") or "") == client_id:
+            n += 1
+    return n
+
+
+def upsert_client_user(
+    path: str | Path,
+    login: str,
+    password: str | None,
+    client_id: str,
+    *,
+    is_new: bool,
+) -> None:
+    login = validate_login(login)
+    client_id = client_id.strip()
+    if not client_id:
+        raise ValueError("client_id requis.")
+    data = read_users_file(path)
+    users: list[dict[str, Any]] = list(data.get("users", []))
+    found = False
+    for i, row in enumerate(users):
+        if str(row.get("login", "")).strip() == login:
+            if is_new:
+                raise ValueError("Cet identifiant existe déjà.")
+            h = row.get("password_hash") or row.get("hash")
+            if password:
+                h = generate_password_hash(password)
+            if not h:
+                raise ValueError("Mot de passe requis ou existant.")
+            users[i] = {
+                "login": login,
+                "password_hash": h,
+                "role": "client",
+                "client_id": client_id,
+            }
+            found = True
+            break
+    if not found:
+        if not is_new:
+            raise ValueError("Utilisateur introuvable.")
+        if not password:
+            raise ValueError("Mot de passe requis pour un nouvel utilisateur.")
+        users.append(
+            {
+                "login": login,
+                "password_hash": generate_password_hash(password),
+                "role": "client",
+                "client_id": client_id,
+            }
+        )
+    data["users"] = users
+    write_users_file(path, data)
+
+
+def upsert_staff_user(path: str | Path, login: str, password: str | None, *, is_new: bool) -> None:
+    login = validate_login(login)
+    data = read_users_file(path)
+    users: list[dict[str, Any]] = list(data.get("users", []))
+    found = False
+    for i, row in enumerate(users):
+        if str(row.get("login", "")).strip() == login:
+            if is_new:
+                raise ValueError("Cet identifiant existe déjà.")
+            h = row.get("password_hash") or row.get("hash")
+            if password:
+                h = generate_password_hash(password)
+            if not h:
+                raise ValueError("Mot de passe requis ou existant.")
+            users[i] = {
+                "login": login,
+                "password_hash": h,
+                "role": "staff",
+            }
+            found = True
+            break
+    if not found:
+        if not is_new:
+            raise ValueError("Utilisateur introuvable.")
+        if not password:
+            raise ValueError("Mot de passe requis.")
+        users.append(
+            {
+                "login": login,
+                "password_hash": generate_password_hash(password),
+                "role": "staff",
+            }
+        )
+    data["users"] = users
+    write_users_file(path, data)
+
+
+def delete_user(path: str | Path, login: str) -> None:
+    login = login.strip()
+    data = read_users_file(path)
+    users = [u for u in data.get("users", []) if str(u.get("login", "")).strip() != login]
+    if len(users) == len(data.get("users", [])):
+        raise ValueError("Utilisateur introuvable.")
+    data["users"] = users
+    write_users_file(path, data)
+
+
+def get_user_row(path: str | Path, login: str) -> dict[str, Any] | None:
+    for row in read_users_file(path).get("users", []):
+        if str(row.get("login", "")).strip() == login.strip():
+            return dict(row)
+    return None

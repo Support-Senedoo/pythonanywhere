@@ -3,30 +3,24 @@
 {% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
 <h1>{{ client_label }}</h1>
-<p class="sn-muted">Espace client — outils connectés à votre Odoo (même logique qu’avant : accès dédié à votre base).</p>
+<p class="sn-muted">Applications activées pour votre compte sur votre base Odoo.</p>
 
 {% if not registry_ok %}
 <div class="sn-flash warning">
-  Le registre <code>toolbox_clients.json</code> sur le serveur ne contient pas l’entrée <strong>{{ client_id }}</strong>.
-  Les liens Odoo ci-dessous échoueront tant que la configuration n’est pas ajoutée (voir <code>toolbox_clients.example.json</code>).
+  Aucune configuration trouvée pour ce compte (<code>{{ client_id }}</code>). Contactez Senedoo.
+</div>
+{% elif not client_apps %}
+<div class="sn-flash warning">
+  Aucune application n’est activée pour ce client. L’équipe Senedoo peut l’ajouter depuis l’administration.
+</div>
+{% else %}
+<div class="sn-grid">
+  {% for app in client_apps %}
+  <a class="sn-tile" href="{{ url_for(app.client_endpoint) }}">
+    <h3>{{ app.label }}</h3>
+    <p>{{ app.description }}</p>
+  </a>
+  {% endfor %}
 </div>
 {% endif %}
-
-<div class="sn-card sn-card--accent">
-  <h2>Vue d’ensemble</h2>
-  <p class="sn-muted" style="margin:0;">
-    Connexion technique à Odoo, indicateurs rapides — comme sur l’application web précédente.
-  </p>
-</div>
-
-<div class="sn-grid">
-  <a class="sn-tile" href="{{ url_for('legacy.client_odoo_status') }}">
-    <h3>État connexion Odoo</h3>
-    <p>Version serveur, authentification API, compteur partenaires (test rapide).</p>
-  </a>
-  <div class="sn-tile" style="cursor:default;opacity:0.85;">
-    <h3>Autres outils</h3>
-    <p class="sn-muted">Les écrans métier (rapports, exports, etc.) seront branchés ici sur les mêmes routes que l’ancienne appli au fil des besoins.</p>
-  </div>
-</div>
 {% endblock %}

@@ -13,7 +13,8 @@ from flask import (
 )
 
 from web_app.blueprints.public import login_required_staff
-from web_app.odoo_registry import load_clients_registry
+from web_app.client_apps import apps_for_template
+from web_app.odoo_registry import client_has_app, load_clients_registry
 from odoo_client import OdooClient
 from personalize_syscohada_detail import personalize_fix_detail_complete
 
@@ -68,13 +69,18 @@ def apps_home():
     reg = _registry()
     cid = session.get("staff_selected_client_id")
     label = None
+    staff_apps: list[dict] = []
     if cid and cid in reg:
         label = reg[cid].label
+        for row in apps_for_template(reg[cid].apps):
+            if row.get("staff_endpoint"):
+                staff_apps.append(row)
     return render_template(
         "staff/apps.html",
         clients=reg,
         selected=cid,
         selected_label=label,
+        staff_apps=staff_apps,
     )
 
 
@@ -86,6 +92,10 @@ def staff_apps_odoo_status():
         return redirect(url_for("staff.apps_home"))
     try:
         cfg = get_config_by_id(cid)
+        if not client_has_app(cfg, "odoo_status"):
+            from flask import abort
+
+            abort(404)
         c = OdooClient(cfg.url, cfg.db, cfg.user, cfg.password)
         ver = c.version()
         c.authenticate()

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Clients — administration{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>Clients Odoo</h1>
+<p class="sn-muted">Identifiant technique, base de données, URL et applications visibles par les utilisateurs du portail.</p>
+<p><a class="sn-btn" href="{{ url_for('staff_admin.client_new') }}">+ Nouveau client</a>
+   <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.users_list') }}">Comptes</a>
+   <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.staff_home') }}">← Tableau de bord</a></p>
+
+{% if not clients %}
+<p class="sn-muted">Aucun client. Créez-en un pour lier des comptes et la base Odoo.</p>
+{% else %}
+<div style="overflow-x:auto;">
+<table class="sn-table">
+  <thead>
+    <tr>
+      <th>Id</th>
+      <th>Nom</th>
+      <th>Base Odoo</th>
+      <th>URL</th>
+      <th>Apps</th>
+      <th>Comptes</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in clients %}
+    <tr>
+      <td><code>{{ c.id }}</code></td>
+      <td>{{ c.label }}</td>
+      <td><code>{{ c.db }}</code></td>
+      <td class="sn-muted" style="max-width:12rem;overflow:hidden;text-overflow:ellipsis;">{{ c.url }}</td>
+      <td class="sn-muted" style="font-size:0.85rem;">{{ c.apps }}</td>
+      <td>{{ c.users_count }}</td>
+      <td><a href="{{ url_for('staff_admin.client_edit', client_id=c.id) }}">Modifier</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<style>
+.sn-table { width:100%; border-collapse:collapse; font-size:0.92rem; }
+.sn-table th, .sn-table td { padding:0.5rem 0.65rem; border-bottom:1px solid var(--sn-border); text-align:left; }
+.sn-table th { color:var(--sn-muted); font-weight:600; }
+</style>
+{% endblock %}

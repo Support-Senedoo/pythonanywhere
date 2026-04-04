@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'new' %}Nouveau compte{% else %}Modifier {{ user.login }}{% endif %}{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>{% if mode == 'new' %}Nouveau compte{% else %}Modifier « {{ user.login }} »{% endif %}</h1>
+
+<div class="sn-card">
+  <form method="post">
+    {% if mode == 'new' %}
+    <label for="login">Identifiant de connexion</label>
+    <input type="text" id="login" name="login" required autocomplete="username">
+
+    <label for="role">Rôle</label>
+    <select id="role" name="role" required>
+      <option value="client">Client (portail entreprise)</option>
+      <option value="staff">Équipe Senedoo</option>
+    </select>
+
+    <div id="wrap-client">
+      <label for="client_id">Client / profil Odoo</label>
+      <select id="client_id" name="client_id">
+        <option value="">— Choisir —</option>
+        {% for cid, c in clients.items() %}
+        <option value="{{ cid }}">{{ c.label }} ({{ cid }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" name="password" required autocomplete="new-password">
+    {% else %}
+    <p><strong>Identifiant :</strong> {{ user.login }} · <strong>Rôle :</strong> {{ user.role }}</p>
+    {% if user.role == 'client' %}
+    <label for="client_id">Client / profil Odoo</label>
+    <select id="client_id" name="client_id" required>
+      {% for cid, c in clients.items() %}
+      <option value="{{ cid }}" {% if user.client_id == cid %}selected{% endif %}>{{ c.label }} ({{ cid }})</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <label for="password">Nouveau mot de passe</label>
+    <input type="password" id="password" name="password" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer">
+    {% endif %}
+
+    <button type="submit">Enregistrer</button>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.users_list') }}">Annuler</a>
+  </form>
+</div>
+
+{% if mode == 'edit' %}
+<div class="sn-card" style="border-color:var(--sn-danger);margin-top:1.5rem;">
+  <h2 style="color:var(--sn-danger);margin-top:0;">Supprimer ce compte</h2>
+  <form method="post" action="{{ url_for('staff_admin.user_delete', login=user.login) }}" onsubmit="return confirm('Supprimer cet utilisateur ?');">
+    <label for="confirm_login">Tapez l’identifiant exact</label>
+    <input type="text" id="confirm_login" name="confirm_login" required placeholder="{{ user.login }}" autocomplete="off">
+    <button type="submit" style="background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer</button>
+  </form>
+</div>
+{% endif %}
+
+<script>
+(function(){
+  var role = document.getElementById('role');
+  var wrap = document.getElementById('wrap-client');
+  if (!role || !wrap) return;
+  function sync(){
+    wrap.style.display = role.value === 'client' ? 'block' : 'none';
+    var sel = wrap.querySelector('#client_id');
+    if (sel) sel.required = role.value === 'client';
+  }
+  role.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

@@ -27,9 +27,11 @@ def create_app() -> Flask:
     from web_app.blueprints.public import bp as public_bp
     from web_app.blueprints.legacy_client import bp as legacy_bp
     from web_app.blueprints.staff import bp as staff_bp
+    from web_app.blueprints.staff_admin import bp as staff_admin_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(legacy_bp, url_prefix="/client")
     app.register_blueprint(staff_bp, url_prefix="/staff")
+    app.register_blueprint(staff_admin_bp, url_prefix="/staff")
 
     return app
