@@ -5,64 +5,28 @@
 {% block body %}
 <h1>{{ utility_title }}</h1>
 
-<p class="sn-muted" style="margin:0.5rem 0 1rem;line-height:1.45;font-size:0.95rem;">
-  Plusieurs bases peuvent partager le même <strong>libellé</strong> : utilisez un <strong>identifiant</strong> distinct par base
-  (ex. <code>client_prod</code> / <code>client_test</code>) et indiquez <strong>production</strong> ou <strong>test</strong> pour chaque entrée.
-  <a href="#ajouter-base-odoo" id="link-open-add-base">Ouvrir le formulaire d’ajout</a>
-</p>
-
-<details class="sn-card sn-card--accent" id="ajouter-base-odoo" style="scroll-margin-top:1rem;">
-  <summary style="cursor:pointer;font-weight:600;padding:0.15rem 0;">Ajouter une base Odoo au registre (<code>toolbox_clients.json</code>)</summary>
-  <div style="margin-top:0.85rem;">
-    <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
-      Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
-    </p>
-    <form method="post" action="{{ request.path }}" autocomplete="off" novalidate>
-      <input type="hidden" name="action" value="add_client">
-      <input type="hidden" name="filter_q" value="{{ filter_q }}">
-      <label for="new_client_id">Identifiant technique (unique par base)</label>
-      <input type="text" id="new_client_id" name="new_client_id" required
-             pattern="[a-z][a-z0-9_]{0,62}"
-             placeholder="ex. la_ripaille_prod"
-             title="Lettre minuscule, puis lettres, chiffres ou _ (max 63 car.)"
-             spellcheck="false" autocapitalize="none">
-      <label for="new_label">Libellé affiché (peut être identique pour prod et test)</label>
-      <input type="text" id="new_label" name="new_label" placeholder="ex. Société XYZ">
-      <label for="new_environment">Environnement</label>
-      <select id="new_environment" name="new_environment">
-        <option value="production" selected>Production</option>
-        <option value="test">Test / recette</option>
-      </select>
-      <label for="new_url">URL Odoo (https://…)</label>
-      <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
-      <label for="new_db">Nom de la base (db)</label>
-      <input type="text" id="new_db" name="new_db" required placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
-      <label for="new_user">Utilisateur / e-mail API</label>
-      <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
-      <label for="new_password">Mot de passe ou clé API</label>
-      <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
-      <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
-    </form>
-  </div>
-</details>
-
 <details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Cet utilitaire permet d’<strong>ajouter une base</strong> au registre sans quitter cet écran,
+    <strong>But.</strong> Cet utilitaire permet d’<strong>ajouter une base</strong> au registre (dans la carte « Base et filtre »),
     de vérifier la connexion, de <strong>lister et filtrer</strong> les rapports comptables (<code>account.report</code>),
     d’en <strong>personnaliser</strong> une <strong>copie automatique</strong> du rapport choisi (logique Senedoo : notes « custom »
     retirées sur les feuilles, regroupement par compte, hiérarchie des groupes de comptes, « tout déplier » désactivé) —
     <strong>le rapport d’origine n’est pas modifié</strong>, ou d’en <strong>supprimer</strong> une instance
     (si Odoo et vos droits l’autorisent).
   </p>
+  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
+    Plusieurs bases peuvent partager le même <strong>libellé</strong> : utilisez un <strong>identifiant</strong> distinct par base
+    (ex. <code>client_prod</code> / <code>client_test</code>) et indiquez <strong>production</strong> ou <strong>test</strong> pour chaque entrée.
+  </p>
   <ul>
-    <li><strong>Nouvelle base</strong> : dépliez « Ajouter une base Odoo au registre » ci-dessus → enregistrement puis rechargement avec la base sélectionnée.</li>
-    <li>Choisissez le <strong>client / base</strong> (regroupement par libellé ; précision prod/test dans la liste), puis cliquez sur <strong>Actualiser</strong> : le <strong>voyant</strong> indique si l’API répond.</li>
+    <li><strong>Nouvelle base</strong> : dans la carte ci-dessous, dépliez « Ajouter une base au registre » → enregistrement puis rechargement avec la base présélectionnée.</li>
+    <li><strong>Client (libellé)</strong> : choisissez d’abord un libellé puis <strong>Actualiser</strong> pour voir <strong>toutes les bases</strong> (prod / test) avec l’état de connexion ; cliquez sur <strong>Utiliser cette base</strong> pour la suite. Vous pouvez aussi choisir directement une base dans la liste déroulante.</li>
+    <li>Après sélection d’une base, le <strong>voyant</strong> et les <strong>informations instance</strong> (version, expiration, édition, etc.) s’affichent lorsque la connexion Odoo réussit.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
     <li>Saisissez un filtre (ex. <code>compte</code>, <code>SYSCOHADA</code>, <code>résultat</code>) pour réduire la liste.</li>
     <li><strong>Personnaliser</strong> : indiquez l’<strong>id du rapport source</strong> (standard ou existant), tapez <strong>OUI</strong> — une <strong>copie</strong> est créée dans Odoo puis seule cette copie est personnalisée ; la barre de progression s’affiche pendant l’envoi du formulaire (navigation classique).</li>
-    <li><strong>Supprimer</strong> : recopiez exactement la phrase demandée (<code>SUPPRIMER-&lt;id&gt;</code>) — irréversible si Odoo accepte la suppression.</li>
+    <li><strong>Renommer / supprimer</strong> : depuis la liste des rapports ; celle-ci se replie automatiquement après un clic sur « Personnaliser » (replier/déplier via le titre du bloc). Pour supprimer, recopiez exactement <code>SUPPRIMER-&lt;id&gt;</code> — irréversible si Odoo accepte.</li>
   </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -73,27 +37,119 @@
   </p>
 </details>
 
-<form method="get" class="sn-card sn-card--accent" action="{{ request.path }}" novalidate>
-  <label for="client_id">Base Odoo (client)</label>
-  <select id="client_id" name="client_id">
-    <option value="">— Choisir —</option>
-    {% for label, items in clients_grouped %}
-    <optgroup label="{{ label }}">
-      {% for cid, c in items %}
-      <option value="{{ cid }}" {% if selected_client == cid %}selected{% endif %}>
-        {{ c.db }} — {% if c.environment == 'test' %}Test{% else %}Prod{% endif %} [{{ cid }}]
-      </option>
+<div class="sn-card sn-card--accent">
+  <h2 style="margin-top:0;font-size:1.05rem;">Base Odoo et filtre des rapports</h2>
+  <form method="get" action="{{ request.path }}" novalidate>
+    <label for="filter_label">Client (libellé affiché)</label>
+    <select id="filter_label" name="filter_label">
+      <option value="">— Tous les libellés —</option>
+      {% for lab in distinct_client_labels %}
+      <option value="{{ lab }}" {% if filter_label == lab %}selected{% endif %}>{{ lab }}</option>
       {% endfor %}
-    </optgroup>
-    {% endfor %}
-  </select>
+    </select>
+    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Pour lister <strong>toutes les bases</strong> d’un même client, choisissez son libellé puis « Actualiser » (sans base sélectionnée ci‑dessous).</p>
 
-  <label for="q">Filtrer les rapports (libellé / nom technique)</label>
-  <input type="text" id="q" name="q" value="{{ filter_q }}" placeholder="ex. compte, bilan, SYSCOHADA…">
+    <label for="client_id">Base à utiliser (identifiant technique)</label>
+    <select id="client_id" name="client_id">
+      <option value="">— Choisir —</option>
+      {% for label, items in clients_grouped %}
+      {% if not filter_label or label == filter_label %}
+      <optgroup label="{{ label }}">
+        {% for cid, c in items %}
+        <option value="{{ cid }}" {% if selected_client == cid %}selected{% endif %}>
+          {{ c.db }} — {% if c.environment == 'test' %}Test{% else %}Prod{% endif %} [{{ cid }}]
+        </option>
+        {% endfor %}
+      </optgroup>
+      {% endif %}
+      {% endfor %}
+    </select>
 
-  <button type="submit">Actualiser la liste</button>
-  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
-</form>
+    <label for="q">Filtrer les rapports (libellé / nom technique)</label>
+    <input type="text" id="q" name="q" value="{{ filter_q }}" placeholder="ex. compte, bilan, SYSCOHADA…">
+
+    <button type="submit">Actualiser la liste</button>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+  </form>
+
+  <details id="ajouter-base-odoo" style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
+    <summary style="cursor:pointer;font-weight:600;">Ajouter une base au registre (<code>toolbox_clients.json</code>)</summary>
+    <div style="margin-top:0.85rem;">
+      <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
+        Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
+      </p>
+      <form method="post" action="{{ request.path }}" autocomplete="off" novalidate>
+        <input type="hidden" name="action" value="add_client">
+        <input type="hidden" name="filter_q" value="{{ filter_q }}">
+        <input type="hidden" name="filter_label" value="{{ filter_label }}">
+        <label for="new_client_id">Identifiant technique (unique par base)</label>
+        <input type="text" id="new_client_id" name="new_client_id" required
+               pattern="[a-z][a-z0-9_]{0,62}"
+               placeholder="ex. la_ripaille_prod"
+               title="Lettre minuscule, puis lettres, chiffres ou _ (max 63 car.)"
+               spellcheck="false" autocapitalize="none">
+        <label for="new_label">Libellé affiché (peut être identique pour prod et test)</label>
+        <input type="text" id="new_label" name="new_label" placeholder="ex. Société XYZ">
+        <label for="new_environment">Environnement</label>
+        <select id="new_environment" name="new_environment">
+          <option value="production" selected>Production</option>
+          <option value="test">Test / recette</option>
+        </select>
+        <label for="new_url">URL Odoo (https://…)</label>
+        <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
+        <label for="new_db">Nom de la base (db)</label>
+        <input type="text" id="new_db" name="new_db" required placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
+        <label for="new_user">Utilisateur / e-mail API</label>
+        <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
+        <label for="new_password">Mot de passe ou clé API</label>
+        <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
+        <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
+      </form>
+    </div>
+  </details>
+</div>
+
+{% if filter_label and not selected_client and label_picker_rows %}
+<div class="sn-card">
+  <h2 style="margin-top:0;font-size:1.05rem;">Bases du client « {{ filter_label }} »</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">État de connexion à l’API comptable (<code>account.report</code>) pour chaque entrée du registre partageant ce libellé.</p>
+  <div class="sn-scroll-x">
+  <table class="sn-table">
+    <thead>
+      <tr>
+        <th>Identifiant</th>
+        <th>Environnement</th>
+        <th>Base (db)</th>
+        <th>URL</th>
+        <th>Connexion</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in label_picker_rows %}
+      {% set cc = row.cfg %}
+      <tr>
+        <td><code>{{ row.client_id }}</code></td>
+        <td>{% if cc.environment == 'test' %}Test{% else %}Prod{% endif %}</td>
+        <td><code>{{ cc.db }}</code></td>
+        <td class="sn-muted" style="max-width:10rem;overflow:hidden;text-overflow:ellipsis;font-size:0.85rem;">{{ cc.url }}</td>
+        <td>
+          {% if row.ok %}
+          <span class="sn-dot sn-dot--ok"></span> {{ row.msg }}
+          {% else %}
+          <span class="sn-dot sn-dot--fail"></span> <span class="sn-muted">{{ row.msg }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <a class="sn-btn" style="padding:0.35rem 0.65rem;font-size:0.85rem;white-space:nowrap;" href="{{ url_for('staff.rapports_comptables', client_id=row.client_id, filter_label=filter_label) }}{% if filter_q %}&amp;q={{ filter_q|urlencode }}{% endif %}">Utiliser cette base</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
 
 {% if selected_client %}
 {% set cfg = clients[selected_client] %}
@@ -116,8 +172,64 @@
     {% endif %}
   </div>
 
+  {% if sibling_rows %}
+  <h3 style="font-size:0.98rem;margin:1rem 0 0.5rem;">Toutes les bases de ce client ({{ cfg.label }})</h3>
+  <div class="sn-scroll-x">
+  <table class="sn-table" style="font-size:0.9rem;">
+    <thead>
+      <tr>
+        <th>Identifiant</th>
+        <th>Env.</th>
+        <th>Base (db)</th>
+        <th>Connexion</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sr in sibling_rows %}
+      {% set sc = sr.cfg %}
+      <tr {% if sr.current %}style="background:rgba(111,45,168,0.12);"{% endif %}>
+        <td><code>{{ sr.client_id }}</code>{% if sr.current %} <strong>(active)</strong>{% endif %}</td>
+        <td>{% if sc.environment == 'test' %}Test{% else %}Prod{% endif %}</td>
+        <td><code>{{ sc.db }}</code></td>
+        <td>
+          {% if sr.ok %}<span class="sn-dot sn-dot--ok"></span>{% else %}<span class="sn-dot sn-dot--fail"></span>{% endif %}
+          <span class="sn-muted" style="font-size:0.82rem;">{{ sr.msg }}</span>
+        </td>
+        <td>
+          {% if not sr.current %}
+          <a class="sn-btn sn-btn--ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;" href="{{ url_for('staff.rapports_comptables', client_id=sr.client_id, filter_label=filter_label) }}{% if filter_q %}&amp;q={{ filter_q|urlencode }}{% endif %}">Basculer</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if conn_status == 'ok' and instance_meta_rows %}
+  <details style="margin-top:1rem;">
+    <summary style="cursor:pointer;font-weight:600;">Informations sur la base (version, abonnement, etc.)</summary>
+    <dl class="sn-instance-meta" style="margin:0.65rem 0 0;display:grid;grid-template-columns:minmax(10rem,14rem) 1fr;gap:0.35rem 1rem;font-size:0.88rem;">
+      {% for mk, mv in instance_meta_rows %}
+      <dt class="sn-muted" style="margin:0;">{{ mk }}</dt>
+      <dd style="margin:0;">{{ mv }}</dd>
+      {% endfor %}
+    </dl>
+    <p class="sn-muted" style="margin:0.65rem 0 0;font-size:0.8rem;line-height:1.4;">Données fournies par Odoo (<code>common.version</code>, <code>ir.config_parameter</code>, modules) selon les droits du compte API ; certaines instances ne renvoient pas la date d’expiration ou la taille.</p>
+  </details>
+  {% endif %}
+
   {% if conn_status == 'ok' %}
-  <h2 style="font-size:1.1rem;">Rapports ({{ reports|length }} affiché(s), max 400)</h2>
+  <details id="sn-reports-list" class="sn-reports-details" {% if not prefill_report_id %}open{% endif %} style="margin-top:1rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:1.05rem;">
+      Rapports ({{ reports|length }} affiché(s), max 400)
+      {% if prefill_report_id %}
+      <span class="sn-muted" style="font-weight:normal;font-size:0.9rem;"> — liste repliée (rapport id={{ prefill_report_id }} présélectionné pour la personnalisation)</span>
+      {% endif %}
+    </summary>
+    <div style="margin-top:0.75rem;">
   {% if not reports %}
   <p class="sn-muted">Aucun rapport ne correspond au filtre.</p>
   {% else %}
@@ -139,16 +251,33 @@
           <form method="post" action="{{ request.path }}" style="display:inline;margin:0;">
             <input type="hidden" name="client_id" value="{{ selected_client }}">
             <input type="hidden" name="filter_q" value="{{ filter_q }}">
+            <input type="hidden" name="filter_label" value="{{ filter_label }}">
             <input type="hidden" name="action" value="prefill">
             <input type="hidden" name="report_id" value="{{ r.id }}">
             <button type="submit" class="sn-btn" style="margin-top:0;padding:0.35rem 0.75rem;font-size:0.85rem;">Personnaliser</button>
           </form>
+          <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
+            <summary style="cursor:pointer;font-size:0.88rem;">Renommer…</summary>
+            <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
+              <form method="post" action="{{ request.path }}" novalidate>
+                <input type="hidden" name="client_id" value="{{ selected_client }}">
+                <input type="hidden" name="filter_q" value="{{ filter_q }}">
+                <input type="hidden" name="filter_label" value="{{ filter_label }}">
+                <input type="hidden" name="action" value="rename_report">
+                <input type="hidden" name="report_id" value="{{ r.id }}">
+                <label for="rename-{{ r.id }}" style="margin-top:0;">Nouveau nom (liste / français)</label>
+                <input type="text" id="rename-{{ r.id }}" name="new_report_name" value="{{ r.name }}" autocomplete="off" required style="margin-top:0.35rem;">
+                <button type="submit" class="sn-btn" style="margin-top:0.5rem;padding:0.35rem 0.75rem;font-size:0.85rem;">Enregistrer le nom</button>
+              </form>
+            </div>
+          </details>
           <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
             <summary style="cursor:pointer;color:var(--sn-danger);font-size:0.88rem;">Supprimer…</summary>
             <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
               <form method="post" action="{{ request.path }}" novalidate>
                 <input type="hidden" name="client_id" value="{{ selected_client }}">
                 <input type="hidden" name="filter_q" value="{{ filter_q }}">
+                <input type="hidden" name="filter_label" value="{{ filter_label }}">
                 <input type="hidden" name="action" value="unlink">
                 <input type="hidden" name="report_id" value="{{ r.id }}">
                 <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Tapez exactement : <code>SUPPRIMER-{{ r.id }}</code></p>
@@ -164,6 +293,8 @@
   </table>
   </div>
   {% endif %}
+    </div>
+  </details>
   {% endif %}
 </div>
 
@@ -179,6 +310,7 @@
   <form id="form-personalize-report" method="post" action="{{ request.path }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="filter_label" value="{{ filter_label }}">
     <input type="hidden" name="action" value="personalize">
     <label for="report_id_p">ID du rapport <strong>source</strong> (<code>account.report</code>)</label>
     <input type="number" id="report_id_p" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. rapport standard ou copie existante">
@@ -190,7 +322,7 @@
   </form>
 </div>
 {% else %}
-<p class="sn-muted">Choisissez une base dans la liste (ou ajoutez-en une ci-dessus) pour afficher le voyant et les rapports.</p>
+<p class="sn-muted">Choisissez un <strong>libellé client</strong> puis « Actualiser » pour lister toutes les bases, ou sélectionnez directement une base dans la carte ci-dessus (ou dépliez « Ajouter une base au registre »).</p>
 {% endif %}
 
 <div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">
@@ -213,18 +345,11 @@
 
 <script>
 (function(){
-  var details = document.getElementById('ajouter-base-odoo');
-  var link = document.getElementById('link-open-add-base');
-  if (link && details) {
-    link.addEventListener('click', function(e) {
-      e.preventDefault();
-      details.open = true;
-      details.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      try { document.getElementById('new_client_id').focus(); } catch (x) {}
-    });
-  }
-  if (location.hash === '#ajouter-base-odoo' && details) {
-    details.open = true;
+  var detailsAdd = document.getElementById('ajouter-base-odoo');
+  if (location.hash === '#ajouter-base-odoo' && detailsAdd) {
+    detailsAdd.open = true;
+    detailsAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try { var ni = document.getElementById('new_client_id'); if (ni) ni.focus(); } catch (x) {}
   }
   var form = document.getElementById('form-personalize-report');
   var overlay = document.getElementById('sn-personalize-overlay');

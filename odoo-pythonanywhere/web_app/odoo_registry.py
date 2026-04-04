@@ -69,6 +69,22 @@ def clients_grouped_for_select(reg: dict[str, ClientOdooConfig]) -> list[tuple[s
     return groups
 
 
+def distinct_client_labels(reg: dict[str, ClientOdooConfig]) -> list[str]:
+    """Libellés distincts triés (affichage « client » regroupant plusieurs bases)."""
+    return sorted({c.label for c in reg.values()}, key=str.casefold)
+
+
+def configs_for_label(reg: dict[str, ClientOdooConfig], label: str) -> list[tuple[str, ClientOdooConfig]]:
+    """Toutes les entrées du registre partageant ce libellé affiché."""
+    lab = (label or "").strip()
+    if not lab:
+        return []
+    return sorted(
+        [(cid, c) for cid, c in reg.items() if c.label == lab],
+        key=lambda x: (0 if x[1].environment == "production" else 1, x[0].lower()),
+    )
+
+
 def load_clients_registry(path: str | Path) -> dict[str, ClientOdooConfig]:
     p = Path(path)
     if not p.is_file():

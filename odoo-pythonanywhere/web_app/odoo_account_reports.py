@@ -157,6 +157,57 @@ def unlink_account_report(
     )
 
 
+def _merge_report_name_for_rename(raw_name: Any, new_label: str) -> Any:
+    """Met à jour le champ name (traduit ou simple) pour l’affichage liste en français."""
+    if isinstance(raw_name, dict):
+        out = dict(raw_name)
+        touched = False
+        for k in list(out.keys()):
+            if isinstance(k, str) and (k == "fr_FR" or k.startswith("fr_")):
+                out[k] = new_label
+                touched = True
+        if not touched:
+            out["fr_FR"] = new_label
+        return out
+    return new_label
+
+
+def write_account_report_name(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    new_label: str,
+) -> None:
+    """Écrit le libellé du rapport dans Odoo (champ name, y compris traductions fr_*)."""
+    label = (new_label or "").strip()
+    if not label:
+        raise ValueError("Le nouveau nom ne peut pas être vide.")
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[report_id]],
+        {"fields": ["name"]},
+    )
+    if not rows:
+        raise ValueError(f"Rapport comptable id={report_id} introuvable.")
+    merged = _merge_report_name_for_rename(rows[0].get("name"), label)
+    execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "write",
+        [[report_id], {"name": merged}],
+    )
+
+
 def _copy_report_display_name(raw_name: Any, suffix: str) -> Any:
     """Construit le nom affiché du rapport dupliqué (traductions Odoo ou chaîne simple)."""
     if isinstance(raw_name, dict):

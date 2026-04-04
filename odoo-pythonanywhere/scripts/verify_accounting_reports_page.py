@@ -28,10 +28,11 @@ if str(_ROOT) not in sys.path:
 # Toujours présents (même sans base sélectionnée)
 REQUIRED_ALWAYS = [
     'id="ajouter-base-odoo"',
+    'name="filter_label"',
     'name="new_client_id"',
     'name="new_environment"',
     'value="add_client"',
-    "Ajouter une base Odoo au registre",
+    "Ajouter une base au registre",
     "Enregistrer la base",
     "sn-page-bottom-flash",
     "copie automatique",
@@ -41,6 +42,7 @@ REQUIRED_ALWAYS = [
 
 # Uniquement si ?client_id=… pointe vers un client connu du registre
 REQUIRED_WITH_CLIENT = [
+    'id="sn-reports-list"',
     'id="report_id_p"',
     'id="form-personalize-report"',
     "sn-personalize-overlay",

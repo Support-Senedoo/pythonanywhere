@@ -1,6 +1,8 @@
 """Espace Senedoo : choix client / apps + utilitaires (personnalisation rapport)."""
 from __future__ import annotations
 
+from typing import Any
+
 from flask import (
     Blueprint,
     abort,
@@ -16,9 +18,13 @@ from flask import (
 from web_app.blueprints.public import login_required_staff
 from web_app import app_version
 from web_app.client_apps import apps_for_template
+from web_app.odoo_instance_info import collect_authenticated_instance_metadata
 from web_app.odoo_registry import (
     client_has_app,
     clients_grouped_for_select,
+    configs_for_label,
+    connect_xmlrpc,
+    distinct_client_labels,
     load_clients_registry,
     upsert_client,
     validate_client_id,
@@ -42,6 +48,7 @@ from web_app.odoo_account_reports import (
     read_account_report_label,
     search_account_reports,
     unlink_account_report,
+    write_account_report_name,
 )
 from web_app.session_odoo import get_config_by_id, get_xmlrpc_for_staff_client_id
 
@@ -231,6 +238,27 @@ def odoo_account_databases_probe():
     )
 
 
+def _rapports_url_params(
+    *,
+    client_id: str | None = None,
+    q: str | None = None,
+    report_id: int | None = None,
+    filter_label: str | None = None,
+) -> dict[str, Any]:
+    d: dict[str, Any] = {}
+    if client_id:
+        d["client_id"] = client_id
+    qs = (q or "").strip()
+    if qs:
+        d["q"] = qs
+    if report_id is not None and report_id > 0:
+        d["report_id"] = report_id
+    fl = (filter_label or "").strip()
+    if fl:
+        d["filter_label"] = fl
+    return d
+
+
 @bp.route("/utilities/personalize-report", methods=["GET", "POST"])
 @bp.route("/utilities/rapports-comptables", methods=["GET", "POST"])
 @login_required_staff
@@ -240,6 +268,7 @@ def rapports_comptables():
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
         filter_q = (request.form.get("filter_q") or "").strip()
+        filter_label_post = (request.form.get("filter_label") or "").strip()
 
         if action == "add_client":
             clients_path = current_app.config["TOOLBOX_CLIENTS_PATH"]
@@ -247,7 +276,9 @@ def rapports_comptables():
                 new_cid = validate_client_id(request.form.get("new_client_id") or "")
             except ValueError as e:
                 flash(str(e), "danger")
-                return redirect(url_for("staff.rapports_comptables", q=filter_q or None))
+                return redirect(
+                    url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post))
+                )
             label = (request.form.get("new_label") or "").strip() or new_cid
             url = (request.form.get("new_url") or "").strip()
             db = (request.form.get("new_db") or "").strip()
@@ -255,7 +286,9 @@ def rapports_comptables():
             password = (request.form.get("new_password") or "").strip() or None
             if not url or not db or not user:
                 flash("URL, nom de base (db) et utilisateur Odoo sont requis.", "danger")
-                return redirect(url_for("staff.rapports_comptables", q=filter_q or None))
+                return redirect(
+                    url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post))
+                )
             env_raw = (request.form.get("new_environment") or "").strip().lower()
             env_kw = env_raw if env_raw in ("production", "test") else None
             try:
@@ -273,30 +306,52 @@ def rapports_comptables():
                 flash(f"Base enregistrée : {label} (identifiant {new_cid}).", "success")
             except ValueError as e:
                 flash(str(e), "danger")
-                return redirect(url_for("staff.rapports_comptables", q=filter_q or None))
+                return redirect(
+                    url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post))
+                )
             return redirect(
-                url_for("staff.rapports_comptables", client_id=new_cid, q=filter_q or None)
+                url_for(
+                    "staff.rapports_comptables",
+                    **_rapports_url_params(
+                        client_id=new_cid,
+                        q=filter_q,
+                        filter_label=filter_label_post or label,
+                    ),
+                )
             )
 
         cid = (request.form.get("client_id") or "").strip().lower()
         if cid not in reg:
             flash("Base / client inconnu.", "danger")
-            return redirect(url_for("staff.rapports_comptables"))
+            return redirect(url_for("staff.rapports_comptables", **_rapports_url_params(q=filter_q, filter_label=filter_label_post)))
         if action == "prefill":
             rid = (request.form.get("report_id") or "").strip()
+            try:
+                rid_int = int(rid) if rid else 0
+            except ValueError:
+                rid_int = 0
             return redirect(
                 url_for(
                     "staff.rapports_comptables",
-                    client_id=cid,
-                    q=filter_q,
-                    report_id=rid or None,
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=rid_int if rid_int > 0 else None,
+                        filter_label=reg[cid].label,
+                    ),
                 )
             )
+        fl_save = reg[cid].label
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(cid)
         except Exception as e:
             flash(f"Connexion impossible : {e!s}", "danger")
-            return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+            return redirect(
+                url_for(
+                    "staff.rapports_comptables",
+                    **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                )
+            )
         if action == "personalize":
             try:
                 rid = int(request.form.get("report_id") or "0")
@@ -307,14 +362,22 @@ def rapports_comptables():
                 return redirect(
                     url_for(
                         "staff.rapports_comptables",
-                        client_id=cid,
-                        q=filter_q,
-                        report_id=rid if rid > 0 else None,
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            report_id=rid if rid > 0 else None,
+                            filter_label=fl_save,
+                        ),
                     )
                 )
             if rid <= 0:
                 flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
-                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    )
+                )
             try:
                 new_rid = duplicate_account_report(models, db, uid, pwd, rid)
                 personalize_fix_detail_complete(models, db, uid, pwd, new_rid)
@@ -330,17 +393,56 @@ def rapports_comptables():
                 return redirect(
                     url_for(
                         "staff.rapports_comptables",
-                        client_id=cid,
-                        q=filter_q,
-                        report_id=rid if rid > 0 else None,
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            report_id=rid if rid > 0 else None,
+                            filter_label=fl_save,
+                        ),
                     )
                 )
             return redirect(
                 url_for(
                     "staff.rapports_comptables",
-                    client_id=cid,
-                    q=filter_q,
-                    report_id=new_rid,
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=new_rid,
+                        filter_label=fl_save,
+                    ),
+                )
+            )
+        if action == "rename_report":
+            try:
+                rid = int(request.form.get("report_id") or "0")
+            except ValueError:
+                rid = 0
+            new_name = (request.form.get("new_report_name") or "").strip()
+            if rid <= 0:
+                flash("Identifiant de rapport invalide.", "danger")
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    )
+                )
+            if not new_name:
+                flash("Saisissez un nom pour le rapport.", "warning")
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    )
+                )
+            try:
+                write_account_report_name(models, db, uid, pwd, rid, new_name)
+                flash(f"Rapport id={rid} renommé : « {new_name} ».", "success")
+            except Exception as e:
+                flash(f"Impossible de renommer le rapport : {e!s}", "danger")
+            return redirect(
+                url_for(
+                    "staff.rapports_comptables",
+                    **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
                 )
             )
         if action == "unlink":
@@ -351,19 +453,39 @@ def rapports_comptables():
             expected = f"SUPPRIMER-{rid}"
             if (request.form.get("confirm_delete") or "").strip() != expected:
                 flash("Confirmation de suppression incorrecte.", "danger")
-                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    )
+                )
             if rid <= 0:
                 flash("Identifiant de rapport invalide.", "danger")
-                return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+                return redirect(
+                    url_for(
+                        "staff.rapports_comptables",
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    )
+                )
             try:
                 rlabel = read_account_report_label(models, db, uid, pwd, rid)
                 unlink_account_report(models, db, uid, pwd, rid)
                 flash(f"Rapport « {rlabel} » (id={rid}) supprimé.", "success")
             except Exception as e:
                 flash(f"Suppression impossible : {e!s}", "danger")
-            return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+            return redirect(
+                url_for(
+                    "staff.rapports_comptables",
+                    **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                )
+            )
         flash("Action non reconnue.", "warning")
-        return redirect(url_for("staff.rapports_comptables", client_id=cid, q=filter_q))
+        return redirect(
+            url_for(
+                "staff.rapports_comptables",
+                **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+            )
+        )
 
     selected = (request.args.get("client_id") or "").strip().lower()
     if selected not in reg:
@@ -371,9 +493,34 @@ def rapports_comptables():
     filter_q = (request.args.get("q") or "").strip()
     prefill_rid = request.args.get("report_id", type=int)
 
+    filter_label = (request.args.get("filter_label") or "").strip()
+    valid_labels = {c.label for c in reg.values()}
+    if filter_label and filter_label not in valid_labels:
+        filter_label = ""
+    if selected and filter_label and reg[selected].label != filter_label:
+        selected = ""
+    if selected and not filter_label:
+        filter_label = reg[selected].label
+
     conn_status = "idle"
     conn_detail = ""
     reports: list = []
+    instance_meta_rows: list[tuple[str, str]] = []
+    label_picker_rows: list[dict[str, Any]] = []
+    sibling_rows: list[dict[str, Any]] = []
+
+    if filter_label and not selected:
+        for cid, ccfg in configs_for_label(reg, filter_label):
+            pr: dict[str, Any] = {"client_id": cid, "cfg": ccfg, "ok": False, "msg": ""}
+            try:
+                m, dbn, u, p = connect_xmlrpc(ccfg)
+                okp, msgp = probe_odoo_reports_access(m, dbn, u, p)
+                pr["ok"] = okp
+                pr["msg"] = msgp
+            except Exception as e:
+                pr["msg"] = str(e)
+            label_picker_rows.append(pr)
+
     if selected:
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
@@ -382,22 +529,56 @@ def rapports_comptables():
             if ok:
                 conn_status = "ok"
                 reports = search_account_reports(models, db, uid, pwd, filter_q)
+                try:
+                    instance_meta_rows = collect_authenticated_instance_metadata(
+                        models, db, uid, pwd, reg[selected].url
+                    )
+                except Exception:
+                    instance_meta_rows = []
             else:
                 conn_status = "error"
         except Exception as e:
             conn_status = "error"
             conn_detail = str(e)
 
+        sibs = configs_for_label(reg, reg[selected].label)
+        if len(sibs) > 1:
+            for cid, ccfg in sibs:
+                sr: dict[str, Any] = {
+                    "client_id": cid,
+                    "cfg": ccfg,
+                    "current": cid == selected,
+                    "ok": False,
+                    "msg": "",
+                }
+                if cid == selected:
+                    sr["ok"] = conn_status == "ok"
+                    sr["msg"] = conn_detail
+                else:
+                    try:
+                        m, dbn, u, p = connect_xmlrpc(ccfg)
+                        okp, msgp = probe_odoo_reports_access(m, dbn, u, p)
+                        sr["ok"] = okp
+                        sr["msg"] = msgp
+                    except Exception as e:
+                        sr["msg"] = str(e)
+                sibling_rows.append(sr)
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
         clients_grouped=clients_grouped_for_select(reg),
+        distinct_client_labels=distinct_client_labels(reg),
         selected_client=selected,
+        filter_label=filter_label,
         filter_q=filter_q,
         conn_status=conn_status,
         conn_detail=conn_detail,
         reports=reports,
         prefill_report_id=prefill_rid,
+        label_picker_rows=label_picker_rows,
+        sibling_rows=sibling_rows,
+        instance_meta_rows=instance_meta_rows,
         utility_title=UTILITY_TITLE,
         utility_version=UTILITY_VERSION,
         utility_date=UTILITY_DATE,
