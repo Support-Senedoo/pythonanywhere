@@ -32,7 +32,7 @@ REQUIRED_ALWAYS = [
     'name="new_client_id"',
     'name="new_environment"',
     'value="add_client"',
-    "Ajouter une base au registre",
+    "Ajouter une nouvelle base",
     "Enregistrer la base",
     "sn-page-bottom-flash",
     "copie automatique",

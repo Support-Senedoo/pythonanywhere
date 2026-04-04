@@ -20,8 +20,8 @@
     (ex. <code>client_prod</code> / <code>client_test</code>) et indiquez <strong>production</strong> ou <strong>test</strong> pour chaque entrée.
   </p>
   <ul>
-    <li><strong>Nouvelle base</strong> : dans la carte ci-dessous, cliquez sur le bouton « Ajouter une base au registre » pour afficher le formulaire → enregistrement puis rechargement avec la base présélectionnée.</li>
-    <li><strong>Client (libellé)</strong> : choisissez d’abord un libellé puis <strong>Actualiser</strong> pour voir <strong>toutes les bases</strong> (prod / test) avec l’état de connexion ; cliquez sur <strong>Utiliser cette base</strong> pour la suite. Vous pouvez aussi choisir directement une base dans la liste déroulante.</li>
+    <li><strong>Nouvelle base</strong> : dans la carte ci-dessous, cliquez sur « Ajouter une nouvelle base » pour afficher le formulaire → enregistrement puis rechargement avec la base présélectionnée.</li>
+    <li><strong>Choisir une base</strong> : sans libellé, <strong>Actualiser</strong> affiche <strong>toutes les bases</strong> (liste déroulante + tableau avec état de connexion). Avec un libellé, seules les bases de ce client. Cliquez sur <strong>Utiliser cette base</strong> ou choisissez dans la liste déroulante.</li>
     <li>Après sélection d’une base, le <strong>voyant</strong> et les <strong>informations instance</strong> (version, expiration, édition, etc.) s’affichent lorsque la connexion Odoo réussit.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
     <li>Saisissez un filtre (ex. <code>compte</code>, <code>SYSCOHADA</code>, <code>résultat</code>) pour réduire la liste.</li>
@@ -47,7 +47,7 @@
       <option value="{{ lab }}" {% if filter_label == lab %}selected{% endif %}>{{ lab }}</option>
       {% endfor %}
     </select>
-    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Pour lister <strong>toutes les bases</strong> d’un même client, choisissez son libellé puis « Actualiser » (sans base sélectionnée ci‑dessous).</p>
+    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Sans libellé : la liste déroulante et le tableau ci‑dessous montrent <strong>toutes les bases</strong> après « Actualiser ». Avec un libellé : seules les bases de ce client.</p>
 
     <label for="client_id">Base à utiliser (identifiant technique)</label>
     <select id="client_id" name="client_id">
@@ -68,15 +68,16 @@
     <label for="q">Filtrer les rapports (libellé / nom technique)</label>
     <input type="text" id="q" name="q" value="{{ filter_q }}" placeholder="ex. compte, bilan, SYSCOHADA…">
 
-    <button type="submit">Actualiser la liste</button>
-    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+    <div id="ajouter-base-odoo" class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
+      <button type="submit">Actualiser la liste</button>
+      <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+      <button type="button" class="sn-btn sn-btn--ghost" id="btn-show-add-base" aria-expanded="false" aria-controls="panel-add-base-odoo">
+        Ajouter une nouvelle base
+      </button>
+    </div>
   </form>
 
-  <div id="ajouter-base-odoo" style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
-    <button type="button" class="sn-btn sn-btn--ghost" id="btn-show-add-base" aria-expanded="false" aria-controls="panel-add-base-odoo" style="margin-top:0;">
-      Ajouter une base au registre (<code>toolbox_clients.json</code>)
-    </button>
-    <div id="panel-add-base-odoo" class="sn-panel-add-base" hidden style="margin-top:0.85rem;padding:0.85rem 0 0;border-top:1px dashed var(--sn-border);">
+    <div id="panel-add-base-odoo" class="sn-panel-add-base" hidden style="margin-top:0.85rem;padding-top:0.85rem;border-top:1px dashed var(--sn-border);">
       <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
         Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
       </p>
@@ -109,13 +110,12 @@
       </form>
       <button type="button" class="sn-btn sn-btn--ghost" id="btn-hide-add-base" style="margin-top:0.65rem;">Fermer le formulaire</button>
     </div>
-  </div>
 </div>
 
-{% if filter_label and not selected_client and label_picker_rows %}
+{% if not selected_client and label_picker_rows %}
 <div class="sn-card">
-  <h2 style="margin-top:0;font-size:1.05rem;">Bases du client « {{ filter_label }} »</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">État de connexion à l’API comptable (<code>account.report</code>) pour chaque entrée du registre partageant ce libellé.</p>
+  <h2 style="margin-top:0;font-size:1.05rem;">{% if filter_label %}Bases du client « {{ filter_label }} »{% else %}Toutes les bases du registre{% endif %}</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">État de connexion à l’API comptable (<code>account.report</code>) — cliquez sur <strong>Utiliser cette base</strong> pour la sélectionner.</p>
   <div class="sn-scroll-x">
   <table class="sn-table">
     <thead>
@@ -325,7 +325,7 @@
   </form>
 </div>
 {% else %}
-<p class="sn-muted">Choisissez un <strong>libellé client</strong> puis « Actualiser » pour lister toutes les bases, ou sélectionnez directement une base dans la carte ci-dessus (bouton « Ajouter une base au registre » si besoin).</p>
+<p class="sn-muted">« Actualiser » sans base sélectionnée affiche toutes les bases (ou filtrées par libellé) ; choisissez-en une dans la liste ou le tableau. Utilisez « Ajouter une nouvelle base » si besoin.</p>
 {% endif %}
 
 <div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">

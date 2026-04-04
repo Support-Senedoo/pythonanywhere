@@ -509,8 +509,19 @@ def rapports_comptables():
     label_picker_rows: list[dict[str, Any]] = []
     sibling_rows: list[dict[str, Any]] = []
 
-    if filter_label and not selected:
-        for cid, ccfg in configs_for_label(reg, filter_label):
+    if not selected and reg:
+        if filter_label:
+            to_probe = configs_for_label(reg, filter_label)
+        else:
+            to_probe = sorted(
+                reg.items(),
+                key=lambda x: (
+                    x[1].label.casefold(),
+                    0 if x[1].environment == "production" else 1,
+                    x[0].lower(),
+                ),
+            )
+        for cid, ccfg in to_probe:
             pr: dict[str, Any] = {"client_id": cid, "cfg": ccfg, "ok": False, "msg": ""}
             try:
                 m, dbn, u, p = connect_xmlrpc(ccfg)
