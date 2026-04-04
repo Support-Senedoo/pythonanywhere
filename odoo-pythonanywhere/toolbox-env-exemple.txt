@@ -26,10 +26,25 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 #   python toolbox_generate_password_hash.py
 # Coller le résultat dans toolbox_users.json (champ password_hash).
 
-# Comptes démo code : test / passer (client + staff) — désactiver en prod :
+# Comptes démo code : test / passer (client) + support@senedoo.com / 2026@Senedoo (staff) — désactiver en prod :
 # TOOLBOX_DISABLE_DEV_LOGIN=1
 # Client démo associé au registre (id dans toolbox_clients.json) :
 # TOOLBOX_TEST_CLIENT_ID=la_ripaille
+
+# --- Réinitialisation mot de passe (/forgot-password) : SMTP + URL publique ---
+# URL du site SANS slash final (liens dans les e-mails). Obligatoire si le domaine déduit de la requête est faux (proxy).
+# TOOLBOX_PUBLIC_BASE_URL=https://senedoo.pythonanywhere.com
+# Fichier jetons (défaut : même répertoire que toolbox_users.json). Optionnel :
+# TOOLBOX_PASSWORD_RESET_TOKENS_PATH=/home/VOTRE_USER/pythonanywhere/odoo-pythonanywhere/toolbox_password_reset_tokens.json
+#
+# TOOLBOX_SMTP_HOST=smtp.gmail.com
+# TOOLBOX_SMTP_PORT=587
+# TOOLBOX_SMTP_USER=votre_compte@gmail.com
+# TOOLBOX_SMTP_PASSWORD=mot_de_passe_application_gmail
+# TOOLBOX_MAIL_FROM=noreply@votredomaine.com
+#
+# Comptes gratuits PythonAnywhere : pas d’e-mail sortant « générique » ; utiliser un relais (Gmail app password,
+# SendGrid, Mailgun, SMTP du registrar, etc.). Voir aussi l’aide PA sur l’envoi d’e-mails.
 
 # Bases Odoo « gérées » (suggestions dans le champ Base lors de l’édition client, séparateur virgule ou ;)
 # À remplir avec les noms techniques des bases accessibles au compte API (ex. support@senedoo.com).

@@ -173,6 +173,8 @@ Host pythonanywhere
 - [ ] Déploiement : **`deploy_pa.ps1`** depuis `odoo-pythonanywhere/` **ou**, si le `.ps1` casse (ParserError), **`git pull` sur PA** / **scp+ssh** / **MCP SSH** (voir section « Si deploy_pa.ps1 plante »)
 - [ ] `requirements.txt` réinstallé avec la **bonne** version Python du web app
 - [ ] `toolbox_users.json` et `toolbox_clients.json` toujours présents sur le serveur
+- [ ] Staff production : `TOOLBOX_DISABLE_DEV_LOGIN=1` + compte(s) staff dans le JSON avec `password_hash`
+- [ ] Réinit. e-mail (si besoin) : `TOOLBOX_PUBLIC_BASE_URL`, `TOOLBOX_SMTP_*`, `TOOLBOX_MAIL_FROM` + test `/forgot-password`
 - [ ] `TOOLBOX_SECRET_KEY` toujours défini dans l’onglet Web
 - [ ] WSGI pointe toujours vers `pythonanywhere_wsgi.py` (ou `pa_wsgi.py`)
 - [ ] **Reload** du site (onglet Web PythonAnywhere)
@@ -204,6 +206,15 @@ Host pythonanywhere
 ### Utilitaire « Rapports comptables Odoo » (personnalisation / exports)
 
 - Fichier principal : **`web_app/odoo_account_reports.py`**. Les métadonnées **version**, **date** et **auteur** viennent de la même source que le reste de la toolbox : **`web_app/app_version.py`** (`TOOLBOX_APP_VERSION`, `TOOLBOX_APP_DATE`, `TOOLBOX_APP_AUTHOR` — ce dernier surchargeable via env `TOOLBOX_APP_AUTHOR`, voir **`toolbox-env-exemple.txt`**).
+- **P&L — analytique et budget (Odoo SaaS)** : sur `/staff/utilities/rapports-comptables`, action **« Créer la copie (détail + analytique / budget) »** — duplication `account.report`, même personnalisation détail que le bouton « Personnaliser » ([`personalize_syscohada_detail.py`](personalize_syscohada_detail.py)), puis écriture des options `filter_analytic` et `filter_budget` (si le champ existe) via [`personalize_pl_analytic_budget.py`](personalize_pl_analytic_budget.py). **Sonde budget / analytique** : bouton lecture seule qui compte les lignes de budget avec analytique renseigné (`account.budget.line` ou `crossovered.budget.lines`).
+- **CLI (hors Flask)** : `python personalize_pl_analytic_budget.py --report-id <id>` sur une copie déjà créée ; `--probe-only` pour la sonde seule.
+
+#### Checklist budget financier × compte analytique (SaaS)
+
+1. **Données** : les lignes de budget financier doivent porter l’**analytique** attendu (répartition ou compte analytique selon la version). La sonde staff indique un ratio « lignes avec analytique / total » ; 0 % signifie qu’il faut compléter la saisie côté Odoo avant d’exiger un budget « par axe » dans le rapport.
+2. **Test moteur standard** : ouvrir la **copie** du P&L dans Odoo, choisir la période, un **budget** et un **compte analytique**. Vérifier si la **colonne budget** change quand on change l’analytique. Si **oui**, la configuration (filtres + saisie) suffit en général. Si **non**, le moteur du rapport ne croise pas budget et analytique : envisager **Odoo Studio** (limites selon abonnement), un **rapport analytique** (budget analytique vs réalisé) en complément, ou une évolution validée par Odoo.
+3. **Lignes sans mouvement analytique** : utiliser d’abord les options du rapport (**masquer lignes à zéro** / équivalent selon l’UI). Si la structure SYSCOHADA garde des totaux de section non nuls, combiner avec le détail par compte (personnalisation existante) ou ajuster via Studio si nécessaire.
+4. **Risque connu** : sur certaines bases Enterprise, le **groupby compte** + notes peut provoquer des erreurs RPC au dépliage — voir `--revert` dans [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py).
 
 ### Pistes « demain » possibles
 
@@ -212,7 +223,7 @@ Host pythonanywhere
 
 ---
 
-*Dernière mise à jour de cette section : avril 2026 — sonde bases : mode cookie session navigateur après captcha manuel ; version via `app_version` ; rapports comptables alignés sur `app_version` ; piège `deploy_pa.ps1` / encodage PowerShell sur Mon Drive ; rappel Reload Web après `git pull`.*
+*Dernière mise à jour de cette section : avril 2026 — sonde bases : mode cookie session navigateur après captcha manuel ; version via `app_version` ; rapports comptables : P&L analytique/budget + sonde budget ; piège `deploy_pa.ps1` / encodage PowerShell sur Mon Drive ; rappel Reload Web après `git pull`.*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 
@@ -221,6 +232,77 @@ python toolbox_generate_password_hash.py
 ```
 
 Coller le résultat dans `toolbox_users.json` (`password_hash`).
+
+## Comptes staff via `toolbox_users.json` (sans dépendre de la démo)
+
+Par défaut, l’app accepte aussi des identifiants **codés en dur pour la démo** (`test` / `passer`, et en staff `support@senedoo.com` / `2026@Senedoo`) tant que **`TOOLBOX_DISABLE_DEV_LOGIN`** n’est **pas** défini. Pour n’utiliser **que** le fichier JSON (recommandé en production) :
+
+1. **Onglet Web** PythonAnywhere → **Variables d’environnement** → ajouter  
+   **`TOOLBOX_DISABLE_DEV_LOGIN`** = **`1`** (ou `true` / `yes` / `on`).
+2. Créer ou éditer **`toolbox_users.json`** sur le serveur (hors Git), au bon chemin :
+   - par défaut : **`/home/senedoo/pythonanywhere/odoo-pythonanywhere/toolbox_users.json`**  
+     (même dossier que `pythonanywhere_wsgi.py`, sauf si vous avez défini **`TOOLBOX_USERS_PATH`**).
+3. Y mettre au moins un utilisateur **`role`: `staff`** avec un **`password_hash`** Werkzeug valide.
+
+**Exemple minimal** (à adapter ; ne pas commiter les vrais secrets) :
+
+```json
+{
+  "users": [
+    {
+      "login": "support@senedoo.com",
+      "password_hash": "COLLER_ICI_LE_HASH_GENERE",
+      "role": "staff"
+    }
+  ]
+}
+```
+
+**Générer le hash** (sur votre PC ou dans une **console Bash** PA, depuis `odoo-pythonanywhere/`) :
+
+```bash
+cd ~/pythonanywhere/odoo-pythonanywhere
+python3.10 toolbox_generate_password_hash.py 'VotreMotDePasseSecurise'
+```
+
+Copier la **ligne unique** affichée dans le champ **`password_hash`**.
+
+4. **Reload** du site Web (onglet Web).
+
+Sans démo et sans ligne staff dans le JSON, la connexion équipe échouera : vérifiez le fichier et les droits de lecture du processus WSGI.
+
+## Réinitialisation du mot de passe par e-mail (`/forgot-password`)
+
+L’app envoie un lien (valide **24 h**) si :
+
+- l’identifiant saisi existe dans **`toolbox_users.json`** ;
+- **`TOOLBOX_SMTP_HOST`** et **`TOOLBOX_MAIL_FROM`** sont renseignés ;
+- l’envoi SMTP réussit (TLS, identifiants corrects).
+
+### Variables à ajouter (onglet Web PythonAnywhere)
+
+| Variable | Exemple / rôle |
+|----------|----------------|
+| **`TOOLBOX_PUBLIC_BASE_URL`** | `https://senedoo.pythonanywhere.com` — **sans** `/` final. Évite un mauvais lien si le serveur ne devine pas l’URL publique. |
+| **`TOOLBOX_SMTP_HOST`** | `smtp.gmail.com`, `smtp.sendgrid.net`, serveur de votre hébergeur mail, etc. |
+| **`TOOLBOX_SMTP_PORT`** | `587` (défaut si omis) — STARTTLS, comme dans le code (`starttls` puis login). |
+| **`TOOLBOX_SMTP_USER`** | Utilisateur SMTP (souvent l’adresse e-mail du compte). |
+| **`TOOLBOX_SMTP_PASSWORD`** | Mot de passe ou **mot de passe d’application** (ex. Gmail avec 2FA). |
+| **`TOOLBOX_MAIL_FROM`** | Adresse **expéditeur** visible par le destinataire (souvent identique à `SMTP_USER` ou un alias autorisé par le fournisseur). |
+
+Optionnel : **`TOOLBOX_PASSWORD_RESET_TOKENS_PATH`** — fichier JSON des jetons (défaut : `toolbox_password_reset_tokens.json` dans le **même répertoire que** `toolbox_users.json`). Le fichier est créé automatiquement ; pas besoin de le versionner.
+
+Référence copier-coller : fichier **[`toolbox-env-exemple.txt`](toolbox-env-exemple.txt)** (section « Réinitialisation mot de passe »).
+
+### Après modification des variables
+
+1. **Reload** du site Web.  
+2. Tester : page d’accueil ou connexion → **Mot de passe oublié ?** → saisir un **login exact** présent dans `toolbox_users.json`.  
+3. Si le serveur répond une erreur SMTP, consulter le **journal d’erreurs** du site (`…error.log` sur PA) et vérifier pare-feu / politique du fournisseur (Gmail : « applications moins sécurisées » remplacé par **mots de passe d’application**).
+
+### Limites PythonAnywhere
+
+Les comptes **gratuits** n’ont pas un service mail intégré pour votre domaine : il faut un **relais externe** (Gmail, SendGrid, Mailgun, SMTP du registrar, etc.). Si aucune variable SMTP n’est configurée, la page « mot de passe oublié » affiche que l’e-mail n’est pas configuré et invite à contacter l’administrateur.
 
 ---
 
