@@ -401,7 +401,12 @@
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
     <input type="hidden" name="action" value="personalize_balance">
     <label for="report_id_b">ID du rapport balance <strong>source</strong> (<code>account.report</code>)</label>
-    <input type="number" id="report_id_b" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. balance générale standard">
+    <div class="sn-prefill-report-row" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.5rem 0.85rem;margin-bottom:0.35rem;">
+      <input type="number" id="report_id_b" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. balance générale standard" style="max-width:11rem;">
+      {% if prefill_report_name %}
+      <span class="sn-muted" style="font-size:0.92rem;line-height:1.45;"><strong>{{ prefill_report_name }}</strong></span>
+      {% endif %}
+    </div>
     <label for="confirm_b">Confirmation</label>
     <input type="text" id="confirm_b" name="confirm" placeholder="Tapez OUI en majuscules">
     <button type="submit">Créer la copie et appliquer les 6 colonnes</button>
@@ -426,7 +431,12 @@
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
     <input type="hidden" name="action" value="personalize_pl_budget">
     <label for="report_id_ab">ID du rapport <strong>source</strong> (<code>account.report</code>)</label>
-    <input type="number" id="report_id_ab" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. P&L SYSCOHADA standard ou copie">
+    <div class="sn-prefill-report-row" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.5rem 0.85rem;margin-bottom:0.35rem;">
+      <input type="number" id="report_id_ab" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. P&L SYSCOHADA standard ou copie" style="max-width:11rem;">
+      {% if prefill_report_name %}
+      <span class="sn-muted" style="font-size:0.92rem;line-height:1.45;"><strong>{{ prefill_report_name }}</strong></span>
+      {% endif %}
+    </div>
     <p class="sn-muted" style="font-size:0.85rem;margin:-0.35rem 0 0.5rem;">Libellé de la copie : source + « — copie Senedoo (analytique budget) ».</p>
     <label for="confirm_ab">Confirmation</label>
     <input type="text" id="confirm_ab" name="confirm" placeholder="Tapez OUI en majuscules">
@@ -447,7 +457,12 @@
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
     <input type="hidden" name="action" value="personalize">
     <label for="report_id_p">ID du rapport <strong>source</strong> (<code>account.report</code>)</label>
-    <input type="number" id="report_id_p" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. rapport standard ou copie existante">
+    <div class="sn-prefill-report-row" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.5rem 0.85rem;margin-bottom:0.35rem;">
+      <input type="number" id="report_id_p" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. rapport standard ou copie existante" style="max-width:11rem;">
+      {% if prefill_report_name %}
+      <span class="sn-muted" style="font-size:0.92rem;line-height:1.45;"><strong>{{ prefill_report_name }}</strong></span>
+      {% endif %}
+    </div>
     <p class="sn-muted" style="font-size:0.85rem;margin:-0.35rem 0 0.5rem;">Le libellé de la copie sera celui du source + « — copie Senedoo » (traductions préservées quand c’est possible).</p>
     <label for="confirm_p">Confirmation</label>
     <input type="text" id="confirm_p" name="confirm" placeholder="Tapez OUI en majuscules">
@@ -530,6 +545,36 @@
       form.removeAttribute('data-sn-native-longpost');
     });
   });
+
+  function snFocusPersonalizeConfirm() {
+    var panel = document.getElementById('personalize');
+    if (!panel) return;
+    panel.querySelectorAll('input[type="number"][name="report_id"]').forEach(function (ridInput) {
+      var v = (ridInput.value || '').trim();
+      if (!v) return;
+      var form = ridInput.closest('form');
+      if (!form) return;
+      var c = form.querySelector('input[name="confirm"]');
+      if (!c) return;
+      try {
+        c.focus({ preventScroll: true });
+      } catch (e) {
+        try { c.focus(); } catch (e2) {}
+      }
+      try { c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e3) {}
+    });
+  }
+  requestAnimationFrame(function () {
+    requestAnimationFrame(snFocusPersonalizeConfirm);
+  });
+  var personalizePanel = document.getElementById('personalize');
+  if (personalizePanel) {
+    personalizePanel.querySelectorAll('input[type="number"][name="report_id"]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        if ((inp.value || '').trim()) snFocusPersonalizeConfirm();
+      });
+    });
+  }
 })();
 </script>
 {% endif %}

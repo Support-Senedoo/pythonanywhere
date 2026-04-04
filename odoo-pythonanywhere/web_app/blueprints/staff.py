@@ -790,6 +790,21 @@ def _accounting_reports_page(accounting_mode: str):
         else clients_sorted_for_select(reg)
     )
 
+    prefill_report_name = ""
+    if selected and conn_status == "ok" and prefill_rid and prefill_rid > 0:
+        for r in reports:
+            if int(r["id"]) == int(prefill_rid):
+                prefill_report_name = (str(r.get("name") or "")).strip()
+                break
+        if not prefill_report_name:
+            try:
+                m, dbn, u, p = get_xmlrpc_for_staff_client_id(selected)
+                prefill_report_name = (
+                    read_account_report_label(m, dbn, u, p, int(prefill_rid)) or ""
+                ).strip()
+            except Exception:
+                prefill_report_name = ""
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
@@ -803,6 +818,7 @@ def _accounting_reports_page(accounting_mode: str):
         conn_detail=conn_detail,
         reports=reports,
         prefill_report_id=prefill_rid,
+        prefill_report_name=prefill_report_name,
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,
