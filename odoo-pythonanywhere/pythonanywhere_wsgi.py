@@ -25,6 +25,9 @@ _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+# Entrée WSGI PA uniquement : désactive le cache LRU Jinja (sinon l’accueil peut rester ancien après git pull).
+os.environ.setdefault("TOOLBOX_JINJA_NO_CACHE", "1")
+
 from web_app import create_app
 
 application = create_app()

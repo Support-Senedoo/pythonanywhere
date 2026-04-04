@@ -10,11 +10,18 @@ _ROOT = Path(__file__).resolve().parent.parent
 
 
 def create_app() -> Flask:
+    _on_pa = any(k.startswith("PYTHONANYWHERE") for k in os.environ)
+    _no_jinja_cache = os.environ.get("TOOLBOX_JINJA_NO_CACHE", "").lower() in ("1", "true", "yes")
+
     app = Flask(
         __name__,
         template_folder=str(Path(__file__).resolve().parent / "templates"),
         static_folder=str(Path(__file__).resolve().parent / "static"),
     )
+    # Sur PA : cache_size=0 évite les gabarits Jinja « figés » après git pull (plus fiable que seul TEMPLATES_AUTO_RELOAD).
+    if _no_jinja_cache or _on_pa:
+        app.jinja_options = {**dict(app.jinja_options), "cache_size": 0}
+
     app.config["SECRET_KEY"] = os.environ.get("TOOLBOX_SECRET_KEY") or "CHANGE_ME_TOOLBOX_SECRET"
     app.config["TOOLBOX_USERS_PATH"] = os.environ.get(
         "TOOLBOX_USERS_PATH", str(_ROOT / "toolbox_users.json")
@@ -25,11 +32,9 @@ def create_app() -> Flask:
     app.config["DEBUG"] = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
     app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
 
-    # Sans ceci, Jinja garde les gabarits compilés en mémoire : après un git pull sur PA, l’accueil
-    # peut rester figé jusqu’à un Reload Web. On recharge les templates si les fichiers changent.
-    _on_pa = any(k.startswith("PYTHONANYWHERE") for k in os.environ)
+    # Relecture des .html si le fichier change (complément au cache_size=0 ci-dessus sur PA).
     _force_tpl = os.environ.get("TOOLBOX_TEMPLATE_AUTO_RELOAD", "").lower() in ("1", "true", "yes")
-    app.config["TEMPLATES_AUTO_RELOAD"] = bool(app.config["DEBUG"] or _on_pa or _force_tpl)
+    app.config["TEMPLATES_AUTO_RELOAD"] = bool(app.config["DEBUG"] or _on_pa or _force_tpl or _no_jinja_cache)
 
     from web_app.blueprints.public import bp as public_bp
     from web_app.blueprints.legacy_client import bp as legacy_bp

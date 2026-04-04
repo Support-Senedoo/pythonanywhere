@@ -22,6 +22,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+os.environ.setdefault("TOOLBOX_JINJA_NO_CACHE", "1")
+
 # Décommenter / adapter sur PythonAnywhere si besoin :
 # os.environ.setdefault("TOOLBOX_SECRET_KEY", "changez-moi-longue-chaine-aleatoire")
 # os.environ.setdefault("TOOLBOX_USERS_PATH", os.path.join(_HERE, "toolbox_users.json"))
