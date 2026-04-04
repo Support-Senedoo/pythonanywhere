@@ -2,46 +2,47 @@
 {% block title %}{% if mode == 'new' %}Nouveau client{% else %}Modifier client{% endif %}{% endblock %}
 {% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
-<h1>{% if mode == 'new' %}Nouveau client{% else %}Modifier « {{ client.label }} »{% endif %}</h1>
-<p class="sn-muted">L’identifiant technique sert à lier les comptes portail (ex. <code>la_ripaille</code>) : minuscules, chiffres, underscore.</p>
+<h1>{% if mode == 'new' %}Nouvelle base Odoo{% else %}Modifier la base « {{ client.db }} »{% endif %}</h1>
+<p class="sn-muted">L’identifiant portail et dans le registre est le <strong>nom technique de la base</strong> (db), en minuscules après enregistrement.</p>
 
 <div class="sn-card">
   <form method="post">
     {% if mode == 'new' %}
-    <label for="client_id">Identifiant client</label>
-    <input type="text" id="client_id" name="client_id" required pattern="[a-z][a-z0-9_]*" placeholder="ex. la_ripaille"
-           title="Lettre minuscule puis lettres minuscules, chiffres ou _">
-    {% else %}
-    <p><strong>Identifiant :</strong> <code>{{ client.id }}</code> (fixe)</p>
-    {% endif %}
-
-    <label for="label">Nom affiché</label>
-    <input type="text" id="label" name="label" required value="{{ client.label if client else '' }}" placeholder="Ex. La Ripaille">
-
-    <label for="environment">Environnement</label>
-    <select id="environment" name="environment">
-      <option value="production" {% if not client or client.environment != 'test' %}selected{% endif %}>Production</option>
-      <option value="test" {% if client and client.environment == 'test' %}selected{% endif %}>Test / recette</option>
-    </select>
-    <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">Plusieurs entrées peuvent partager le même nom affiché (ex. prod + test) avec des identifiants techniques distincts.</p>
-
-    <label for="url">URL Odoo</label>
-    <input type="url" id="url" name="url" required value="{{ client.url if client else '' }}" placeholder="https://xxx.odoo.com">
-
-    <label for="db">Nom de la base Odoo</label>
+    <label for="db">Nom de la base Odoo (identifiant unique)</label>
     <datalist id="odoo-db-suggestions">
       {% for name in odoo_db_presets|default([]) %}
       <option value="{{ name }}"></option>
       {% endfor %}
     </datalist>
     <input type="text" id="db" name="db" required list="odoo-db-suggestions"
-           value="{{ client.db if client else '' }}" placeholder="Choisir ou saisir le nom technique">
+           pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}"
+           title="Lettre ou chiffre, puis lettres, chiffres, tiret ou underscore"
+           placeholder="ex. ma_societe_prod" spellcheck="false" autocapitalize="none">
     <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">
-      Suggestions : variable serveur <code>TOOLBOX_ODOO_MANAGED_DATABASES</code> (bases gérées, ex. compte support)
-      + bouton ci-dessous pour interroger <code>/xmlrpc/2/db</code> list() sur l’URL (si le serveur l’autorise).
+      Suggestions : <code>TOOLBOX_ODOO_MANAGED_DATABASES</code> + bouton ci-dessous pour interroger <code>db.list()</code> une fois l’URL renseignée.
     </p>
+    {% else %}
+    <p><strong>Nom de base (identifiant) :</strong> <code>{{ client.db }}</code> — non modifiable ici.</p>
+    <input type="hidden" name="db" value="{{ client.db }}">
+    {% endif %}
+
+    <label for="environment">Environnement</label>
+    <select id="environment" name="environment">
+      <option value="production" {% if not client or client.environment != 'test' %}selected{% endif %}>Production</option>
+      <option value="test" {% if client and client.environment == 'test' %}selected{% endif %}>Test / recette</option>
+    </select>
+    <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">Plusieurs entrées sur le <strong>même serveur Odoo</strong> (même hôte d’URL) peuvent être regroupées pour le portail client (bascule prod / test).</p>
+
+    <label for="url">URL Odoo</label>
+    <input type="url" id="url" name="url" required value="{{ client.url if client else '' }}" placeholder="https://xxx.odoo.com">
+
+    {% if mode == 'new' %}
     <button type="button" class="sn-btn sn-btn--ghost" id="btn-refresh-odoo-dbs" style="margin-top:0.5rem;">Actualiser les suggestions de bases</button>
     <span id="odoo-db-list-msg" class="sn-muted" style="font-size:0.82rem;margin-left:0.5rem;"></span>
+    {% else %}
+    <button type="button" class="sn-btn sn-btn--ghost" id="btn-refresh-odoo-dbs" style="margin-top:0.5rem;">Actualiser les suggestions de bases</button>
+    <span id="odoo-db-list-msg" class="sn-muted" style="font-size:0.82rem;margin-left:0.5rem;"></span>
+    {% endif %}
 
     <label for="odoo_user">Login Odoo (connexion API / XML-RPC)</label>
     <input type="text" id="odoo_user" name="odoo_user" required value="{{ client.user if client else '' }}"
@@ -69,15 +70,15 @@
 
 {% if mode == 'edit' %}
 <div class="sn-card" style="margin-top:1.25rem;">
-  <h2 style="margin-top:0;font-size:1.05rem;">Autre base (même client)</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Pour enregistrer une <strong>deuxième</strong> entrée (ex. recette) avec le même nom affiché qu’ici, ouvrez l’utilitaire rapports comptables : le libellé sera prérempli.</p>
-  <a class="sn-btn" href="{{ url_for('staff.rapports_comptables', filter_label=client.label, prefill_label=client.label, open_add='1') }}">Ajouter une nouvelle base pour « {{ client.label }} »</a>
+  <h2 style="margin-top:0;font-size:1.05rem;">Autre base (même serveur)</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Pour enregistrer une <strong>deuxième</strong> base sur le même hôte Odoo (ex. recette), ouvrez l’écran dédié — le filtre serveur sera présélectionné.</p>
+  <a class="sn-btn" href="{% if add_base_filter_host %}{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=add_base_filter_host) }}{% else %}{{ url_for('staff.rapports_comptables', add_base_only='1') }}{% endif %}">Ajouter une autre base (formulaire seul)</a>
 </div>
 <div class="sn-card" style="border-color:var(--sn-danger);margin-top:1.5rem;">
-  <h2 style="color:var(--sn-danger);margin-top:0;">Supprimer ce client</h2>
-  <p class="sn-muted">Impossible s’il reste des comptes portail liés. Tapez l’identifiant <code>{{ client.id }}</code> pour confirmer.</p>
-  <form method="post" action="{{ url_for('staff_admin.client_delete', client_id=client.id) }}" onsubmit="return confirm('Supprimer définitivement ce client ?');">
-    <input type="text" name="confirm" placeholder="{{ client.id }}" required autocomplete="off">
+  <h2 style="color:var(--sn-danger);margin-top:0;">Supprimer cette base</h2>
+  <p class="sn-muted">Impossible s’il reste des comptes portail liés. Tapez le nom de base <code>{{ client.db }}</code> pour confirmer.</p>
+  <form method="post" action="{{ url_for('staff_admin.client_delete', client_id=client.id) }}" onsubmit="return confirm('Supprimer définitivement cette base ?');">
+    <input type="text" name="confirm" placeholder="{{ client.db }}" required autocomplete="off">
     <button type="submit" style="background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer</button>
   </form>
 </div>

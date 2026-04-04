@@ -28,8 +28,8 @@ if str(_ROOT) not in sys.path:
 # Toujours présents (même sans base sélectionnée)
 REQUIRED_ALWAYS = [
     'id="ajouter-base-odoo"',
-    'name="filter_label"',
-    'name="new_client_id"',
+    'name="filter_host"',
+    'name="new_db"',
     'name="new_environment"',
     'value="add_client"',
     "Ajouter une nouvelle base",
@@ -42,8 +42,8 @@ REQUIRED_ALWAYS = [
 
 REQUIRED_BALANCE_PAGE = [
     'id="ajouter-base-odoo"',
-    'name="filter_label"',
-    'name="new_client_id"',
+    'name="filter_host"',
+    'name="new_db"',
     'value="add_client"',
     "Ajouter une nouvelle base",
     "Enregistrer la base",

@@ -23,7 +23,13 @@ from odoo_client import normalize_odoo_base_url
 from web_app.blueprints.public import login_required_staff
 from web_app.client_apps import KNOWN_APPS, apps_for_template
 from web_app.odoo_account_probe import format_db_list_error
-from web_app.odoo_registry import delete_client, load_clients_registry, upsert_client
+from web_app.odoo_registry import (
+    delete_client,
+    load_clients_registry,
+    normalize_registry_db_key,
+    registry_netloc,
+    upsert_client,
+)
 from web_app.users_store import (
     count_users_for_client,
     delete_user,
@@ -126,13 +132,14 @@ def admin_index():
 def clients_list():
     reg = load_clients_registry(_clients_path())
     rows = []
-    for cid, cfg in sorted(reg.items(), key=lambda x: x[1].label.lower()):
+    for cid, cfg in sorted(reg.items(), key=lambda x: x[1].db.lower()):
         rows.append(
             {
                 "id": cid,
                 "label": cfg.label,
                 "url": cfg.url,
                 "db": cfg.db,
+                "filter_host": registry_netloc(cfg),
                 "environment": cfg.environment,
                 "apps": ", ".join(cfg.apps),
                 "users_count": count_users_for_client(_users_path(), cid),
@@ -145,33 +152,37 @@ def clients_list():
 @login_required_staff
 def client_new():
     if request.method == "POST":
-        cid = (request.form.get("client_id") or "").strip()
-        label = (request.form.get("label") or "").strip()
         url = normalize_odoo_base_url((request.form.get("url") or "").strip())
         db = (request.form.get("db") or "").strip()
         user = (request.form.get("odoo_user") or "").strip()
         password = (request.form.get("odoo_password") or "").strip() or None
         apps = [k for k in KNOWN_APPS if request.form.get(f"app_{k}")]
         try:
-            upsert_client(
-                _clients_path(),
-                cid,
-                label,
-                url,
-                db,
-                user,
-                password,
-                apps,
-                environment=(request.form.get("environment") or "production"),
-            )
-            flash(f"Client « {label} » créé.", "success")
-            return redirect(url_for("staff_admin.clients_list"))
+            cid = normalize_registry_db_key(db)
         except ValueError as e:
             flash(str(e), "danger")
+        else:
+            try:
+                upsert_client(
+                    _clients_path(),
+                    cid,
+                    cid,
+                    url,
+                    db,
+                    user,
+                    password,
+                    apps,
+                    environment=(request.form.get("environment") or "production"),
+                )
+                flash(f"Base « {cid} » enregistrée.", "success")
+                return redirect(url_for("staff_admin.clients_list"))
+            except ValueError as e:
+                flash(str(e), "danger")
     return render_template(
         "staff/admin/client_form.html",
         mode="new",
         client=None,
+        add_base_filter_host="",
         known_apps=KNOWN_APPS,
         odoo_db_presets=_odoo_db_presets(),
         default_odoo_api_user=_default_odoo_api_user_placeholder(),
@@ -188,7 +199,6 @@ def client_edit(client_id: str):
         return redirect(url_for("staff_admin.clients_list"))
     cfg = reg[cid_key]
     if request.method == "POST":
-        label = (request.form.get("label") or "").strip()
         url = normalize_odoo_base_url((request.form.get("url") or "").strip())
         db = (request.form.get("db") or "").strip()
         user = (request.form.get("odoo_user") or "").strip()
@@ -196,25 +206,37 @@ def client_edit(client_id: str):
         password = pw if pw else None
         apps = [k for k in KNOWN_APPS if request.form.get(f"app_{k}")]
         try:
-            upsert_client(
-                _clients_path(),
-                cid_key,
-                label,
-                url,
-                db,
-                user,
-                password,
-                apps,
-                environment=(request.form.get("environment") or "production"),
-            )
-            flash("Client mis à jour.", "success")
-            return redirect(url_for("staff_admin.clients_list"))
+            dbn = normalize_registry_db_key(db)
         except ValueError as e:
             flash(str(e), "danger")
+        else:
+            if dbn != cid_key:
+                flash(
+                    "Le nom de base (identifiant) ne peut pas être modifié : supprimez l’entrée et recréez-la si besoin.",
+                    "danger",
+                )
+            else:
+                try:
+                    upsert_client(
+                        _clients_path(),
+                        cid_key,
+                        cid_key,
+                        url,
+                        db,
+                        user,
+                        password,
+                        apps,
+                        environment=(request.form.get("environment") or "production"),
+                    )
+                    flash("Base mise à jour.", "success")
+                    return redirect(url_for("staff_admin.clients_list"))
+                except ValueError as e:
+                    flash(str(e), "danger")
     return render_template(
         "staff/admin/client_form.html",
         mode="edit",
         client=cfg,
+        add_base_filter_host=registry_netloc(cfg),
         known_apps=KNOWN_APPS,
         odoo_db_presets=_odoo_db_presets(),
         default_odoo_api_user=_default_odoo_api_user_placeholder(),
@@ -244,7 +266,7 @@ def client_delete(client_id: str):
 def users_list():
     rows = list_user_rows(_users_path())
     reg = load_clients_registry(_clients_path())
-    labels = {cid: c.label for cid, c in reg.items()}
+    labels = {cid: c.db for cid, c in reg.items()}
     return render_template(
         "staff/admin/users_list.html",
         users=rows,

@@ -8,17 +8,38 @@ import xmlrpc.client
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from odoo_client import normalize_odoo_base_url
 
 from web_app.client_apps import normalize_app_ids
 
-_CLIENT_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+# Clé registre = nom technique de la base Odoo (normalisé minuscules), aligné PostgreSQL / Odoo courant.
+_REGISTRY_DB_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 
 
 def _normalize_environment(raw: Any) -> str:
     s = str(raw or "production").strip().lower()
     return s if s in ("production", "test") else "production"
+
+
+def normalize_registry_db_key(db: str) -> str:
+    """Valide et normalise le nom de base utilisé comme identifiant unique dans le registre et les comptes."""
+    s = (db or "").strip().lower()
+    if not _REGISTRY_DB_KEY_RE.match(s):
+        raise ValueError(
+            "Nom de base (db) : lettre ou chiffre en tête, puis lettres, chiffres, tiret ou underscore (max 63 car.)."
+        )
+    return s
+
+
+def validate_client_id(client_id: str) -> str:
+    """Alias : l’identifiant portail / registre est le nom de base normalisé."""
+    return normalize_registry_db_key(client_id)
+
+
+def registry_netloc(cfg: ClientOdooConfig) -> str:
+    return urlparse(cfg.url).netloc or ""
 
 
 @dataclass(frozen=True)
@@ -34,13 +55,13 @@ class ClientOdooConfig:
 
 
 def _row_to_config(row: dict[str, Any]) -> ClientOdooConfig:
-    cid = str(row["id"]).strip().lower()
+    db_key = normalize_registry_db_key(str(row.get("db", "")).strip())
     apps = normalize_app_ids(row.get("apps"))
     return ClientOdooConfig(
-        id=cid,
-        label=str(row.get("label") or cid),
+        id=db_key,
+        label=db_key,
         url=normalize_odoo_base_url(str(row["url"])),
-        db=str(row["db"]).strip(),
+        db=db_key,
         user=str(row["user"]).strip(),
         password=str(row["password"]),
         apps=apps,
@@ -48,41 +69,43 @@ def _row_to_config(row: dict[str, Any]) -> ClientOdooConfig:
     )
 
 
-def clients_grouped_for_select(reg: dict[str, ClientOdooConfig]) -> list[tuple[str, list[tuple[str, ClientOdooConfig]]]]:
-    """Regroupe les entrées par libellé affiché pour <optgroup> (plusieurs bases / même client)."""
-    items = sorted(
+def clients_sorted_for_select(reg: dict[str, ClientOdooConfig]) -> list[tuple[str, ClientOdooConfig]]:
+    """Liste plate triée par nom de base puis id (pour <select>)."""
+    return sorted(
         reg.items(),
-        key=lambda x: (x[1].label.lower(), 0 if x[1].environment == "production" else 1, x[0].lower()),
+        key=lambda x: (x[1].db.casefold(), 0 if x[1].environment == "production" else 1, x[0].casefold()),
     )
-    groups: list[tuple[str, list[tuple[str, ClientOdooConfig]]]] = []
-    cur_label: str | None = None
-    bucket: list[tuple[str, ClientOdooConfig]] = []
-    for cid, cfg in items:
-        if cur_label is None or cfg.label != cur_label:
-            if bucket and cur_label is not None:
-                groups.append((cur_label, bucket))
-            bucket = []
-            cur_label = cfg.label
-        bucket.append((cid, cfg))
-    if bucket and cur_label is not None:
-        groups.append((cur_label, bucket))
-    return groups
 
 
-def distinct_client_labels(reg: dict[str, ClientOdooConfig]) -> list[str]:
-    """Libellés distincts triés (affichage « client » regroupant plusieurs bases)."""
-    return sorted({c.label for c in reg.values()}, key=str.casefold)
+def clients_grouped_for_select(reg: dict[str, ClientOdooConfig]) -> list[tuple[str, list[tuple[str, ClientOdooConfig]]]]:
+    """Rétrocompatibilité gabarits : un seul groupe « Bases » avec toutes les entrées triées."""
+    items = clients_sorted_for_select(reg)
+    return [("Bases", items)] if items else []
+
+
+def distinct_odoo_hosts(reg: dict[str, ClientOdooConfig]) -> list[str]:
+    """Hôtes distincts (schéma + host + port) pour filtrer les bases sur un même serveur Odoo."""
+    hosts = {registry_netloc(c) for c in reg.values() if registry_netloc(c)}
+    return sorted(hosts, key=str.casefold)
+
+
+def configs_for_same_host(reg: dict[str, ClientOdooConfig], netloc: str) -> list[tuple[str, ClientOdooConfig]]:
+    """Bases partageant le même hôte d’URL (prod + test sur un même serveur, etc.)."""
+    host = (netloc or "").strip().lower()
+    if not host:
+        return []
+    return sorted(
+        [(cid, c) for cid, c in reg.items() if registry_netloc(c).lower() == host],
+        key=lambda x: (0 if x[1].environment == "production" else 1, x[1].db.casefold()),
+    )
 
 
 def configs_for_label(reg: dict[str, ClientOdooConfig], label: str) -> list[tuple[str, ClientOdooConfig]]:
-    """Toutes les entrées du registre partageant ce libellé affiché."""
+    """Déprécié : conservé pour appels anciens ; équivalent à même hôte si label ressemble à un netloc, sinon vide."""
     lab = (label or "").strip()
     if not lab:
         return []
-    return sorted(
-        [(cid, c) for cid, c in reg.items() if c.label == lab],
-        key=lambda x: (0 if x[1].environment == "production" else 1, x[0].lower()),
-    )
+    return configs_for_same_host(reg, lab)
 
 
 def load_clients_registry(path: str | Path) -> dict[str, ClientOdooConfig]:
@@ -121,15 +144,6 @@ def write_clients_raw(path: str | Path, data: dict[str, Any]) -> None:
         raise
 
 
-def validate_client_id(client_id: str) -> str:
-    s = (client_id or "").strip().lower()
-    if not _CLIENT_ID_RE.match(s):
-        raise ValueError(
-            "Identifiant client : lettre minuscule puis lettres, chiffres ou _ (max 63 car.)."
-        )
-    return s
-
-
 def upsert_client(
     path: str | Path,
     client_id: str,
@@ -142,46 +156,55 @@ def upsert_client(
     *,
     environment: str | None = None,
 ) -> None:
-    cid = validate_client_id(client_id)
+    """Enregistre une base ; id et label sont toujours le nom de base normalisé (client_id / label ignorés)."""
+    del label  # conservé en signature pour appels existants
+    del client_id
+    db_key = normalize_registry_db_key(str(db or "").strip())
     data = read_clients_raw(path)
     clients: list[dict[str, Any]] = list(data.get("clients", []))
     url = (url or "").strip().rstrip("/")
-    db = (db or "").strip()
     user = (user or "").strip()
-    label = (label or "").strip() or cid
     app_ids = list(normalize_app_ids(apps))
 
-    found = False
+    found_idx: int | None = None
     for i, row in enumerate(clients):
-        if str(row.get("id", "")).strip().lower() == cid:
-            pwd = password if password is not None else str(row.get("password", ""))
-            env_use = (
-                _normalize_environment(environment)
-                if environment is not None
-                else _normalize_environment(row.get("environment"))
-            )
-            clients[i] = {
-                "id": cid,
-                "label": label,
-                "url": url,
-                "db": db,
-                "user": user,
-                "password": pwd,
-                "apps": app_ids,
-                "environment": env_use,
-            }
-            found = True
+        rid = str(row.get("id", "")).strip().lower()
+        try:
+            rdb = normalize_registry_db_key(str(row.get("db", "")).strip())
+        except ValueError:
+            rdb = ""
+        if rid == db_key or rdb == db_key:
+            found_idx = i
             break
-    if not found:
+
+    if found_idx is not None:
+        row = clients[found_idx]
+        pwd = password if password is not None else str(row.get("password", ""))
+        env_use = (
+            _normalize_environment(environment)
+            if environment is not None
+            else _normalize_environment(row.get("environment"))
+        )
+        clients[found_idx] = {
+            "id": db_key,
+            "label": db_key,
+            "url": url,
+            "db": db_key,
+            "user": user,
+            "password": pwd,
+            "apps": app_ids,
+            "environment": env_use,
+        }
+    else:
         if not password:
-            raise ValueError("Mot de passe Odoo requis pour un nouveau client.")
+            raise ValueError("Mot de passe Odoo requis pour une nouvelle base.")
         env_use = _normalize_environment(environment or "production")
         clients.append(
             {
-                "id": cid,
-                "label": label,
+                "id": db_key,
+                "label": db_key,
                 "url": url,
-                "db": db,
+                "db": db_key,
                 "user": user,
                 "password": password,
                 "apps": app_ids,
@@ -193,13 +216,11 @@ def upsert_client(
 
 
 def delete_client(path: str | Path, client_id: str) -> None:
-    cid = str(client_id or "").strip().lower()
-    if not cid:
-        raise ValueError("Identifiant client manquant.")
+    cid = normalize_registry_db_key(str(client_id or "").strip())
     data = read_clients_raw(path)
     clients = [c for c in data.get("clients", []) if str(c.get("id", "")).strip().lower() != cid]
     if len(clients) == len(data.get("clients", [])):
-        raise ValueError("Client introuvable.")
+        raise ValueError("Base introuvable.")
     data["clients"] = clients
     write_clients_raw(path, data)
 
@@ -217,3 +238,54 @@ def connect_xmlrpc(cfg: ClientOdooConfig) -> tuple[Any, str, int, str]:
 
 def client_has_app(cfg: ClientOdooConfig, app_id: str) -> bool:
     return app_id in cfg.apps
+
+
+def migrate_registry_ids_to_database_names(
+    clients_path: str | Path,
+    users_path: str | Path | None = None,
+) -> dict[str, str]:
+    """
+    Réécrit toolbox_clients.json : id = label = nom de base normalisé.
+    Retourne l’ancienne map old_registry_id -> new_db_key pour contrôle.
+    Optionnel : met à jour client_id dans toolbox_users.json.
+    """
+    cp = Path(clients_path)
+    data = read_clients_raw(cp)
+    raw_clients: list[dict[str, Any]] = list(data.get("clients", []))
+    mapping: dict[str, str] = {}
+    seen_keys: set[str] = set()
+    new_rows: list[dict[str, Any]] = []
+
+    for row in raw_clients:
+        db_raw = str(row.get("db", "")).strip()
+        db_key = normalize_registry_db_key(db_raw)
+        old_id = str(row.get("id", db_key)).strip().lower()
+        if old_id != db_key:
+            mapping[old_id] = db_key
+        if db_key in seen_keys:
+            raise ValueError(f"Deux entrées partagent la base {db_key!r} : fusionnez ou corrigez avant migration.")
+        seen_keys.add(db_key)
+        new_row = dict(row)
+        new_row["id"] = db_key
+        new_row["label"] = db_key
+        new_row["db"] = db_key
+        new_rows.append(new_row)
+
+    data["clients"] = new_rows
+    write_clients_raw(cp, data)
+
+    if users_path is not None:
+        up = Path(users_path)
+        if up.is_file():
+            udata = json.loads(up.read_text(encoding="utf-8"))
+            users = udata.get("users", [])
+            for u in users:
+                if not isinstance(u, dict):
+                    continue
+                oc = str(u.get("client_id", "")).strip().lower()
+                if oc and oc in mapping:
+                    u["client_id"] = mapping[oc]
+            udata["users"] = users
+            write_clients_raw(up, udata)
+
+    return mapping

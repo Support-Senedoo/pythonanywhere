@@ -1,8 +1,8 @@
 {
   "clients": [
     {
-      "id": "la_ripaille",
-      "label": "La Ripaille",
+      "id": "nom_base_odoo",
+      "label": "nom_base_odoo",
       "url": "https://votre-instance.odoo.com",
       "db": "nom_base_odoo",
       "user": "api_technique@votredomaine.com",

@@ -21,10 +21,10 @@
       <select id="client_id" name="client_id">
         <option value="">— Choisir —</option>
         {% for cid, c in clients.items() %}
-        <option value="{{ cid }}">{{ c.label }} [{{ cid }}]</option>
+        <option value="{{ cid }}">{{ c.db }}</option>
         {% endfor %}
       </select>
-      <p class="sn-muted" style="margin-top:0.4rem;font-size:0.82rem;">L’identifiant technique doit être exactement celui du client dans « Clients Odoo » (ex. <code>la_ripaille</code>).</p>
+      <p class="sn-muted" style="margin-top:0.4rem;font-size:0.82rem;">La valeur doit être le <strong>nom de base</strong> (db) tel qu’enregistré dans « Bases Odoo ».</p>
     </div>
 
     <label for="password">Mot de passe</label>
@@ -39,13 +39,13 @@
     <label for="client_id">Client / profil Odoo</label>
     <select id="client_id" name="client_id" required>
       {% for cid, c in clients.items() %}
-      <option value="{{ cid }}" {% if ucid == cid %}selected{% endif %}>{{ c.label }} [{{ cid }}]</option>
+      <option value="{{ cid }}" {% if ucid == cid %}selected{% endif %}>{{ c.db }}</option>
       {% endfor %}
       {% if user.client_id and ucid not in clients %}
       <option value="{{ ucid }}" selected>{{ user.client_id }} — absent du registre [{{ ucid }}] — choisir un client valide</option>
       {% endif %}
     </select>
-    <p class="sn-muted" style="margin-top:0.4rem;font-size:0.82rem;">La valeur enregistrée est comparée en <strong>minuscules</strong> à l’id du registre (<code>la_ripaille</code>, pas d’espace).</p>
+    <p class="sn-muted" style="margin-top:0.4rem;font-size:0.82rem;">Comparaison en <strong>minuscules</strong> au nom de base du registre.</p>
     {% endif %}
 
     <label for="password">Nouveau mot de passe</label>

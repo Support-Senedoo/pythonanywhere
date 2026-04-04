@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
@@ -21,13 +22,14 @@ from web_app.client_apps import apps_for_template
 from web_app.odoo_instance_info import collect_authenticated_instance_metadata
 from web_app.odoo_registry import (
     client_has_app,
-    clients_grouped_for_select,
-    configs_for_label,
+    clients_sorted_for_select,
+    configs_for_same_host,
     connect_xmlrpc,
-    distinct_client_labels,
+    distinct_odoo_hosts,
     load_clients_registry,
+    normalize_registry_db_key,
+    registry_netloc,
     upsert_client,
-    validate_client_id,
 )
 from web_app.odoo_account_probe import MAX_DATABASES_TO_PROBE, probe_account_databases
 from web_app.pointage_import_util import (
@@ -37,6 +39,10 @@ from web_app.pointage_import_util import (
 )
 from odoo_client import OdooClient, normalize_odoo_base_url
 from personalize_balance_6cols import personalize_balance_six_columns
+from personalize_pl_analytic_budget import (
+    personalize_pl_analytic_budget_options,
+    probe_financial_budget_analytic_summary,
+)
 from personalize_syscohada_detail import personalize_fix_detail_complete
 
 from web_app.odoo_account_reports import (
@@ -103,7 +109,7 @@ def select_client():
         flash("Client inconnu.", "danger")
         return redirect(url_for("staff.staff_home"))
     session["staff_selected_client_id"] = cid
-    flash(f"Base active pour les applications : {_registry()[cid].label}", "success")
+    flash(f"Base active pour les applications : {_registry()[cid].db}", "success")
     return redirect(url_for("staff.apps_home"))
 
 
@@ -115,7 +121,7 @@ def apps_home():
     label = None
     staff_apps: list[dict] = []
     if cid and cid in reg:
-        label = reg[cid].label
+        label = reg[cid].db
         for row in apps_for_template(reg[cid].apps):
             if row.get("staff_endpoint"):
                 staff_apps.append(row)
@@ -143,7 +149,7 @@ def staff_apps_odoo_status():
         c.authenticate()
         n = c.execute("res.partner", "search_count", [[]])
         lines = [
-            f"Client : {cfg.label}",
+            f"Base : {cfg.db}",
             f"Version serveur : {ver.get('server_version', ver)}",
             "Authentification Odoo : OK",
             f"Nombre de partenaires (indicatif) : {n}",
@@ -163,7 +169,7 @@ def staff_apps_pointage_import():
     cfg = reg.get(cid)
     if not cfg or not client_has_app(cfg, "pointage_import"):
         abort(404)
-    ctx = f"Mode équipe · client : {cfg.label} · base {cfg.db}"
+    ctx = f"Mode équipe · base {cfg.db}"
 
     columns: list[str] = []
     preview_rows: list[dict[str, str]] = []
@@ -246,7 +252,9 @@ def _rapports_url_params(
     client_id: str | None = None,
     q: str | None = None,
     report_id: int | None = None,
-    filter_label: str | None = None,
+    filter_host: str | None = None,
+    add_base_only: bool = False,
+    open_meta: bool = False,
 ) -> dict[str, Any]:
     d: dict[str, Any] = {}
     if client_id:
@@ -256,9 +264,13 @@ def _rapports_url_params(
         d["q"] = qs
     if report_id is not None and report_id > 0:
         d["report_id"] = report_id
-    fl = (filter_label or "").strip()
-    if fl:
-        d["filter_label"] = fl
+    fh = (filter_host or "").strip()
+    if fh:
+        d["filter_host"] = fh
+    if add_base_only:
+        d["add_base_only"] = "1"
+    if open_meta:
+        d["open_meta"] = "1"
     return d
 
 
@@ -277,34 +289,54 @@ def _accounting_reports_page(accounting_mode: str):
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
         filter_q = (request.form.get("filter_q") or "").strip()
-        filter_label_post = (request.form.get("filter_label") or "").strip()
+        filter_host_post = (request.form.get("filter_host") or "").strip()
+        add_base_only_post = (request.form.get("add_base_only") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
+        def _ru_err(
+            *,
+            client_id: str | None = None,
+            report_id: int | None = None,
+            filter_host_override: str | None = None,
+        ):
+            return redirect(
+                ru(
+                    **_rapports_url_params(
+                        client_id=client_id,
+                        q=filter_q,
+                        report_id=report_id,
+                        filter_host=filter_host_override
+                        if filter_host_override is not None
+                        else filter_host_post,
+                        add_base_only=add_base_only_post,
+                    ),
+                ),
+            )
 
         if action == "add_client":
             clients_path = current_app.config["TOOLBOX_CLIENTS_PATH"]
-            try:
-                new_cid = validate_client_id(request.form.get("new_client_id") or "")
-            except ValueError as e:
-                flash(str(e), "danger")
-                return redirect(
-                    ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post))
-                )
-            label = (request.form.get("new_label") or "").strip() or new_cid
             url = (request.form.get("new_url") or "").strip()
             db = (request.form.get("new_db") or "").strip()
             user = (request.form.get("new_user") or "").strip()
             password = (request.form.get("new_password") or "").strip() or None
-            if not url or not db or not user:
-                flash("URL, nom de base (db) et utilisateur Odoo sont requis.", "danger")
-                return redirect(
-                    ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post))
-                )
+            try:
+                new_cid = normalize_registry_db_key(db)
+            except ValueError as e:
+                flash(str(e), "danger")
+                return _ru_err()
+            if not url or not user:
+                flash("URL et utilisateur Odoo sont requis.", "danger")
+                return _ru_err()
             env_raw = (request.form.get("new_environment") or "").strip().lower()
             env_kw = env_raw if env_raw in ("production", "test") else None
             try:
                 upsert_client(
                     clients_path,
                     new_cid,
-                    label,
+                    new_cid,
                     normalize_odoo_base_url(url),
                     db,
                     user,
@@ -312,18 +344,17 @@ def _accounting_reports_page(accounting_mode: str):
                     [],
                     environment=env_kw,
                 )
-                flash(f"Base enregistrée : {label} (identifiant {new_cid}).", "success")
+                flash(f"Base enregistrée : {new_cid}.", "success")
             except ValueError as e:
                 flash(str(e), "danger")
-                return redirect(
-                    ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post))
-                )
+                return _ru_err()
+            net = urlparse(normalize_odoo_base_url(url)).netloc
             return redirect(
                 ru(
                     **_rapports_url_params(
                         client_id=new_cid,
                         q=filter_q,
-                        filter_label=filter_label_post or label,
+                        filter_host=filter_host_post or net,
                     ),
                 )
             )
@@ -331,7 +362,7 @@ def _accounting_reports_page(accounting_mode: str):
         cid = (request.form.get("client_id") or "").strip().lower()
         if cid not in reg:
             flash("Base / client inconnu.", "danger")
-            return redirect(ru(**_rapports_url_params(q=filter_q, filter_label=filter_label_post)))
+            return _ru_err()
         if action == "prefill":
             rid = (request.form.get("report_id") or "").strip()
             try:
@@ -344,18 +375,35 @@ def _accounting_reports_page(accounting_mode: str):
                         client_id=cid,
                         q=filter_q,
                         report_id=rid_int if rid_int > 0 else None,
-                        filter_label=reg[cid].label,
+                        filter_host=registry_netloc(reg[cid]),
                     ),
                 )
             )
-        fl_save = reg[cid].label
+        fl_save = registry_netloc(reg[cid])
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(cid)
         except Exception as e:
             flash(f"Connexion impossible : {e!s}", "danger")
             return redirect(
                 ru(
-                    **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
+                )
+            )
+        if action == "budget_probe" and accounting_mode == "standard":
+            try:
+                msg = probe_financial_budget_analytic_summary(models, db, uid, pwd)
+                if len(msg) > 900:
+                    msg = msg[:897] + "…"
+                flash(f"Sonde budget / analytique : {msg}", "info")
+            except Exception as e:
+                flash(f"Sonde budget : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        filter_host=fl_save,
+                    ),
                 )
             )
         if action == "personalize" and accounting_mode == "standard":
@@ -371,7 +419,7 @@ def _accounting_reports_page(accounting_mode: str):
                             client_id=cid,
                             q=filter_q,
                             report_id=rid if rid > 0 else None,
-                            filter_label=fl_save,
+                            filter_host=fl_save,
                         ),
                     )
                 )
@@ -379,7 +427,7 @@ def _accounting_reports_page(accounting_mode: str):
                 flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
                 return redirect(
                     ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                     )
                 )
             try:
@@ -400,7 +448,7 @@ def _accounting_reports_page(accounting_mode: str):
                             client_id=cid,
                             q=filter_q,
                             report_id=rid if rid > 0 else None,
-                            filter_label=fl_save,
+                            filter_host=fl_save,
                         ),
                     )
                 )
@@ -410,7 +458,81 @@ def _accounting_reports_page(accounting_mode: str):
                         client_id=cid,
                         q=filter_q,
                         report_id=new_rid,
-                        filter_label=fl_save,
+                        filter_host=fl_save,
+                    ),
+                )
+            )
+        if action == "personalize_pl_budget" and accounting_mode == "standard":
+            try:
+                rid = int(request.form.get("report_id") or "0")
+            except ValueError:
+                rid = 0
+            if (request.form.get("confirm") or "").strip() != "OUI":
+                flash(
+                    "Tapez OUI en majuscules pour confirmer la personnalisation P&L analytique / budget.",
+                    "warning",
+                )
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            report_id=rid if rid > 0 else None,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            if rid <= 0:
+                flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            try:
+                new_rid = duplicate_account_report(
+                    models,
+                    db,
+                    uid,
+                    pwd,
+                    rid,
+                    name_suffix=" — copie Senedoo (analytique budget)",
+                )
+                personalize_fix_detail_complete(models, db, uid, pwd, new_rid)
+                opt = personalize_pl_analytic_budget_options(models, db, uid, pwd, new_rid)
+                src_label = read_account_report_label(models, db, uid, pwd, rid)
+                rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
+                written = ", ".join(f"{k}={v}" for k, v in opt["written"].items())
+                flash(
+                    f"P&L pilotage : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »). "
+                    f"Options rapport : {written}. "
+                    f"Dans Odoo, sélectionnez un compte analytique et un budget puis vérifiez si la colonne budget "
+                    f"se restreint (sinon voir DEPLOY_PYTHONANYWHERE.md — Studio / contournement).",
+                    "success",
+                )
+            except Exception as e:
+                flash(f"Échec personnalisation P&L analytique / budget : {e!s}", "danger")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            report_id=rid if rid > 0 else None,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            return redirect(
+                ru(
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        report_id=new_rid,
+                        filter_host=fl_save,
                     ),
                 )
             )
@@ -427,7 +549,7 @@ def _accounting_reports_page(accounting_mode: str):
                             client_id=cid,
                             q=filter_q,
                             report_id=rid if rid > 0 else None,
-                            filter_label=fl_save,
+                            filter_host=fl_save,
                         ),
                     )
                 )
@@ -435,7 +557,7 @@ def _accounting_reports_page(accounting_mode: str):
                 flash("Indiquez un identifiant de rapport balance (account.report) valide.", "danger")
                 return redirect(
                     ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                     )
                 )
             try:
@@ -463,7 +585,7 @@ def _accounting_reports_page(accounting_mode: str):
                             client_id=cid,
                             q=filter_q,
                             report_id=rid if rid > 0 else None,
-                            filter_label=fl_save,
+                            filter_host=fl_save,
                         ),
                     )
                 )
@@ -473,7 +595,7 @@ def _accounting_reports_page(accounting_mode: str):
                         client_id=cid,
                         q=filter_q,
                         report_id=new_rid,
-                        filter_label=fl_save,
+                        filter_host=fl_save,
                     ),
                 )
             )
@@ -487,14 +609,14 @@ def _accounting_reports_page(accounting_mode: str):
                 flash("Identifiant de rapport invalide.", "danger")
                 return redirect(
                     ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                     )
                 )
             if not new_name:
                 flash("Saisissez un nom pour le rapport.", "warning")
                 return redirect(
                     ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                     )
                 )
             try:
@@ -504,7 +626,7 @@ def _accounting_reports_page(accounting_mode: str):
                 flash(f"Impossible de renommer le rapport : {e!s}", "danger")
             return redirect(
                 ru(
-                    **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                 )
             )
         if action == "unlink":
@@ -517,14 +639,14 @@ def _accounting_reports_page(accounting_mode: str):
                 flash("Confirmation de suppression incorrecte.", "danger")
                 return redirect(
                     ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                     )
                 )
             if rid <= 0:
                 flash("Identifiant de rapport invalide.", "danger")
                 return redirect(
                     ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                     )
                 )
             try:
@@ -535,12 +657,12 @@ def _accounting_reports_page(accounting_mode: str):
                 flash(f"Suppression impossible : {e!s}", "danger")
             return redirect(
                 ru(
-                    **_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save),
+                    **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                 )
             )
         flash("Action non reconnue.", "warning")
         return redirect(
-            ru(**_rapports_url_params(client_id=cid, q=filter_q, filter_label=fl_save)),
+            ru(**_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save)),
         )
 
     selected = (request.args.get("client_id") or "").strip().lower()
@@ -549,14 +671,31 @@ def _accounting_reports_page(accounting_mode: str):
     filter_q = (request.args.get("q") or "").strip()
     prefill_rid = request.args.get("report_id", type=int)
 
-    filter_label = (request.args.get("filter_label") or "").strip()
-    valid_labels = {c.label for c in reg.values()}
-    if filter_label and filter_label not in valid_labels:
-        filter_label = ""
-    if selected and filter_label and reg[selected].label != filter_label:
+    filter_host = (request.args.get("filter_host") or "").strip()
+    valid_hosts = set(distinct_odoo_hosts(reg))
+    if filter_host and filter_host not in valid_hosts:
+        filter_host = ""
+    if (
+        selected
+        and filter_host
+        and registry_netloc(reg[selected]).lower() != filter_host.lower()
+    ):
         selected = ""
-    if selected and not filter_label:
-        filter_label = reg[selected].label
+    if selected and not filter_host:
+        filter_host = registry_netloc(reg[selected])
+
+    add_base_only = (request.args.get("add_base_only") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    open_instance_meta = (request.args.get("open_meta") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if add_base_only:
+        selected = ""
 
     conn_status = "idle"
     conn_detail = ""
@@ -565,14 +704,14 @@ def _accounting_reports_page(accounting_mode: str):
     label_picker_rows: list[dict[str, Any]] = []
     sibling_rows: list[dict[str, Any]] = []
 
-    if not selected and reg:
-        if filter_label:
-            to_probe = configs_for_label(reg, filter_label)
+    if not add_base_only and not selected and reg:
+        if filter_host:
+            to_probe = configs_for_same_host(reg, filter_host)
         else:
             to_probe = sorted(
                 reg.items(),
                 key=lambda x: (
-                    x[1].label.casefold(),
+                    x[1].db.casefold(),
                     0 if x[1].environment == "production" else 1,
                     x[0].lower(),
                 ),
@@ -608,7 +747,7 @@ def _accounting_reports_page(accounting_mode: str):
             conn_status = "error"
             conn_detail = str(e)
 
-        sibs = configs_for_label(reg, reg[selected].label)
+        sibs = configs_for_same_host(reg, registry_netloc(reg[selected]))
         if len(sibs) > 1:
             for cid, ccfg in sibs:
                 sr: dict[str, Any] = {
@@ -631,13 +770,6 @@ def _accounting_reports_page(accounting_mode: str):
                         sr["msg"] = str(e)
                 sibling_rows.append(sr)
 
-    prefill_new_label = (request.args.get("prefill_label") or "").strip()
-    open_add_base_panel = (request.args.get("open_add") or "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-
     utitle = UTILITY_TITLE_BALANCE if accounting_mode == "balance" else UTILITY_TITLE
     report_open_urls: dict[int, str] = {}
     if selected and conn_status == "ok" and reports and selected in reg:
@@ -645,13 +777,20 @@ def _accounting_reports_page(accounting_mode: str):
         for r in reports:
             report_open_urls[int(r["id"])] = account_report_odoo_form_url(bu, int(r["id"]))
 
+    clients_for_select = (
+        configs_for_same_host(reg, filter_host)
+        if filter_host
+        else clients_sorted_for_select(reg)
+    )
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
-        clients_grouped=clients_grouped_for_select(reg),
-        distinct_client_labels=distinct_client_labels(reg),
+        clients_sorted=clients_sorted_for_select(reg),
+        clients_for_select=clients_for_select,
+        distinct_odoo_hosts=distinct_odoo_hosts(reg),
         selected_client=selected,
-        filter_label=filter_label,
+        filter_host=filter_host,
         filter_q=filter_q,
         conn_status=conn_status,
         conn_detail=conn_detail,
@@ -660,8 +799,8 @@ def _accounting_reports_page(accounting_mode: str):
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,
-        prefill_new_label=prefill_new_label,
-        open_add_base_panel=open_add_base_panel,
+        add_base_only=add_base_only,
+        open_instance_meta=open_instance_meta,
         accounting_mode=accounting_mode,
         accounting_endpoint=_ACCOUNTING_EP[accounting_mode],
         report_open_urls=report_open_urls,

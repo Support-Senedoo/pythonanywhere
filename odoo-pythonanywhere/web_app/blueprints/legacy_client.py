@@ -5,7 +5,12 @@ from flask import Blueprint, abort, current_app, flash, redirect, render_templat
 
 from web_app.blueprints.public import login_required_client
 from web_app.client_apps import apps_for_template
-from web_app.odoo_registry import client_has_app, configs_for_label, load_clients_registry
+from web_app.odoo_registry import (
+    client_has_app,
+    configs_for_same_host,
+    load_clients_registry,
+    registry_netloc,
+)
 from web_app.pointage_import_util import (
     ALLOWED_SUFFIX,
     parse_pointage_csv,
@@ -25,7 +30,7 @@ def select_client_base():
     if cur not in reg or picked not in reg:
         flash("Choix de base invalide.", "danger")
         return redirect(url_for("legacy.client_home"))
-    if reg[picked].label != reg[cur].label:
+    if registry_netloc(reg[picked]).lower() != registry_netloc(reg[cur]).lower():
         flash("Cette base n’est pas autorisée pour votre compte.", "danger")
         return redirect(url_for("legacy.client_home"))
     session["client_id"] = picked
@@ -42,12 +47,12 @@ def client_home():
     cid = (session.get("client_id") or "").strip().lower() or None
     reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
     cfg = reg.get(cid) if cid else None
-    client_label = cfg.label if cfg else (cid or "—")
+    client_label = cfg.db if cfg else (cid or "—")
     registry_ok = bool(cfg)
     client_apps = apps_for_template(cfg.apps) if cfg else []
     base_choices: list[dict] = []
     if cfg:
-        sibs = configs_for_label(reg, cfg.label)
+        sibs = configs_for_same_host(reg, registry_netloc(cfg))
         if len(sibs) > 1:
             for sid, scfg in sorted(
                 sibs,
@@ -82,7 +87,7 @@ def client_odoo_status():
     cfg = reg.get(cid) if cid else None
     if not cfg or not client_has_app(cfg, "odoo_status"):
         abort(404)
-    client_label = cfg.label if cfg else (cid or "client")
+    client_label = cfg.db if cfg else (cid or "client")
     try:
         c = get_odoo_client_for_browser_client()
         ver = c.version()
@@ -110,8 +115,8 @@ def client_pointage_import():
     cfg = reg.get(cid) if cid else None
     if not cfg or not client_has_app(cfg, "pointage_import"):
         abort(404)
-    client_label = cfg.label
-    ctx = f"Entreprise : {client_label} · base {cfg.db}"
+    client_label = cfg.db
+    ctx = f"Base : {client_label}"
 
     columns: list[str] = []
     preview_rows: list[dict[str, str]] = []
