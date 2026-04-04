@@ -27,8 +27,8 @@
 
 <div class="sn-card sn-card--accent">
   <p style="margin:0 0 1rem;padding:0.65rem 0.85rem;background:rgba(111,45,168,0.12);border-radius:8px;line-height:1.45;font-size:0.95rem;">
-    <strong>Liste des bases sans URL :</strong> renseignez seulement <strong>login</strong> + <strong>mot de passe</strong> du compte Odoo.com, puis « Analyser ».
-    Ne remplissez <strong>pas</strong> l’URL (section repliable ci‑dessous).
+    <strong>Liste des bases (portail Mes bases) :</strong> renseignez <strong>login</strong> + <strong>mot de passe</strong>, puis « Analyser ».
+    L’URL plus bas est <strong>facultative</strong> — laissez-la vide pour ce mode.
   </p>
   {# type="text" sur l’URL : évite la validation navigateur « champ URL » qui bloque l’envoi vide. #}
   <form method="post" autocomplete="off" novalidate data-sn-probe="odoo-bases">
@@ -43,19 +43,18 @@
     <input type="password" id="odoo_password" name="odoo_password" value="" autocomplete="current-password"
            placeholder="Obligatoire pour Mes bases (même sans URL)">
 
-    <details style="margin:1rem 0 0.5rem;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:0.5rem 0.75rem;">
-      <summary style="cursor:pointer;font-weight:600;">Option avancée : URL d’une instance (db.list)</summary>
-      <p class="sn-muted" style="margin:0.65rem 0 0.5rem;font-size:0.88rem;">
-        À ouvrir seulement si vous voulez interroger <code>db.list()</code> sur <strong>une</strong> instance précise.
-        Pour le portail « Mes bases », laissez ce champ vide.
-      </p>
-      <label for="odoo_url" class="sn-muted">URL de l’instance</label>
-      <input type="text" id="odoo_url" name="odoo_url" autocapitalize="none" spellcheck="false" aria-required="false"
-             value="{{ request.form.get('odoo_url', '') }}"
-             placeholder="ex. https://monentreprise.odoo.com (facultatif)">
-    </details>
+    {# URL hors <details> : évite les validations navigateur bizarres sur champs requis / type=url dans un bloc fermé. Jamais d’attribut required ici. #}
+    <hr style="margin:1.25rem 0;border:none;border-top:1px solid rgba(255,255,255,0.12);">
+    <p class="sn-muted" style="font-size:0.9rem;margin:0 0 0.5rem;line-height:1.45;">
+      <strong>Facultatif</strong> — remplissez seulement pour <code>db.list()</code> sur une instance précise.
+      Pour « Mes bases » (odoo.com), <strong>laissez vide</strong> (pas d’URL obligatoire).
+    </p>
+    <label for="odoo_url" class="sn-muted">URL de l’instance Odoo</label>
+    <input type="text" id="odoo_url" name="odoo_url" autocapitalize="none" spellcheck="false"
+           value="{{ request.form.get('odoo_url', '') }}"
+           placeholder="Laisser vide si vous utilisez uniquement le portail Mes bases">
 
-    {# formnovalidate : certains navigateurs ignorent novalidate sur <form> dans des cas limites #}
+    {# formnovalidate : désactive la validation HTML5 (évite « Veuillez remplir ce champ » sur type=url vide, etc.) #}
     <button type="submit" formnovalidate style="margin-top:0.85rem;">Analyser les bases</button>
     <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
   </form>

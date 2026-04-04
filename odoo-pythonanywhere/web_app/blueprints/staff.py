@@ -181,7 +181,7 @@ def utilities_home():
     return render_template("staff/utilities.html", clients=reg)
 
 
-_ODOO_PROBE_UTIL_VERSION = "1.2.3"
+_ODOO_PROBE_UTIL_VERSION = "1.2.4"
 _ODOO_PROBE_UTIL_DATE = "2026-04-03"
 
 
