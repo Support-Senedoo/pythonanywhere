@@ -235,6 +235,214 @@ def _copy_report_display_name(raw_name: Any, suffix: str) -> Any:
     return s + suffix if suffix.strip() not in s else s
 
 
+def _ultimate_root_report_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    *,
+    max_hops: int = 24,
+) -> int:
+    """Remonte les ``root_report_id`` jusqu’au rapport racine (menu / variantes Odoo)."""
+    cur = int(report_id)
+    for _ in range(max_hops):
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "read",
+            [[cur]],
+            {"fields": ["root_report_id"]},
+        )
+        if not rows:
+            return cur
+        rr = rows[0].get("root_report_id")
+        if not rr or not (isinstance(rr, (list, tuple)) and rr[0]):
+            return cur
+        nxt = int(rr[0])
+        if nxt == cur:
+            return cur
+        cur = nxt
+    return cur
+
+
+def _account_report_has_field(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    field_name: str,
+) -> bool:
+    try:
+        fg = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "fields_get",
+            [],
+            {"attributes": ["type"]},
+        )
+    except Exception:
+        return False
+    return field_name in fg
+
+
+def _link_report_copy_to_root(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    new_report_id: int,
+    root_report_id: int,
+) -> None:
+    """Rattache la copie à la balance / racine d’origine (variante du même ``root_report_id``)."""
+    if not _account_report_has_field(models, db, uid, password, "root_report_id"):
+        return
+    if new_report_id == root_report_id:
+        return
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[new_report_id], {"root_report_id": root_report_id}],
+        )
+    except Exception:
+        pass
+
+
+def _proposed_name_search_strings(proposed: Any) -> list[str]:
+    out: list[str] = []
+    if isinstance(proposed, dict):
+        for k in ("fr_FR", "fr_BE", "fr_CA", "fr_CH", "en_US", "en_GB"):
+            v = proposed.get(k)
+            if v and str(v).strip():
+                out.append(str(v).strip())
+        for v in proposed.values():
+            s = str(v).strip()
+            if s and s not in out:
+                out.append(s)
+    elif proposed:
+        out.append(str(proposed).strip())
+    return out or ["Rapport"]
+
+
+def _copy_name_collides_existing(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    exclude_id: int,
+    proposed: Any,
+    *,
+    root_for_sibling_check: int | None,
+) -> bool:
+    """True si un autre rapport porte déjà ce nom (recherche par langue + variantes même racine)."""
+    langs = ("fr_FR", "fr_BE", "fr_CA", "en_US", "en_GB")
+    for s in _proposed_name_search_strings(proposed):
+        for lang in langs:
+            hits = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "search",
+                [[("id", "!=", exclude_id), ("name", "=", s)]],
+                {"limit": 2, "context": {"lang": lang}},
+            )
+            if hits:
+                return True
+        hits_plain = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "search",
+            [[("id", "!=", exclude_id), ("name", "=", s)]],
+            {"limit": 2},
+        )
+        if hits_plain:
+            return True
+
+    prop_display = format_report_name(proposed).strip().lower()
+    if prop_display and prop_display != "—" and root_for_sibling_check:
+        sib = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "search",
+            [[("root_report_id", "=", root_for_sibling_check), ("id", "!=", exclude_id)]],
+            {"limit": 500},
+        )
+        if sib:
+            rows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "read",
+                [sib],
+                {"fields": ["name"]},
+            )
+            for r in rows:
+                if format_report_name(r.get("name")).strip().lower() == prop_display:
+                    return True
+    return False
+
+
+def _write_duplicate_unique_name(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    new_report_id: int,
+    raw_source_name: Any,
+    name_suffix: str,
+    *,
+    root_for_uniqueness: int | None,
+) -> None:
+    for i in range(50):
+        suf = name_suffix if i == 0 else f"{name_suffix} ({i + 1})"
+        proposed = _copy_report_display_name(raw_source_name, suf)
+        if _copy_name_collides_existing(
+            models,
+            db,
+            uid,
+            password,
+            new_report_id,
+            proposed,
+            root_for_sibling_check=root_for_uniqueness,
+        ):
+            continue
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[new_report_id], {"name": proposed}],
+        )
+        return
+    raise ValueError(
+        "Impossible d’attribuer un nom de rapport unique après 50 tentatives ; "
+        "renommez manuellement dans Odoo."
+    )
+
+
 def duplicate_account_report(
     models: Any,
     db: str,
@@ -245,7 +453,12 @@ def duplicate_account_report(
     name_suffix: str = " — copie Senedoo",
 ) -> int:
     """
-    Duplique un account.report (API copy), puis renomme la copie.
+    Duplique un account.report (API ``copy``), rattache la copie au même ``root_report_id``
+    que la balance / le rapport d’origine (racine remontée), puis renomme avec suffixe Senedoo.
+
+    Si le nom existe déjà (autre rapport ou autre variante sous la même racine), le suffixe est
+    incrémenté : ``… (2)``, ``… (3)``, etc.
+
     La personnalisation Senedoo doit toujours s’appliquer sur cette copie, pas sur l’original.
     """
     rows = execute_kw(
@@ -261,6 +474,8 @@ def duplicate_account_report(
     if not rows:
         raise ValueError(f"Rapport comptable id={source_report_id} introuvable.")
     raw_name = rows[0].get("name")
+    root_target = _ultimate_root_report_id(models, db, uid, password, source_report_id)
+
     new_res = execute_kw(
         models,
         db,
@@ -277,14 +492,16 @@ def duplicate_account_report(
         new_id = int(new_res[0])
     else:
         new_id = int(new_res)
-    new_name = _copy_report_display_name(raw_name, name_suffix)
-    execute_kw(
+
+    _link_report_copy_to_root(models, db, uid, password, new_id, root_target)
+    _write_duplicate_unique_name(
         models,
         db,
         uid,
         password,
-        "account.report",
-        "write",
-        [[new_id], {"name": new_name}],
+        new_id,
+        raw_name,
+        name_suffix,
+        root_for_uniqueness=root_target,
     )
     return new_id
