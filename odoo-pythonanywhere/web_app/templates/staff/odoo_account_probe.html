@@ -7,7 +7,7 @@
 <details class="sn-doc" open>
   <summary>But &amp; principe</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    Deux modes (non enregistrés côté appli ; login et mot de passe <strong>masqués</strong> à l’écran) :
+    Deux modes (rien n’est enregistré côté serveur ; le <strong>mot de passe</strong> reste masqué et n’est <strong>pas</strong> réaffiché après envoi) :
     <strong>(1)</strong> laissez l’URL vide : connexion au <strong>portail Odoo.com</strong> (page « Mes bases »), liste des
     instances <code>*.odoo.com</code> liées au compte, puis test XML-RPC sur chacune.
     <strong>(2)</strong> URL d’une instance : <code>db.list()</code> sur cette instance si le service <code>db</code> existe,
@@ -34,18 +34,19 @@
     L’URL plus bas est <strong>facultative</strong> — laissez-la vide pour ce mode.
   </p>
   {# type="text" sur l’URL : évite la validation navigateur « champ URL » qui bloque l’envoi vide. #}
-  <form method="post" autocomplete="off" novalidate data-sn-probe="odoo-bases">
-    <label for="odoo_login">E-mail / login Odoo.com <span class="sn-muted">(saisie masquée)</span></label>
-    {# Pas de required HTML5 : validation côté serveur uniquement (évite popups navigateur inutiles). #}
-    <input type="password" id="odoo_login" name="odoo_login"
+  <form method="post" autocomplete="on" novalidate data-sn-probe="odoo-bases">
+    <label for="odoo_login">E-mail / login Odoo.com</label>
+    {# Login en clair : lisible + mémorisation navigateur ; pas de required HTML5 (validation serveur). #}
+    <input type="text" id="odoo_login" name="odoo_login"
            value="{{ request.form.get('odoo_login', '') }}"
            autocomplete="username" inputmode="email"
            spellcheck="false"
-           aria-label="Login Odoo, affichage masqué">
+           aria-label="E-mail ou login Odoo.com">
 
     <label for="odoo_password">Mot de passe du même compte</label>
+    {# Jamais de value côté serveur après POST (sécurité) — le navigateur peut proposer un mot de passe enregistré. #}
     <input type="password" id="odoo_password" name="odoo_password" value="" autocomplete="current-password"
-           placeholder="Obligatoire pour Mes bases (même sans URL)">
+           placeholder="Saisir à chaque analyse (ou gestionnaire de mots de passe du navigateur)">
 
     {# URL hors <details> : évite les validations navigateur bizarres sur champs requis / type=url dans un bloc fermé. Jamais d’attribut required ici. #}
     <hr style="margin:1.25rem 0;border:none;border-top:1px solid rgba(255,255,255,0.12);">
@@ -62,6 +63,29 @@
     <button type="submit" formnovalidate style="margin-top:0.85rem;">Analyser les bases</button>
     <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
   </form>
+  <p class="sn-muted" style="font-size:0.8rem;margin:0.75rem 0 0;line-height:1.45;">
+    Le <strong>login</strong> peut être mémorisé dans ce navigateur (local) pour les prochaines visites ; le <strong>mot de passe</strong> n’est jamais stocké par l’appli et le champ est vidé après chaque envoi.
+  </p>
+  <script>
+  (function () {
+    var key = "toolbox_staff_odoo_probe_login";
+    var login = document.getElementById("odoo_login");
+    if (!login || !login.form) return;
+    try {
+      if (!login.value.trim()) {
+        var saved = localStorage.getItem(key);
+        if (saved) login.value = saved;
+      }
+    } catch (e) {}
+    login.form.addEventListener("submit", function () {
+      try {
+        var v = login.value.trim();
+        if (v) localStorage.setItem(key, v);
+        else localStorage.removeItem(key);
+      } catch (e) {}
+    });
+  })();
+  </script>
 </div>
 
 {% if result %}
