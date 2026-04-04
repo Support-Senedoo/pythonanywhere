@@ -21,6 +21,9 @@ if str(_ROOT) not in sys.path:
 # Présents sur chaque page utilitaire rapports (sans base sélectionnée)
 REQUIRED_COMMON = [
     'id="ajouter-base-odoo"',
+    'id="btn-toggle-add-base"',
+    'id="btn-close-add-base"',
+    'id="panel-add-base-odoo"',
     'name="filter_host"',
     'name="new_db"',
     'name="new_environment"',

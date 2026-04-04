@@ -115,9 +115,9 @@
 <details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi — balance 6 colonnes</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Choisir une balance comptable standard Odoo à <strong>4 colonnes</strong> (solde initial, débit, crédit, solde final sur la période),
+    <strong>But.</strong> Partir d’une balance <strong>4 colonnes</strong> (solde initial, débit, crédit, solde final) <em>ou</em> d’une balance à <strong>2 colonnes</strong> (débit et crédit sur la période seulement),
     en créer une <strong>copie</strong>, puis la transformer en <strong>6 colonnes</strong> : débit initial, crédit initial, débit période, crédit période, débit final, crédit final.
-    L’original n’est pas modifié. Le rapport doit utiliser le moteur standard sur les colonnes initiale/finale (subformule <code>sum</code>).
+    L’original n’est pas modifié. En 4 colonnes, les soldes initiaux/finaux doivent utiliser la subformule <code>sum</code>. En 2 colonnes, les soldes sont dérivés via les champs Odoo <code>to_beginning_of_period</code> et <code>from_beginning</code> : contrôler les totaux sur une base de test ; les lignes de regroupement peuvent exiger des formules d’agrégation complémentaires.
   </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -154,12 +154,16 @@
 
     <div id="ajouter-base-odoo" class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
       <button type="submit">Actualiser la liste</button>
+      <button type="button" id="btn-toggle-add-base" class="sn-btn sn-btn--ghost">Ajouter une base</button>
       <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
     </div>
   </form>
 
-    <div id="panel-add-base-odoo" class="sn-panel-add-base" style="margin-top:0.85rem;padding-top:0.85rem;border-top:1px dashed var(--sn-border);">
-      <h3 style="margin:0 0 0.5rem;font-size:1rem;">Ajouter une nouvelle base</h3>
+    <div id="panel-add-base-odoo" class="sn-panel-add-base" hidden style="margin-top:0.85rem;padding-top:0.85rem;border-top:1px dashed var(--sn-border);">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.5rem;margin:0 0 0.5rem;">
+        <h3 style="margin:0;font-size:1rem;">Ajouter une nouvelle base</h3>
+        <button type="button" id="btn-close-add-base" class="sn-btn sn-btn--ghost" style="flex-shrink:0;">Fermer</button>
+      </div>
       <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
         Même fichier que les autres utilitaires staff. Après enregistrement, la page se recharge avec cette base présélectionnée.
       </p>
@@ -385,7 +389,7 @@
 <div class="sn-card" id="personalize">
   {% if accounting_mode == 'balance' %}
   <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation balance — 6 colonnes</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Copie du rapport (suffixe « — copie Senedoo (6 col.) »), puis colonnes et expressions adaptées. La balance source doit avoir <strong>exactement 4 colonnes</strong> dans l’ordre attendu par Odoo.</p>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Copie du rapport (suffixe « — copie Senedoo (6 col.) »), puis colonnes et expressions adaptées. Source acceptée : <strong>4 colonnes</strong> (ordre Odoo classique) ou <strong>2 colonnes</strong> (débit puis crédit période).</p>
   <form id="form-personalize-balance" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q }}">
@@ -447,7 +451,7 @@
   {% endif %}
 </div>
 {% else %}
-<p class="sn-muted">« Actualiser » sans base sélectionnée affiche toutes les bases (ou filtrées par serveur) ; choisissez-en une dans la liste ou le tableau. Utilisez « Ajouter une nouvelle base » si besoin.</p>
+<p class="sn-muted">« Actualiser » sans base sélectionnée affiche toutes les bases (ou filtrées par serveur) ; choisissez-en une dans la liste ou le tableau. Le formulaire d’ajout est masqué par défaut : cliquez sur <strong>Ajouter une base</strong>, puis <strong>Fermer</strong> pour le replier.</p>
 {% endif %}
 
 <div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">
@@ -470,8 +474,30 @@
 
 <script>
 (function(){
+  var panelAdd = document.getElementById('panel-add-base-odoo');
+  var btnToggleAdd = document.getElementById('btn-toggle-add-base');
+  var btnCloseAdd = document.getElementById('btn-close-add-base');
+  function openAddBasePanel() {
+    if (!panelAdd) return;
+    panelAdd.hidden = false;
+  }
+  function closeAddBasePanel() {
+    if (!panelAdd) return;
+    panelAdd.hidden = true;
+    try { if (btnToggleAdd) btnToggleAdd.focus(); } catch (e) {}
+  }
+  if (btnToggleAdd) {
+    btnToggleAdd.addEventListener('click', function () {
+      openAddBasePanel();
+      try { var u = document.getElementById('new_url'); if (u) u.focus(); } catch (x) {}
+    });
+  }
+  if (btnCloseAdd) {
+    btnCloseAdd.addEventListener('click', closeAddBasePanel);
+  }
   var anchorAdd = document.getElementById('ajouter-base-odoo');
   if (location.hash === '#ajouter-base-odoo' && anchorAdd) {
+    openAddBasePanel();
     try { anchorAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
     try { var ni = document.getElementById('new_db'); if (ni) ni.focus(); } catch (x) {}
   }
