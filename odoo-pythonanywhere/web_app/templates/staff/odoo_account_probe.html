@@ -33,7 +33,8 @@
   {# type="text" sur l’URL : évite la validation navigateur « champ URL » qui bloque l’envoi vide. #}
   <form method="post" autocomplete="off" novalidate data-sn-probe="odoo-bases">
     <label for="odoo_login">E-mail / login Odoo.com <span class="sn-muted">(saisie masquée)</span></label>
-    <input type="password" id="odoo_login" name="odoo_login" required
+    {# Pas de required HTML5 : validation côté serveur uniquement (évite popups navigateur inutiles). #}
+    <input type="password" id="odoo_login" name="odoo_login"
            value="{{ request.form.get('odoo_login', '') }}"
            autocomplete="username" inputmode="email"
            spellcheck="false"
