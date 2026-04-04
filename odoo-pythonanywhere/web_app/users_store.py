@@ -10,6 +10,8 @@ from typing import Any
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from web_app.odoo_registry import validate_client_id
+
 _LOGIN_RE = re.compile(r"^[a-zA-Z0-9._@+-]{2,80}$")
 
 
@@ -72,7 +74,11 @@ def verify_user(path: str | Path, login: str, password: str) -> ToolboxUser | No
     if role == "client":
         if not cid or not str(cid).strip():
             return None
-        return ToolboxUser(login=canon, role=role, client_id=str(cid).strip())
+        try:
+            cid_norm = validate_client_id(str(cid))
+        except ValueError:
+            return None
+        return ToolboxUser(login=canon, role=role, client_id=cid_norm)
     return ToolboxUser(login=canon, role=role, client_id=None)
 
 
@@ -102,10 +108,17 @@ def list_user_rows(path: str | Path) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: (r["role"], r["login"].lower()))
 
 
+def _client_id_key(client_id: str | None) -> str:
+    return (str(client_id or "")).strip().lower()
+
+
 def count_users_for_client(path: str | Path, client_id: str) -> int:
+    target = _client_id_key(client_id)
+    if not target:
+        return 0
     n = 0
     for row in list_user_rows(path):
-        if row["role"] == "client" and str(row.get("client_id") or "") == client_id:
+        if row["role"] == "client" and _client_id_key(row.get("client_id")) == target:
             n += 1
     return n
 
@@ -119,9 +132,10 @@ def upsert_client_user(
     is_new: bool,
 ) -> None:
     login = validate_login(login)
-    client_id = client_id.strip()
-    if not client_id:
-        raise ValueError("client_id requis.")
+    try:
+        client_id = validate_client_id(client_id)
+    except ValueError as e:
+        raise ValueError(str(e)) from e
     data = read_users_file(path)
     users: list[dict[str, Any]] = list(data.get("users", []))
     found = False

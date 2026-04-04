@@ -97,7 +97,7 @@ def login():
         session["logged_in"] = True
         session["login"] = user.login
         session["role"] = user.role
-        session["client_id"] = user.client_id
+        session["client_id"] = (user.client_id or "").strip().lower() or None
         session["portal"] = portal
         if user.role == "staff":
             session.pop("staff_selected_client_id", None)

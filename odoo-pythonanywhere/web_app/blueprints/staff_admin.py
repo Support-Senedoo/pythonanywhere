@@ -23,6 +23,10 @@ from web_app.users_store import (
     upsert_staff_user,
 )
 
+
+def _client_id_in_registry(reg: dict, client_id: str) -> bool:
+    return (client_id or "").strip().lower() in reg
+
 bp = Blueprint("staff_admin", __name__, url_prefix="/admin")
 
 
@@ -176,7 +180,7 @@ def user_new():
                 upsert_staff_user(_users_path(), login, password, is_new=True)
                 flash(f"Compte équipe « {login} » créé.", "success")
             else:
-                if client_id not in reg:
+                if not _client_id_in_registry(reg, client_id):
                     flash("Client inconnu dans le registre.", "danger")
                     return render_template(
                         "staff/admin/user_form.html",
@@ -216,8 +220,8 @@ def user_edit(login: str):
                 upsert_staff_user(_users_path(), login, password, is_new=False)
                 flash("Compte équipe mis à jour.", "success")
             else:
-                if client_id not in reg:
-                    flash("Client inconnu.", "danger")
+                if not _client_id_in_registry(reg, client_id):
+                    flash("Client inconnu dans le registre.", "danger")
                     return render_template(
                         "staff/admin/user_form.html",
                         mode="edit",

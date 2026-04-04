@@ -27,7 +27,8 @@ def try_dev_user(login: str, password: str, portal: str) -> ToolboxUser | None:
         return None
     portal = (portal or "client").strip().lower()
     if portal == "client":
-        cid = (os.environ.get("TOOLBOX_TEST_CLIENT_ID") or "la_ripaille").strip()
+        # Même clé que dans toolbox_clients.json (toujours en minuscules).
+        cid = (os.environ.get("TOOLBOX_TEST_CLIENT_ID") or "la_ripaille").strip().lower()
         return ToolboxUser(login=_DEV_LOGIN, role="client", client_id=cid)
     if portal == "staff":
         return ToolboxUser(login=_DEV_LOGIN, role="staff", client_id=None)

@@ -18,7 +18,7 @@ def get_config_for_client_session() -> ClientOdooConfig:
     """Compte connecté type client : une seule base (session client_id)."""
     if session.get("role") != "client":
         raise PermissionError("Rôle client requis.")
-    cid = session.get("client_id")
+    cid = (session.get("client_id") or "").strip().lower()
     if not cid:
         raise RuntimeError("Session client sans client_id.")
     reg = _registry()
@@ -34,9 +34,10 @@ def get_odoo_client_for_browser_client() -> OdooClient:
 
 def get_config_by_id(client_id: str) -> ClientOdooConfig:
     reg = _registry()
-    if client_id not in reg:
-        raise ValueError(f"client_id inconnu : {client_id}")
-    return reg[client_id]
+    cid = (client_id or "").strip().lower()
+    if cid not in reg:
+        raise ValueError(f"client_id inconnu : {client_id!r}")
+    return reg[cid]
 
 
 def get_xmlrpc_for_staff_client_id(client_id: str) -> tuple[Any, str, int, str]:

@@ -14,7 +14,7 @@ bp = Blueprint("legacy", __name__)
 @bp.route("/")
 @login_required_client
 def client_home():
-    cid = session.get("client_id")
+    cid = (session.get("client_id") or "").strip().lower() or None
     reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
     cfg = reg.get(cid) if cid else None
     client_label = cfg.label if cfg else (cid or "—")
@@ -32,7 +32,7 @@ def client_home():
 @bp.route("/odoo-status")
 @login_required_client
 def client_odoo_status():
-    cid = session.get("client_id")
+    cid = (session.get("client_id") or "").strip().lower() or None
     reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
     cfg = reg.get(cid) if cid else None
     if not cfg or not client_has_app(cfg, "odoo_status"):

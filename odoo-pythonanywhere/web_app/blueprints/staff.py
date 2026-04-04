@@ -54,7 +54,7 @@ def staff_home():
 @bp.route("/select-client", methods=["POST"])
 @login_required_staff
 def select_client():
-    cid = (request.form.get("client_id") or "").strip()
+    cid = (request.form.get("client_id") or "").strip().lower()
     if not cid or cid not in _registry():
         flash("Client inconnu.", "danger")
         return redirect(url_for("staff.staff_home"))
