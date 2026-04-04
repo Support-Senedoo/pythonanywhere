@@ -22,7 +22,7 @@ Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **j
 2. **`install_pa_ssh_key.ps1 -IdentityFile "%USERPROFILE%\.ssh\id_ed25519_pa_cursor"`** → mot de passe **compte PA une dernière fois** pour ajouter cette `.pub` dans `authorized_keys`.
 3. **`deploy_pa.ps1`** choisit **automatiquement** `id_ed25519_pa_cursor` s’il existe (sinon `id_ed25519`).
 4. **MCP** `execute_command` : `privateKeyPath` = **`C:\Users\<user>\.ssh\id_ed25519_pa_cursor`** (adapter `<user>` ; clé **non** chiffrée sinon erreur « passphrase »).
-5. Si **`deploy_pa.ps1`** échoue avec **ParserError** et des accents illisibles : souvent **PowerShell 5.1 + fichier sur Google Drive / encodage** — ne pas conclure que PA est inaccessible : faire **`git pull`** sur PA (Bash) ou **MCP SSH** avec la commande documentée dans **`DEPLOY_PYTHONANYWHERE.md`** ; puis **Reload** Web.
+5. Si **`deploy_pa.ps1`** échoue avec **ParserError** : le script dans le dépôt utilise des **messages ASCII** pour éviter l’encodage sur Mon Drive ; si ça persiste, **`git pull`** sur PA (Bash) ou **MCP SSH** (voir **`DEPLOY_PYTHONANYWHERE.md`**) ; puis **Reload** Web.
 
 ## Connexion SSH « comme la dernière fois » (PC utilisateur)
 

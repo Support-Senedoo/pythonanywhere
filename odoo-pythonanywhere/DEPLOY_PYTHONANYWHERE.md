@@ -45,7 +45,7 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 
 ### Si `deploy_pa.ps1` plante au démarrage (ParserError, accents « cassés »)
 
-Sur **Google Drive / « Mon Drive »** (ou selon l’encodage du fichier), **Windows PowerShell 5.1** peut mal interpréter le `.ps1` (chaînes accentuées lues comme du charabia → erreurs du type *Argument manquant* sur des lignes pourtant valides). **Le dépôt PA n’est pas en cause** : le blocage est local au script PowerShell.
+Le script **`deploy_pa.ps1` du dépôt** utilise des **messages ASCII** dans le code exécutable (depuis avril 2026) pour éviter ce cas sur **Google Drive / Mon Drive** avec **PowerShell 5.1**. Si vous avez encore une **ancienne copie** ou un fichier ré-enregistré avec accents dans les `Write-Host` / `Write-Error`, le parseur peut mal lire le fichier (erreurs *Argument manquant*). **Le serveur PA n’est pas en cause** : blocage local au `.ps1`.
 
 **Alternatives fiables** (après `git push` depuis la machine où Git fonctionne) :
 

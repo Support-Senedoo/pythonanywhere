@@ -1,28 +1,31 @@
-# Déploie la toolbox Flask sur PythonAnywhere via SSH (clé privée locale).
-# À lancer dans PowerShell sur VOTRE PC (pas uniquement via un agent distant sans accès SSH).
+# Deploy Flask toolbox to PythonAnywhere via SSH (local private key).
+# Run in PowerShell on YOUR PC (not only from a remote agent without SSH).
 #
-# Enchaînement automatique :
-#   1) git push depuis la racine du dépôt (pour que GitHub ait les derniers commits) ;
-#   2) sur PA : deploy_pa.sh fait git fetch + pull --ff-only, puis pip.
-# Pensez à committer avant de lancer le script (les fichiers non commités ne partent pas au push).
-# Pour sauter l’étape push (réseau indisponible, dépôt en lecture seule) : -SkipGitPush
+# Flow:
+#   1) git push from repo root (so GitHub has latest commits);
+#   2) on PA: deploy_pa.sh runs git fetch + pull --ff-only, then pip.
+# Commit before run (uncommitted files are not pushed).
+# To skip local push: -SkipGitPush
 #
-# Si SSH/scp demande encore le mot de passe PA à chaque fois : une fois seulement
+# If SSH/scp still asks PA password each time: run once
 #   .\install_pa_ssh_key.ps1
 #
-# Pour réutiliser la même cible (alias « pa ») : fusionner ssh_config.pythonanywhere.example
-# dans %USERPROFILE%\.ssh\config puis : .\deploy_pa.ps1 -UserHost pa
+# Reuse target (host alias "pa"): merge ssh_config.pythonanywhere.example
+# into %USERPROFILE%\.ssh\config then: .\deploy_pa.ps1 -UserHost pa
 #
-# Clé sans phrase (agent / MCP) : exécuter une fois  .\setup_pa_automation_key.ps1
-# puis  .\install_pa_ssh_key.ps1 -IdentityFile "$env:USERPROFILE\.ssh\id_ed25519_pa_cursor"
-# Si ce fichier existe, il est utilisé automatiquement à la place de id_ed25519.
+# Key without passphrase (agent / MCP): run once .\setup_pa_automation_key.ps1
+# then .\install_pa_ssh_key.ps1 -IdentityFile "$env:USERPROFILE\.ssh\id_ed25519_pa_cursor"
+# If that file exists, it is used instead of id_ed25519.
 #
-# Usage (depuis ce dossier odoo-pythonanywhere) :
+# Usage (from this folder odoo-pythonanywhere):
 #   .\deploy_pa.ps1
-# Forcer ta clé personnelle :
+# Force your key:
 #   .\deploy_pa.ps1 -IdentityFile "C:\Users\patri\.ssh\id_ed25519"
-# Sans push local :
+# No local push:
 #   .\deploy_pa.ps1 -SkipGitPush
+#
+# NOTE: User-visible strings are ASCII-only so PowerShell 5.1 parses this file
+# correctly when opened from Google Drive / paths where UTF-8 without BOM fails.
 
 param(
     [string]$IdentityFile,
@@ -40,21 +43,21 @@ if (-not $PSBoundParameters.ContainsKey("IdentityFile") -or [string]::IsNullOrWh
     }
 }
 if (-not (Test-Path -LiteralPath $IdentityFile)) {
-    Write-Error "Clé introuvable : $IdentityFile"
+    Write-Error "Key not found: $IdentityFile"
 }
 $deploySh = Join-Path $PSScriptRoot "deploy_pa.sh"
 if (-not (Test-Path $deploySh)) {
-    Write-Error "Fichier manquant : $deploySh"
+    Write-Error "Missing file: $deploySh"
 }
 
-# IdentitiesOnly : n’essaie que cette clé (évite trop d’échecs publickey avec plusieurs clés).
+# IdentitiesOnly: use only this key (fewer publickey failures with many keys).
 $sshOpts = @(
     "-i", $IdentityFile,
     "-o", "StrictHostKeyChecking=accept-new",
     "-o", "IdentitiesOnly=yes"
 )
-Write-Host ">>> Clé : $IdentityFile"
-Write-Host ">>> Cible : $UserHost"
+Write-Host ">>> Key: $IdentityFile"
+Write-Host ">>> Target: $UserHost"
 
 if (-not $SkipGitPush) {
     $gitTop = ""
@@ -65,7 +68,7 @@ if (-not $SkipGitPush) {
         $gitTop = ""
     }
     if ($gitTop) {
-        Write-Host ">>> Git : dépôt $gitTop"
+        Write-Host ">>> Git repo: $gitTop"
         $dirty = ""
         try {
             $dirty = (& git @("-C", $gitTop, "status", "--porcelain") 2>$null)
@@ -73,40 +76,40 @@ if (-not $SkipGitPush) {
             $dirty = ""
         }
         if ($dirty) {
-            Write-Host ">>> ATTENTION : modifications non commitées — elles ne seront pas poussées. Committez puis relancez." -ForegroundColor Yellow
+            Write-Host ">>> WARNING: uncommitted changes will not be pushed. Commit then re-run." -ForegroundColor Yellow
         }
-        Write-Host ">>> Git push (origin) pour que le pull sur PythonAnywhere récupère le dernier code..."
+        Write-Host ">>> Git push (origin) so PythonAnywhere pull gets latest..."
         & git @("-C", $gitTop, "push")
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "git push a échoué (réseau, branche sans upstream, ou conflit). Corrigez ou relancez avec -SkipGitPush."
+            Write-Error "git push failed (network, no upstream, or conflict). Fix or use -SkipGitPush."
         }
     } else {
-        Write-Host ">>> Aucun dépôt Git détecté depuis $PSScriptRoot — étape push ignorée." -ForegroundColor DarkYellow
+        Write-Host ">>> No Git repo from $PSScriptRoot - push step skipped." -ForegroundColor DarkYellow
     }
 } else {
-    Write-Host ">>> SkipGitPush : pas de git push local."
+    Write-Host ">>> SkipGitPush: no local git push."
 }
 
-# Éviter Get-Content | ssh (conflit stdin si phrase secrète ou certains clients).
-# Forcer LF : CRLF Windows casse bash (ex. set -o pipefail -> "invalid option name").
+# Avoid Get-Content | ssh (stdin issues with passphrase keys).
+# Force LF: Windows CRLF breaks bash (e.g. set -o pipefail -> invalid option).
 $remoteName = "deploy_pa_run.sh"
 $tmpUnix = Join-Path $env:TEMP "deploy_pa_unix_$PID.sh"
 $raw = Get-Content -Raw -LiteralPath $deploySh
 $unix = $raw -replace "`r`n", "`n" -replace "`r", "`n"
 [System.IO.File]::WriteAllText($tmpUnix, $unix, [System.Text.UTF8Encoding]::new($false))
 
-Write-Host ">>> Copie du script sur PA..."
+Write-Host ">>> Uploading script to PA..."
 try {
     & scp.exe @sshOpts $tmpUnix "${UserHost}:~/${remoteName}"
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "scp a échoué (exit $LASTEXITCODE)."
+        Write-Error "scp failed (exit $LASTEXITCODE)."
     }
 } finally {
     Remove-Item -LiteralPath $tmpUnix -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ">>> Exécution sur PA (git fetch + pull + pip)..."
+Write-Host ">>> Running on PA (git fetch + pull + pip)..."
 & ssh.exe @sshOpts $UserHost "chmod +x ~/${remoteName} && bash ~/${remoteName}; ec=`$?; rm -f ~/${remoteName}; exit `$ec"
 $code = $LASTEXITCODE
-Write-Host ">>> Terminé (code $code)."
+Write-Host ">>> Done (exit code $code)."
 exit $code
