@@ -235,37 +235,26 @@
     overlay.setAttribute('aria-hidden', 'false');
     var ctrl = new AbortController();
     var t = setTimeout(function() { ctrl.abort(); }, 900000);
-    function navigateAfterPersonalizeRedirect() {
-      var fd = new FormData(form);
-      var path = window.location.pathname;
-      var sp = new URLSearchParams();
-      var cid = fd.get('client_id');
-      var fq = fd.get('filter_q');
-      if (cid) sp.set('client_id', cid);
-      if (fq) sp.set('q', fq);
-      var qs = sp.toString();
-      window.location.href = path + (qs ? '?' + qs : '');
-    }
     fetch(form.action, {
       method: 'POST',
+      headers: { 'X-Toolbox-Ajax': '1' },
       body: new FormData(form),
       credentials: 'same-origin',
       cache: 'no-store',
-      redirect: 'manual',
       signal: ctrl.signal
     }).then(function(resp) {
       clearTimeout(t);
-      if (resp.status >= 300 && resp.status < 400) {
-        var loc = resp.headers.get('Location');
-        if (loc) {
-          window.location.href = new URL(loc, window.location.href).href;
-          return;
-        }
-      }
-      /* Chrome / Firefox : redirect: manual -> type opaqueredirect, status 0, pas d'en-tête Location lisible */
-      if (resp.type === 'opaqueredirect' || resp.status === 0) {
-        navigateAfterPersonalizeRedirect();
-        return;
+      var ct = (resp.headers.get('Content-Type') || '');
+      if (resp.ok && ct.indexOf('application/json') !== -1) {
+        return resp.json().then(function(data) {
+          if (data && typeof data.redirect === 'string') {
+            window.location.href = data.redirect;
+            return;
+          }
+          overlay.hidden = true;
+          overlay.setAttribute('aria-hidden', 'true');
+          window.alert('Réponse serveur inattendue (pas d’URL de redirection).');
+        });
       }
       overlay.hidden = true;
       overlay.setAttribute('aria-hidden', 'true');
