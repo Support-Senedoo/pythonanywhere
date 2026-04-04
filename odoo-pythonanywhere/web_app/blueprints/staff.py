@@ -599,11 +599,12 @@ def _accounting_reports_page(accounting_mode: str):
                         pwd,
                         new_rid,
                         rlabel,
+                        under_trial_balance=True,
                     )
                     if menu_mid:
                         msg += (
-                            " Une entrée de menu a été créée sous Facturation › Reporting "
-                            "(États / déclarations légaux) avec le nom du rapport — ouvrez-la pour lancer l’analyse."
+                            " Une entrée de menu a été créée sous Analyse › Grands livres, "
+                            "juste après Balance comptable (libellés selon la langue Odoo) — ouvrez-la pour lancer l’analyse."
                         )
                 except Exception:
                     pass
@@ -879,6 +880,7 @@ def _accounting_reports_page(accounting_mode: str):
                 p,
                 brid,
                 act_name,
+                under_trial_balance=True,
             )
             balance_menu_id = menu_mid
             if aid:

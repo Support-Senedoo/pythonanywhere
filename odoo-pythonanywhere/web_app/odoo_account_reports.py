@@ -255,6 +255,137 @@ _ACCOUNT_REPORT_MENU_PARENT_XMLIDS: tuple[str, ...] = (
     "account.menu_finance_reports",
 )
 
+# Menu « Balance comptable » / trial balance (Enterprise account_reports, etc.) : même parent = sous-menu
+# type Analyse › Grands livres ; on insère la copie juste après cette entrée (séquence + 1).
+_TRIAL_BALANCE_MENU_XMLIDS: tuple[str, ...] = (
+    "account_reports.menu_action_account_report_trial_balance",
+    "account_accountant.menu_action_account_report_trial_balance",
+    "account.menu_action_account_report_trial_balance",
+)
+_TRIAL_BALANCE_DATA_NAME_EXACT = "menu_action_account_report_trial_balance"
+_TRIAL_BALANCE_MODULE_PREF: tuple[str, ...] = (
+    "account_reports",
+    "account_accountant",
+    "account",
+)
+
+
+def _menu_m2o_id(val: Any) -> int | None:
+    if val in (None, False):
+        return None
+    if isinstance(val, (list, tuple)) and val:
+        try:
+            return int(val[0])
+        except (TypeError, ValueError):
+            return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _find_trial_balance_menu_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> int | None:
+    for xmlid in _TRIAL_BALANCE_MENU_XMLIDS:
+        mod, _, name = xmlid.partition(".")
+        if not name:
+            continue
+        mid = _ir_ui_menu_id_from_xmlid(models, db, uid, password, mod, name)
+        if mid:
+            return mid
+    try:
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.model.data",
+            "search_read",
+            [
+                [
+                    ("model", "=", "ir.ui.menu"),
+                    ("name", "=", _TRIAL_BALANCE_DATA_NAME_EXACT),
+                ]
+            ],
+            {"fields": ["module", "res_id"], "limit": 20},
+        )
+    except Exception:
+        rows = []
+    if not rows:
+        try:
+            rows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.model.data",
+                "search_read",
+                [
+                    [
+                        ("model", "=", "ir.ui.menu"),
+                        ("name", "ilike", "%trial_balance%"),
+                    ]
+                ],
+                {"fields": ["module", "res_id"], "limit": 20},
+            )
+        except Exception:
+            rows = []
+    if not rows:
+        return None
+
+    def _pref_key(mod: str) -> int:
+        try:
+            return _TRIAL_BALANCE_MODULE_PREF.index(mod)
+        except ValueError:
+            return len(_TRIAL_BALANCE_MODULE_PREF)
+
+    rows.sort(key=lambda r: (_pref_key(str(r.get("module") or "")), str(r.get("name") or "")))
+    rid = rows[0].get("res_id")
+    return int(rid) if rid else None
+
+
+def resolve_parent_menu_below_trial_balance(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> tuple[int, int] | None:
+    """
+    Parent ``ir.ui.menu`` du menu Balance comptable / trial balance + séquence pour placer une entrée
+    juste après (même niveau que Balance comptable, sous Analyse › Grands livres selon la traduction).
+    """
+    tb_mid = _find_trial_balance_menu_id(models, db, uid, password)
+    if not tb_mid:
+        return None
+    try:
+        tb_rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "read",
+            [[tb_mid]],
+            {"fields": ["parent_id", "sequence"]},
+        )
+    except Exception:
+        return None
+    if not tb_rows:
+        return None
+    parent_id = _menu_m2o_id(tb_rows[0].get("parent_id"))
+    if not parent_id:
+        return None
+    seq = tb_rows[0].get("sequence")
+    try:
+        base_seq = int(seq) if seq is not None else 10
+    except (TypeError, ValueError):
+        base_seq = 10
+    return (parent_id, base_seq + 1)
+
 
 def resolve_parent_menu_for_account_report(models: Any, db: str, uid: int, password: str) -> int | None:
     """Retourne l’id ``ir.ui.menu`` parent (ex. Reporting > Statement Reports)."""
@@ -344,9 +475,15 @@ def ensure_account_report_reporting_menu(
     password: str,
     report_id: int,
     menu_title: str,
+    *,
+    under_trial_balance: bool = False,
 ) -> tuple[int | None, int | None]:
     """
-    Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu`` sous Reporting.
+    Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu``.
+
+    Par défaut : sous **Reporting** (Statement Reports / Reporting). Avec ``under_trial_balance=True``
+    (balance 6 col.) : sous le **même parent** que le menu **Balance comptable** / trial balance,
+    séquence juste après (Analyse › Grands livres › … selon la langue).
 
     Retourne ``(client_action_id, menu_id)``. Si aucun parent menu n’est résolu, retourne
     ``(action_id, None)`` — l’URL ``web#action=`` peut rester insuffisante selon la version Odoo.
@@ -366,9 +503,57 @@ def ensure_account_report_reporting_menu(
         return None, None
     ref = f"ir.actions.client,{int(aid)}"
     existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
+
+    if under_trial_balance:
+        placement = resolve_parent_menu_below_trial_balance(models, db, uid, password)
+        if placement:
+            parent_id, menu_sequence = placement[0], placement[1]
+        else:
+            parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
+            menu_sequence = 500
+    else:
+        parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
+        menu_sequence = 500
+
     if existing_mid:
+        if parent_id:
+            try:
+                cur = execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "ir.ui.menu",
+                    "read",
+                    [[int(existing_mid)]],
+                    {"fields": ["parent_id", "sequence"]},
+                )
+                if cur:
+                    cp = _menu_m2o_id(cur[0].get("parent_id"))
+                    cs = cur[0].get("sequence")
+                    try:
+                        cs_int = int(cs) if cs is not None else 0
+                    except (TypeError, ValueError):
+                        cs_int = 0
+                    if cp != int(parent_id) or cs_int != int(menu_sequence):
+                        execute_kw(
+                            models,
+                            db,
+                            uid,
+                            password,
+                            "ir.ui.menu",
+                            "write",
+                            [
+                                [int(existing_mid)],
+                                {
+                                    "parent_id": int(parent_id),
+                                    "sequence": int(menu_sequence),
+                                },
+                            ],
+                        )
+            except Exception:
+                pass
         return aid, existing_mid
-    parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
     if not parent_id:
         return aid, None
     try:
@@ -384,7 +569,7 @@ def ensure_account_report_reporting_menu(
                     "name": title,
                     "parent_id": int(parent_id),
                     "action": ref,
-                    "sequence": 500,
+                    "sequence": int(menu_sequence),
                 }
             ],
         )
