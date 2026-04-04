@@ -39,6 +39,22 @@ Modèles : `toolbox_users.example.json`, `toolbox_clients.example.json`, `toolbo
 
 *Dernière vérification manuelle : avril 2026 (SSH + MCP opérationnels).*
 
+## Pourquoi « ça ne se met pas à jour » alors qu’avant (sans Git) ça marchait
+
+Avec un **déploiement manuel** (upload / édition directe sur PA), vous modifiez **les mêmes fichiers** que ceux que le serveur Web exécute : un seul endroit, pas d’ambiguïté.
+
+Avec **Git** :
+
+1. **`git pull`** met à jour les fichiers **sur le disque** du serveur (dans le clone, ex. `~/pythonanywhere`).
+2. Le **processus Python** qui sert le site (WSGI) garde en **mémoire** l’ancien code (modules déjà importés, templates compilés) **jusqu’à un redémarrage**.
+3. Sur PythonAnywhere, ce redémarrage = bouton **Reload** de l’onglet **Web** (pas seulement le terminal Bash).
+
+Donc : **pull sans Reload** = disque à jour, **interface encore ancienne** (ex. version `1.0.0` affichée alors que le fichier `app_version.py` sur disque dit `1.3.x`). Ce n’est pas un bug Git : c’est le cycle de vie du worker WSGI.
+
+**À vérifier une fois pour toutes** : dans l’onglet Web, le **chemin du fichier WSGI** pointe bien vers le `pa_wsgi.py` (ou `pythonanywhere_wsgi.py`) **à l’intérieur du clone** (ex. `.../pythonanywhere/odoo-pythonanywhere/`), et non vers une vieille copie hors dépôt.
+
+Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le disque à la requête) : si elle est récente mais la ligne « Version » semble fausse, un **Reload** est nécessaire pour réimporter le code Python.
+
 ## Déploiement / mise à jour du code
 
 **À chaque modification** : **commit** puis lancer **`deploy_pa.ps1`** depuis votre PC. Le script fait d’abord un **`git push`** vers `origin` (sauf si `-SkipGitPush`), puis sur PA **`deploy_pa.sh`** exécute **`git fetch` + `git pull --ff-only`**, `pip`, et vous rappelle le **Reload**. Sans commit / sans push réussi, le serveur ne verra pas les derniers fichiers.

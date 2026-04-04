@@ -43,6 +43,7 @@ def create_app() -> Flask:
             "toolbox_version": app_version.TOOLBOX_APP_VERSION,
             "toolbox_version_date": app_version.TOOLBOX_APP_DATE,
             "toolbox_app_label": app_version.TOOLBOX_APP_LABEL,
+            "toolbox_git_revision": app_version.git_head_short(),
         }
 
     return app

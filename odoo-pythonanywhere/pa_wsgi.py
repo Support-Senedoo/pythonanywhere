@@ -1,7 +1,9 @@
 """
 Point d'entrée WSGI recommandé pour PythonAnywhere.
 
-Onglet Web > fichier WSGI : chemin vers ce fichier (ex. /home/VOTRE_USER/odoo-pythonanywhere/pa_wsgi.py).
+Onglet Web > fichier WSGI : chemin absolu vers ce fichier dans le clone Git, ex.
+  /home/senedoo/pythonanywhere/odoo-pythonanywhere/pa_wsgi.py
+(ne pas utiliser un ancien dossier « odoo-pythonanywhere » hors du clone : le git pull ne mettrait pas ce code à jour).
 
 Variables d'environnement (onglet Web ou en tête de ce fichier avec os.environ.setdefault) :
   TOOLBOX_SECRET_KEY   — obligatoire en production (clé longue aléatoire)
