@@ -14,6 +14,7 @@ from flask import (
 )
 
 from web_app.blueprints.public import login_required_staff
+from web_app import app_version
 from web_app.client_apps import apps_for_template
 from web_app.odoo_registry import client_has_app, load_clients_registry
 from web_app.odoo_account_probe import MAX_DATABASES_TO_PROBE, probe_account_databases
@@ -181,10 +182,6 @@ def utilities_home():
     return render_template("staff/utilities.html", clients=reg)
 
 
-_ODOO_PROBE_UTIL_VERSION = "1.2.4"
-_ODOO_PROBE_UTIL_DATE = "2026-04-03"
-
-
 @bp.route("/utilities/odoo-compte-bases", methods=["GET", "POST"])
 @login_required_staff
 def odoo_account_databases_probe():
@@ -202,8 +199,8 @@ def odoo_account_databases_probe():
         "staff/odoo_account_probe.html",
         result=result,
         max_probe=MAX_DATABASES_TO_PROBE,
-        util_version=_ODOO_PROBE_UTIL_VERSION,
-        util_date=_ODOO_PROBE_UTIL_DATE,
+        util_version=app_version.TOOLBOX_APP_VERSION,
+        util_date=app_version.TOOLBOX_APP_DATE,
     )
 
 
