@@ -4,6 +4,7 @@ from __future__ import annotations
 import http.cookiejar
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -70,6 +71,53 @@ def _host_to_db_name(hostname: str) -> str:
     return ""
 
 
+def _portal_page_suggests_captcha(html: str) -> bool:
+    """Détecte reCAPTCHA, hCaptcha, Cloudflare Turnstile, etc. dans le HTML."""
+    low = html.lower()
+    markers = (
+        "g-recaptcha",
+        "recaptcha",
+        "hcaptcha",
+        "cf-turnstile",
+        "challenges.cloudflare.com",
+        "turnstile",
+        "data-sitekey",
+        "challenge-platform",
+        "captcha-container",
+    )
+    return any(m in low for m in markers)
+
+
+def _portal_captcha_blocked_message() -> str:
+    return (
+        "Le portail Odoo.com exige une étape anti-robot (captcha / reCAPTCHA / Turnstile). "
+        "Les requêtes depuis PythonAnywhere (IP de datacenter) la déclenchent très souvent ; "
+        "la toolbox ne peut pas la remplir. "
+        "Pistes : utiliser le mode avec URL d’instance (db.list) si le serveur l’expose ; "
+        "ou ouvrir « Mes bases » dans un navigateur et recopier les liens ; "
+        "ou lancer un script équivalent depuis votre PC (réseau résidentiel)."
+    )
+
+
+def _portal_browser_header_pairs() -> list[tuple[str, str]]:
+    """En-têtes proches d’un navigateur (évite en partie les blocages « bot » trop grossiers)."""
+    ua = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    )
+    return [
+        ("User-Agent", ua),
+        (
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        ),
+        ("Accept-Language", "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"),
+        ("Accept-Encoding", "gzip, deflate"),
+        ("Upgrade-Insecure-Requests", "1"),
+        ("DNT", "1"),
+    ]
+
+
 def _extract_instance_urls_from_portal_html(html: str) -> list[str]:
     """Repère les URL d’instances hébergées chez Odoo dans le HTML « Mes bases »."""
     found: set[str] = set()
@@ -107,12 +155,7 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
 
     cj = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-    # UA « navigateur » : certains pare-feu / WAF odoo.com rejettent ou cassent la session avec un UA outil rare.
-    _ua = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 SenedooToolbox/1.3"
-    )
-    opener.addheaders = [("User-Agent", _ua), ("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")]
+    opener.addheaders = _portal_browser_header_pairs()
 
     try:
         q = urllib.parse.urlencode({"redirect": redirect_path})
@@ -121,6 +164,9 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
         html = r.read().decode("utf-8", "replace")
     except (OSError, urllib.error.HTTPError) as e:
         return [], f"Réseau / portail Odoo.com (page login) : {e!s}"
+
+    if _portal_page_suggests_captcha(html):
+        return [], _portal_captcha_blocked_message()
 
     csrf = None
     for pat in (
@@ -136,6 +182,8 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
     if not csrf:
         return [], "Impossible de lire le formulaire de connexion odoo.com (jeton CSRF manquant — le portail a peut‑être changé)."
 
+    time.sleep(0.6)
+
     data = urllib.parse.urlencode(
         {
             "csrf_token": csrf,
@@ -144,16 +192,17 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
             "redirect": redirect_path,
         }
     ).encode()
-    req = urllib.request.Request(
-        login_url_with_q,
-        data=data,
-        method="POST",
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": login_url_with_q,
-            "Origin": origin,
-        },
-    )
+    post_h = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Referer": login_url_with_q,
+        "Origin": origin,
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
+    }
+    req = urllib.request.Request(login_url_with_q, data=data, method="POST", headers=post_h)
     try:
         r2 = opener.open(req, timeout=35)
         r2.read()
@@ -175,8 +224,8 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
                 " La page renvoyée évoque une double authentification : ce script ne peut pas la valider — "
                 "désactivez temporairement la 2FA sur le portail odoo.com, ou utilisez le mode avec URL d’instance."
             )
-        elif "captcha" in low or "recaptcha" in low:
-            hint = " Un captcha semble requis : connexion automatique impossible depuis la toolbox."
+        elif _portal_page_suggests_captcha(db_html):
+            hint = " " + _portal_captcha_blocked_message()
         return [], (
             "Échec de connexion au portail Odoo.com (e-mail, mot de passe, ou accès « Mes bases »). "
             "Vérifiez identifiants, droits sur « Mes bases », et si le compte impose une connexion via accounts.odoo.com / SSO uniquement."

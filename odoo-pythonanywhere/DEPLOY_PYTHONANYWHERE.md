@@ -194,7 +194,7 @@ Host pythonanywhere
 ### Utilitaire « Sonde bases Odoo par compte » (`/staff/utilities/odoo-compte-bases`)
 
 - **Deux modes** (voir **`web_app/odoo_account_probe.py`**) :
-  - **Sans URL** : session HTTP sur **www.odoo.com** (login + mot de passe + CSRF, User-Agent type navigateur, `Referer` / `Origin`), page **Mes bases**, extraction des liens `https://*.odoo.com`, déduction du nom de base PostgreSQL depuis l’hôte, puis **XML-RPC** `authenticate` / `object` sur chaque instance. **2FA**, **captcha** ou login réservé à **accounts.odoo.com** / SSO peuvent empêcher ce mode (message d’erreur détaillé côté appli).
+  - **Sans URL** : session HTTP sur **www.odoo.com** (login + mot de passe + CSRF, en-têtes type navigateur, `Sec-Fetch-*`, léger délai avant POST), page **Mes bases**, etc. **Captcha / Turnstile** : souvent imposé pour les IP **datacenter** (ex. PythonAnywhere) — la toolbox ne peut pas le résoudre ; utiliser le mode **avec URL**, le navigateur pour « Mes bases », ou un script en local. **2FA** et **SSO** peuvent aussi bloquer ce mode.
   - **Avec URL** : `db.list()` sur cette instance si le service `db` existe ; sinon liste vide et message via **`format_db_list_error`** / **`_is_odoo_db_service_disabled`** (dont `KeyError: 'db'` / `repr(Fault)` avec `\'db\'`).
 - Variables optionnelles : **`TOOLBOX_ODOO_PORTAL_ORIGIN`**, **`TOOLBOX_ODOO_PORTAL_LANG`** (défaut `https://www.odoo.com`, `/fr_FR`) — voir **`toolbox-env-exemple.txt`**.
 - **Login** et **mot de passe** : champs masqués ; mot de passe non réinjecté dans le HTML après POST.
