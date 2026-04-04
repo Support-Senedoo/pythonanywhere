@@ -337,7 +337,7 @@
       <dd style="margin:0;">{{ mv }}</dd>
       {% endfor %}
     </dl>
-    <p class="sn-muted" style="margin:0.65rem 0 0;font-size:0.8rem;line-height:1.4;">Données fournies par Odoo (<code>common.version</code>, <code>ir.config_parameter</code>, modules) selon les droits du compte API ; certaines instances ne renvoient pas la date d’expiration ou la taille.</p>
+    <p class="sn-muted" style="margin:0.65rem 0 0;font-size:0.8rem;line-height:1.4;">Données fournies par Odoo : <code>common.version</code> (chaîne + <code>server_version_info</code>), <code>ir.module.module</code> sur <strong>base</strong> / <strong>web_enterprise</strong> (version installée en base, <code>published_version</code> si présent), <code>ir.config_parameter</code>. La ligne « Version Odoo (module base, installée en base) » correspond à la métadonnée officielle de la base ; selon les droits du compte API certaines valeurs peuvent manquer.</p>
   </details>
   {% endif %}
 

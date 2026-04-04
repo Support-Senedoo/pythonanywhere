@@ -9,6 +9,27 @@ from odoo_client import normalize_odoo_base_url
 from personalize_syscohada_detail import execute_kw
 
 
+def format_server_version_info(info: Any) -> str | None:
+    """
+    Normalise le tuple ``server_version_info`` renvoyé par ``common.version()`` (ex. ``(19, 0, 1, 0)``).
+
+    Sur Odoo SaaS / récent, c’est souvent la forme la plus stable pour comparer les instances.
+    """
+    if info is None:
+        return None
+    if isinstance(info, (list, tuple)) and info:
+        parts: list[str] = []
+        for x in info[:6]:
+            if isinstance(x, bool):
+                parts.append("1" if x else "0")
+            elif x is None:
+                continue
+            else:
+                parts.append(str(x))
+        return ".".join(parts) if parts else None
+    return str(info)
+
+
 def read_public_server_version(base_url: str) -> dict[str, Any]:
     """Appelle xmlrpc/2/common.version() sans authentification (disponible sur la plupart des instances)."""
     try:
@@ -41,9 +62,13 @@ def collect_authenticated_instance_metadata(
         rows.append(("Version publique (common)", f"— {pub['_xmlrpc_error']}"))
     else:
         if pub.get("server_version"):
-            rows.append(("Version serveur (common.version)", str(pub["server_version"])))
-        if pub.get("server_version_info") is not None:
-            rows.append(("Détail version (tuple)", str(pub["server_version_info"])))
+            rows.append(("Version annoncée par le serveur (common.version)", str(pub["server_version"])))
+        svi = pub.get("server_version_info")
+        if svi is not None:
+            rows.append(("server_version_info (brut)", str(svi)))
+            svi_fmt = format_server_version_info(svi)
+            if svi_fmt:
+                rows.append(("Version dérivée de server_version_info", svi_fmt))
         serie = pub.get("server_serie") or pub.get("series")
         if serie:
             rows.append(("Série Odoo", str(serie)))
@@ -62,21 +87,50 @@ def collect_authenticated_instance_metadata(
             rows.append((label, str(v)))
 
     try:
-        ent = execute_kw(
+        ent_ids = execute_kw(
             models,
             db,
             uid,
             password,
             "ir.module.module",
-            "search_count",
+            "search",
             [[("name", "=", "web_enterprise"), ("state", "=", "installed")]],
+            {"limit": 1},
         )
+        ent = bool(ent_ids)
         rows.append(
             (
                 "Type / édition",
                 "Enterprise (web_enterprise installé)" if ent else "Community (sans web_enterprise)",
             )
         )
+        if ent_ids:
+            wer = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.module.module",
+                "read",
+                [ent_ids],
+                {"fields": ["latest_version", "published_version"]},
+            )
+            if wer:
+                w = wer[0]
+                if w.get("latest_version"):
+                    rows.append(
+                        (
+                            "Module web_enterprise — version installée (DB)",
+                            str(w["latest_version"]),
+                        )
+                    )
+                if w.get("published_version"):
+                    rows.append(
+                        (
+                            "Module web_enterprise — published_version",
+                            str(w["published_version"]),
+                        )
+                    )
     except Exception as e:
         rows.append(("Type / édition", f"— {e}"))
 
@@ -98,7 +152,21 @@ def collect_authenticated_instance_metadata(
     except Exception:
         pass
 
+    # Version « métier » de la base : ir.module.module sur base (latest_version = installée en DB, Odoo 19).
     try:
+        mod_fields = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.module.module",
+            "fields_get",
+            [],
+            {"attributes": ["type"]},
+        )
+        base_read_fields = ["latest_version", "published_version"]
+        if isinstance(mod_fields, dict) and "installed_version" in mod_fields:
+            base_read_fields.append("installed_version")
         bids = execute_kw(
             models,
             db,
@@ -118,10 +186,31 @@ def collect_authenticated_instance_metadata(
                 "ir.module.module",
                 "read",
                 [bids],
-                {"fields": ["latest_version"]},
+                {"fields": base_read_fields},
             )
-            if br and br[0].get("latest_version"):
-                rows.append(("Module « base » (latest_version)", str(br[0]["latest_version"])))
+            if br:
+                b0 = br[0]
+                if b0.get("latest_version"):
+                    rows.append(
+                        (
+                            "Version Odoo (module base, installée en base)",
+                            str(b0["latest_version"]),
+                        )
+                    )
+                if b0.get("published_version"):
+                    rows.append(
+                        (
+                            "Module base — published_version (dépôt / SaaS)",
+                            str(b0["published_version"]),
+                        )
+                    )
+                if b0.get("installed_version"):
+                    rows.append(
+                        (
+                            "Module base — installed_version (réf. disque / calcul Odoo)",
+                            str(b0["installed_version"]),
+                        )
+                    )
     except Exception:
         pass
 
