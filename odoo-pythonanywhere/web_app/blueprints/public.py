@@ -4,7 +4,7 @@ from functools import wraps
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
-from web_app.dev_auth import try_dev_user
+from web_app.dev_auth import dev_login_disabled, try_dev_user
 from web_app.users_store import verify_user
 
 bp = Blueprint("public", __name__)
@@ -59,10 +59,28 @@ def login():
         if not user:
             user = verify_user(path, login_name, password)
         if not user:
-            if login_name.lower() == "test" and (password or "").strip() == "passer":
+            ln = login_name.strip().lower()
+            pw = (password or "").strip()
+            if ln == "test" and pw == "passer":
+                if dev_login_disabled():
+                    flash(
+                        "La connexion automatique test/passer est désactivée "
+                        "(TOOLBOX_DISABLE_DEV_LOGIN sur le serveur). "
+                        "Utilisez un compte créé dans l’administration, ou un utilisateur « test » "
+                        "dans toolbox_users.json dont le mot de passe correspond bien à « passer ».",
+                        "danger",
+                    )
+                else:
+                    flash(
+                        "Connexion refusée avec test/passer. Vérifiez d’avoir choisi le bon portail "
+                        "(client ou équipe) et rechargez la page ; en cas de doute, contactez l’administrateur.",
+                        "danger",
+                    )
+            elif ln == "test":
                 flash(
-                    "Le compte démo test/passer est désactivé sur ce serveur "
-                    "(variable d’environnement TOOLBOX_DISABLE_DEV_LOGIN).",
+                    "Mot de passe incorrect pour l’identifiant « test ». "
+                    "En démo, le mot de passe exact est « passer » (tout en minuscules, sans espace). "
+                    "Sinon utilisez un compte défini dans l’administration.",
                     "danger",
                 )
             else:

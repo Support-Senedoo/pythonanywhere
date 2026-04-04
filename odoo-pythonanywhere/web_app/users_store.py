@@ -41,18 +41,24 @@ def write_users_file(path: str | Path, data: dict[str, Any]) -> None:
         raise
 
 
+def _login_key(login: str) -> str:
+    return (login or "").strip().lower()
+
+
 def load_users(path: str | Path) -> dict[str, dict[str, Any]]:
     data = read_users_file(path)
     by_login: dict[str, dict[str, Any]] = {}
     for row in data.get("users", []):
-        login = str(row["login"]).strip()
-        by_login[login] = row
+        key = _login_key(str(row.get("login", "")))
+        if not key:
+            continue
+        by_login[key] = row
     return by_login
 
 
 def verify_user(path: str | Path, login: str, password: str) -> ToolboxUser | None:
     users = load_users(path)
-    row = users.get(login.strip())
+    row = users.get(_login_key(login))
     if not row:
         return None
     h = row.get("password_hash") or row.get("hash")
@@ -61,12 +67,13 @@ def verify_user(path: str | Path, login: str, password: str) -> ToolboxUser | No
     role = str(row.get("role", "")).strip().lower()
     if role not in ("client", "staff"):
         return None
+    canon = str(row.get("login", "")).strip() or _login_key(login)
     cid = row.get("client_id")
     if role == "client":
         if not cid or not str(cid).strip():
             return None
-        return ToolboxUser(login=login, role=role, client_id=str(cid).strip())
-    return ToolboxUser(login=login, role=role, client_id=None)
+        return ToolboxUser(login=canon, role=role, client_id=str(cid).strip())
+    return ToolboxUser(login=canon, role=role, client_id=None)
 
 
 def validate_login(login: str) -> str:
@@ -119,7 +126,7 @@ def upsert_client_user(
     users: list[dict[str, Any]] = list(data.get("users", []))
     found = False
     for i, row in enumerate(users):
-        if str(row.get("login", "")).strip() == login:
+        if _login_key(str(row.get("login", ""))) == _login_key(login):
             if is_new:
                 raise ValueError("Cet identifiant existe déjà.")
             h = row.get("password_hash") or row.get("hash")
@@ -158,7 +165,7 @@ def upsert_staff_user(path: str | Path, login: str, password: str | None, *, is_
     users: list[dict[str, Any]] = list(data.get("users", []))
     found = False
     for i, row in enumerate(users):
-        if str(row.get("login", "")).strip() == login:
+        if _login_key(str(row.get("login", ""))) == _login_key(login):
             if is_new:
                 raise ValueError("Cet identifiant existe déjà.")
             h = row.get("password_hash") or row.get("hash")
@@ -190,9 +197,9 @@ def upsert_staff_user(path: str | Path, login: str, password: str | None, *, is_
 
 
 def delete_user(path: str | Path, login: str) -> None:
-    login = login.strip()
+    key = _login_key(login)
     data = read_users_file(path)
-    users = [u for u in data.get("users", []) if str(u.get("login", "")).strip() != login]
+    users = [u for u in data.get("users", []) if _login_key(str(u.get("login", ""))) != key]
     if len(users) == len(data.get("users", [])):
         raise ValueError("Utilisateur introuvable.")
     data["users"] = users
@@ -200,7 +207,8 @@ def delete_user(path: str | Path, login: str) -> None:
 
 
 def get_user_row(path: str | Path, login: str) -> dict[str, Any] | None:
+    key = _login_key(login)
     for row in read_users_file(path).get("users", []):
-        if str(row.get("login", "")).strip() == login.strip():
+        if _login_key(str(row.get("login", ""))) == key:
             return dict(row)
     return None

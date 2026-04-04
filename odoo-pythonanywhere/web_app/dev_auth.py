@@ -9,8 +9,17 @@ _DEV_LOGIN = "test"
 _DEV_PASSWORD = "passer"
 
 
+def dev_login_disabled() -> bool:
+    return os.environ.get("TOOLBOX_DISABLE_DEV_LOGIN", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def try_dev_user(login: str, password: str, portal: str) -> ToolboxUser | None:
-    if os.environ.get("TOOLBOX_DISABLE_DEV_LOGIN", "").strip().lower() in ("1", "true", "yes", "on"):
+    if dev_login_disabled():
         return None
     login_clean = (login or "").strip().lower()
     password_clean = (password or "").strip()

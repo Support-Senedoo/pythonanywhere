@@ -242,7 +242,8 @@ def user_edit(login: str):
 @bp.route("/users/<path:login>/delete", methods=["POST"])
 @login_required_staff
 def user_delete(login: str):
-    if (request.form.get("confirm_login") or "").strip() != login.strip():
+    c = (request.form.get("confirm_login") or "").strip()
+    if c.casefold() != (login or "").strip().casefold():
         flash("Tapez l’identifiant exact pour confirmer la suppression.", "warning")
         return redirect(url_for("staff_admin.user_edit", login=login))
     try:
