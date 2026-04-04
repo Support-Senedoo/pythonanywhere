@@ -1,8 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Odoo — client{% endblock %}
+{% block title %}Odoo — {{ client_label }}{% endblock %}
 {% block body %}
-<h1>État Odoo</h1>
-<pre>{% for line in lines %}{{ line }}
-{% endfor %}</pre>
-<p><a href="{{ url_for('legacy.client_home') }}">Retour espace client</a></p>
+<h1>État connexion Odoo</h1>
+<div class="sn-card">
+  <div class="sn-pre" style="margin:0;white-space:pre-wrap;">{% for line in lines %}{{ line }}
+{% endfor %}</div>
+</div>
+<p><a class="sn-btn sn-btn--ghost" href="{{ url_for('legacy.client_home') }}">← Retour espace client</a></p>
 {% endblock %}

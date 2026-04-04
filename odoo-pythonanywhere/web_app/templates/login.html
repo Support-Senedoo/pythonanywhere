@@ -1,24 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Connexion — Toolbox{% endblock %}
+{% block title %}Connexion — Senedoo{% endblock %}
 {% block body %}
 <h1>Connexion</h1>
-<p class="muted">
+<p class="sn-muted">
   {% if portal == 'staff' %}
-  Portail <strong>Senedoo</strong> (équipe).
+  Portail <strong>équipe Senedoo</strong>.
   {% else %}
-  Portail <strong>client</strong>.
+  Portail <strong>client</strong> — votre espace Odoo.
   {% endif %}
 </p>
 
-<form method="post" action="{{ url_for('public.login') }}">
-  <input type="hidden" name="portal" value="{{ portal }}">
-  <label for="login">Identifiant</label>
-  <input type="text" id="login" name="login" required autocomplete="username">
+<div class="sn-card" style="max-width:26rem;">
+  <form method="post" action="{{ url_for('public.login') }}">
+    <input type="hidden" name="portal" value="{{ portal }}">
+    <label for="login">Identifiant</label>
+    <input type="text" id="login" name="login" required autocomplete="username" placeholder="test">
 
-  <label for="password">Mot de passe</label>
-  <input type="password" id="password" name="password" required autocomplete="current-password">
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••">
 
-  <button type="submit">Se connecter</button>
-</form>
-<p><a href="{{ url_for('public.index') }}">Retour accueil</a></p>
+    <button type="submit">Se connecter</button>
+  </form>
+  <p class="sn-muted" style="margin-top:1rem;font-size:0.85rem;">
+    Démo : <strong>test</strong> / <strong>passer</strong> (selon le portail choisi).
+  </p>
+</div>
+<p style="margin-top:1rem;"><a href="{{ url_for('public.index') }}">← Retour accueil</a></p>
 {% endblock %}

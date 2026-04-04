@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Odoo — staff{% endblock %}
 {% block body %}
-<h1>État Odoo (base sélectionnée)</h1>
-<pre>{% for line in lines %}{{ line }}
-{% endfor %}</pre>
-<p><a href="{{ url_for('staff.apps_home') }}">Retour applications</a></p>
+<h1>État Odoo</h1>
+<div class="sn-card">
+  <div class="sn-pre" style="margin:0;white-space:pre-wrap;">{% for line in lines %}{{ line }}
+{% endfor %}</div>
+</div>
+<p><a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.apps_home') }}">← Applications</a></p>
 {% endblock %}

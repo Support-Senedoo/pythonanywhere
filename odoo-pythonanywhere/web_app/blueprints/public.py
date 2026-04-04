@@ -4,6 +4,7 @@ from functools import wraps
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
+from web_app.dev_auth import try_dev_user
 from web_app.users_store import verify_user
 
 bp = Blueprint("public", __name__)
@@ -54,7 +55,9 @@ def login():
         from flask import current_app
 
         path = current_app.config["TOOLBOX_USERS_PATH"]
-        user = verify_user(path, login_name, password)
+        user = try_dev_user(login_name, password, portal)
+        if not user:
+            user = verify_user(path, login_name, password)
         if not user:
             flash("Identifiant ou mot de passe incorrect.", "danger")
             return render_template("login.html", portal=portal), 401

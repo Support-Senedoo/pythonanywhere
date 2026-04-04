@@ -1,18 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Accueil — Toolbox{% endblock %}
+{% block title %}Accueil — Senedoo{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
-<h1>Accueil</h1>
-<p class="muted">Choisissez votre espace. Les identifiants diffèrent selon le portail.</p>
+<h1>Bienvenue</h1>
+<p class="sn-muted">Portail Senedoo — choisissez votre espace.</p>
 
-<div class="card">
-  <h2>Espace client</h2>
-  <p>Applications prévues pour votre entreprise (ex. La Ripaille), sur votre base Odoo uniquement.</p>
-  <a class="btn" href="{{ url_for('public.login', portal='client') }}">Connexion client</a>
+<div class="sn-portal-row">
+  <div class="sn-card sn-card--accent">
+    <span class="sn-pill">Client</span>
+    <h2 style="margin-top:0.75rem;">Espace entreprise</h2>
+    <p class="sn-muted">Applications sur votre base Odoo (ex. La Ripaille) : suivi, outils métier.</p>
+    <a class="sn-btn" href="{{ url_for('public.login', portal='client') }}">Connexion client</a>
+  </div>
+  <div class="sn-card">
+    <span class="sn-pill" style="background:rgba(240,180,41,0.15);color:var(--sn-accent);">Équipe</span>
+    <h2 style="margin-top:0.75rem;">Espace Senedoo</h2>
+    <p class="sn-muted">Accès staff : bases clients, applications et utilitaires techniques.</p>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('public.login', portal='staff') }}">Connexion équipe</a>
+  </div>
 </div>
 
-<div class="card">
-  <h2>Espace Senedoo</h2>
-  <p>Équipe technique : accès aux applications sur la base d’un client choisi, et aux utilitaires (personnalisation de rapport, etc.).</p>
-  <a class="btn" href="{{ url_for('public.login', portal='staff') }}">Connexion équipe</a>
-</div>
+<p class="sn-muted" style="margin-top:1.5rem;font-size:0.85rem;">
+  Accès démo (temporaire) : identifiant <strong>test</strong>, mot de passe <strong>passer</strong> — client et staff.
+</p>
 {% endblock %}

@@ -8,3 +8,8 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 # Génération des hash mots de passe :
 #   python toolbox_generate_password_hash.py
 # Coller le résultat dans toolbox_users.json (champ password_hash).
+
+# Comptes démo code : test / passer (client + staff) — désactiver en prod :
+# TOOLBOX_DISABLE_DEV_LOGIN=1
+# Client démo associé au registre (id dans toolbox_clients.json) :
+# TOOLBOX_TEST_CLIENT_ID=la_ripaille

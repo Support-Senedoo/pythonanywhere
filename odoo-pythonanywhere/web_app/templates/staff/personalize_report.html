@@ -2,9 +2,9 @@
 {% block title %}Personnalisation rapport{% endblock %}
 {% block body %}
 <h1>Personnalisation du rapport comptable</h1>
-<p class="muted">Exécute la même logique que l’outil local <code>personalize_syscohada_detail.py --fix-detail</code> sur une <strong>copie</strong> de rapport (suppression notes custom feuilles, groupby compte, repliable, filter_hierarchy).</p>
+<p class="sn-muted">Exécute la même logique que l’outil local <code>personalize_syscohada_detail.py --fix-detail</code> sur une <strong>copie</strong> de rapport (suppression notes custom feuilles, groupby compte, repliable, filter_hierarchy).</p>
 
-<div class="card">
+<div class="sn-card">
   <form method="post">
     <label for="client_id">Base Odoo (client)</label>
     <select id="client_id" name="client_id" required>
@@ -19,7 +19,7 @@
 
     <label for="confirm">Confirmation</label>
     <input type="text" id="confirm" name="confirm" required placeholder="Tapez OUI en majuscules">
-    <p class="muted">Cette opération modifie le rapport sur la base indiquée.</p>
+    <p class="sn-muted">Cette opération modifie le rapport sur la base indiquée.</p>
 
     <button type="submit">Lancer la personnalisation</button>
   </form>

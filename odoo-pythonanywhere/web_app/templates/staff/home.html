@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Senedoo — tableau de bord{% endblock %}
+{% block title %}Senedoo — équipe{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
 <h1>Espace Senedoo</h1>
+<p class="sn-muted">Sélectionnez une base client pour utiliser les mêmes écrans que l’espace client.</p>
 
-<div class="card">
-  <h2>Mode applications (comme le client)</h2>
-  <p class="muted">Choisissez une base, puis accédez aux mêmes types d’outils que le client.</p>
+<div class="sn-card sn-card--accent">
+  <h2>Applications (mode client)</h2>
+  <p class="sn-muted">Choisissez une base, puis ouvrez le menu applications.</p>
   <form method="post" action="{{ url_for('staff.select_client') }}">
     <label for="client_id">Client / base</label>
     <select id="client_id" name="client_id" required>
@@ -14,15 +16,15 @@
       <option value="{{ cid }}" {% if selected == cid %}selected{% endif %}>{{ c.label }} ({{ cid }})</option>
       {% endfor %}
     </select>
-    <button type="submit">Valider et ouvrir le menu applications</button>
+    <button type="submit">Valider</button>
   </form>
 </div>
 
-<div class="card">
+<div class="sn-card">
   <h2>Utilitaires</h2>
-  <p>Outils techniques : choix de la base à l’intérieur de chaque utilitaire.</p>
-  <a class="btn" href="{{ url_for('staff.utilities_home') }}">Liste des utilitaires</a>
+  <p class="sn-muted">Personnalisation de rapports et autres outils techniques.</p>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">Liste des utilitaires</a>
 </div>
 
-<p><a href="{{ url_for('public.index') }}">Accueil public</a></p>
+<p class="sn-muted"><a href="{{ url_for('public.index') }}">← Accueil public</a></p>
 {% endblock %}
