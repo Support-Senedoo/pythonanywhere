@@ -61,9 +61,9 @@ Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le di
 
 ## Déploiement / mise à jour du code
 
-**À chaque modification** : **commit** puis lancer **`deploy_pa.ps1`** depuis votre PC. Le script fait d’abord un **`git push`** vers `origin` (sauf si `-SkipGitPush`), puis sur PA **`deploy_pa.sh`** exécute **`git fetch` + `git pull --ff-only`**, `pip`, et vous rappelle le **Reload**. Sans commit / sans push réussi, le serveur ne verra pas les derniers fichiers.
+**À chaque publication** : **commit** + **push**, puis sur votre PC **`.\deploy_pa.ps1`** (ou **`.\deploy.ps1`** depuis la racine du dépôt). Cela pousse le code sur GitHub, se connecte en SSH à PA et lance **`deploy_pa.sh`** : **`git pull`**, **`pip`**, puis **reload du site** (voir paragraphe précédent : fichier **`~/.pythonanywhere_api_token`** sur PA). Sans ce fichier token, le script vous le rappelle : il faut alors cliquer **Reload** à la main dans l’onglet **Web**.
 
-**Important** : même si le `git pull` sur PA réussit, le site peut **continuer à servir l’ancien code** tant que vous n’avez pas cliqué **Reload** dans l’onglet Web. Un « déploiement raté » côté ressenti est souvent **Reload oublié**, pas un échec du pull.
+**L’assistant IA** ne peut pas recharger votre site PythonAnywhere à votre place (pas d’accès à votre compte). Seul **le script sur PA** (avec token) ou **vous** (bouton Reload) le font.
 
 ### Si `deploy_pa.ps1` plante au démarrage (ParserError, accents « cassés »)
 
@@ -77,7 +77,7 @@ Le script **`deploy_pa.ps1` du dépôt** utilise des **messages ASCII** dans le 
 4. **Contournement PC** : enregistrer `deploy_pa.ps1` en **UTF-8 avec BOM**, ou copier le script sur un disque local (ex. `C:\temp`) et l’exécuter depuis là.
 
 **Option A — Git (recommandé)**  
-Depuis `odoo-pythonanywhere/` : **`.\deploy_pa.ps1`**. Pour ne pas pousser depuis la machine locale : **`.\deploy_pa.ps1 -SkipGitPush`** (à utiliser seulement si le push a déjà été fait ailleurs).
+Depuis `odoo-pythonanywhere/` : **`.\deploy_pa.ps1`**. Depuis la **racine du dépôt** : **`.\deploy.ps1`**. Push déjà fait ailleurs : **`.\deploy_pa.ps1 -SkipGitPush`**. Sous Cursor : tâche **« Publier sur PythonAnywhere »** (Terminal → Exécuter la tâche…).
 
 ### Déploiement sans saisie de phrase secrète (agent / MCP)
 
@@ -193,11 +193,12 @@ Host pythonanywhere
 
 ### Utilitaire « Sonde bases Odoo par compte » (`/staff/utilities/odoo-compte-bases`)
 
-- **Deux modes** (voir **`web_app/odoo_account_probe.py`**) :
-  - **Sans URL** : session HTTP sur **www.odoo.com** (login + mot de passe + CSRF, en-têtes type navigateur, `Sec-Fetch-*`, léger délai avant POST), page **Mes bases**, etc. **Captcha / Turnstile** : souvent imposé pour les IP **datacenter** (ex. PythonAnywhere) — la toolbox ne peut pas le résoudre ; utiliser le mode **avec URL**, le navigateur pour « Mes bases », ou un script en local. **2FA** et **SSO** peuvent aussi bloquer ce mode.
+- **Modes** (voir **`web_app/odoo_account_probe.py`**) :
+  - **Sans URL, login portail** : session HTTP sur **www.odoo.com** (login + mot de passe + CSRF, en-têtes type navigateur, `Sec-Fetch-*`, léger délai avant POST), page **Mes bases**, etc. **Captcha / Turnstile** : souvent imposé pour les IP **datacenter** (PythonAnywhere) — la toolbox ne peut pas le résoudre seule.
+  - **Sans URL, cookie navigateur** : après **connexion manuelle** sur odoo.com (captcha OK), l’utilisateur colle l’en-tête **Cookie** de la requête document vers **Mes bases** (onglet Réseau des outils développeur). Le serveur PA refait un `GET` sur `/my/databases` avec ce cookie pour extraire les liens `*.odoo.com` — pas de login HTTP automatisé. **Risque** : le cookie équivaut à une session complète ; ne pas le partager. Le **login** du formulaire sert surtout à l’**XML-RPC** sur chaque instance (mot de passe souvent encore nécessaire pour les tests API).
   - **Avec URL** : `db.list()` sur cette instance si le service `db` existe ; sinon liste vide et message via **`format_db_list_error`** / **`_is_odoo_db_service_disabled`** (dont `KeyError: 'db'` / `repr(Fault)` avec `\'db\'`).
 - Variables optionnelles : **`TOOLBOX_ODOO_PORTAL_ORIGIN`**, **`TOOLBOX_ODOO_PORTAL_LANG`** (défaut `https://www.odoo.com`, `/fr_FR`) — voir **`toolbox-env-exemple.txt`**.
-- **Login** et **mot de passe** : champs masqués ; mot de passe non réinjecté dans le HTML après POST.
+- **Mot de passe** et **cookie** : non réinjectés dans le HTML après POST ; le login peut être mémorisé côté navigateur (localStorage) pour la sonde.
 - Version / date affichées : **`app_version.TOOLBOX_APP_VERSION`** / **`TOOLBOX_APP_DATE`**, injectées par **`web_app/blueprints/staff.py`** (`util_version`, `util_date`).
 
 ### Utilitaire « Rapports comptables Odoo » (personnalisation / exports)
@@ -211,7 +212,7 @@ Host pythonanywhere
 
 ---
 
-*Dernière mise à jour de cette section : 4 avril 2026 — sonde bases (version via `app_version`), rapports comptables alignés sur `app_version`, piège `deploy_pa.ps1` / encodage PowerShell sur Mon Drive, rappel Reload Web après `git pull`.*
+*Dernière mise à jour de cette section : avril 2026 — sonde bases : mode cookie session navigateur après captcha manuel ; version via `app_version` ; rapports comptables alignés sur `app_version` ; piège `deploy_pa.ps1` / encodage PowerShell sur Mon Drive ; rappel Reload Web après `git pull`.*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 

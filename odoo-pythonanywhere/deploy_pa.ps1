@@ -1,31 +1,14 @@
-# Deploy Flask toolbox to PythonAnywhere via SSH (local private key).
-# Run in PowerShell on YOUR PC (not only from a remote agent without SSH).
+# Publier sur PythonAnywhere depuis votre PC : git push puis SSH qui lance deploy_pa.sh sur le serveur.
+# Sur PA, deploy_pa.sh fait : git pull, pip, puis RELOAD WEB AUTOMATIQUE si ~/.pythonanywhere_api_token existe.
 #
-# Flow:
-#   1) git push from repo root (so GitHub has latest commits);
-#   2) on PA: deploy_pa.sh runs git fetch + pull --ff-only, then pip.
-# Commit before run (uncommitted files are not pushed).
-# To skip local push: -SkipGitPush
+# Usage :  .\deploy_pa.ps1
+# Sans push local (deja fait ailleurs) :  .\deploy_pa.ps1 -SkipGitPush
 #
-# If SSH/scp still asks PA password each time: run once
-#   .\install_pa_ssh_key.ps1
+# Cle SSH : par defaut %USERPROFILE%\.ssh\id_ed25519_pa_cursor si present, sinon id_ed25519
+#   .\deploy_pa.ps1 -IdentityFile "C:\Users\...\id_ed25519"
+# Alias SSH :  .\deploy_pa.ps1 -UserHost pa
 #
-# Reuse target (host alias "pa"): merge ssh_config.pythonanywhere.example
-# into %USERPROFILE%\.ssh\config then: .\deploy_pa.ps1 -UserHost pa
-#
-# Key without passphrase (agent / MCP): run once .\setup_pa_automation_key.ps1
-# then .\install_pa_ssh_key.ps1 -IdentityFile "$env:USERPROFILE\.ssh\id_ed25519_pa_cursor"
-# If that file exists, it is used instead of id_ed25519.
-#
-# Usage (from this folder odoo-pythonanywhere):
-#   .\deploy_pa.ps1
-# Force your key:
-#   .\deploy_pa.ps1 -IdentityFile "C:\Users\patri\.ssh\id_ed25519"
-# No local push:
-#   .\deploy_pa.ps1 -SkipGitPush
-#
-# NOTE: User-visible strings are ASCII-only so PowerShell 5.1 parses this file
-# correctly when opened from Google Drive / paths where UTF-8 without BOM fails.
+# NOTE: messages ASCII-only (PowerShell 5.1 + Google Drive).
 
 param(
     [string]$IdentityFile,
@@ -50,7 +33,6 @@ if (-not (Test-Path $deploySh)) {
     Write-Error "Missing file: $deploySh"
 }
 
-# IdentitiesOnly: use only this key (fewer publickey failures with many keys).
 $sshOpts = @(
     "-i", $IdentityFile,
     "-o", "StrictHostKeyChecking=accept-new",
@@ -78,27 +60,25 @@ if (-not $SkipGitPush) {
         if ($dirty) {
             Write-Host ">>> WARNING: uncommitted changes will not be pushed. Commit then re-run." -ForegroundColor Yellow
         }
-        Write-Host ">>> Git push (origin) so PythonAnywhere pull gets latest..."
+        Write-Host ">>> Git push (origin)..."
         & git @("-C", $gitTop, "push")
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "git push failed (network, no upstream, or conflict). Fix or use -SkipGitPush."
+            Write-Error "git push failed. Fix or use -SkipGitPush."
         }
     } else {
-        Write-Host ">>> No Git repo from $PSScriptRoot - push step skipped." -ForegroundColor DarkYellow
+        Write-Host ">>> No Git repo - push skipped." -ForegroundColor DarkYellow
     }
 } else {
-    Write-Host ">>> SkipGitPush: no local git push."
+    Write-Host ">>> SkipGitPush."
 }
 
-# Avoid Get-Content | ssh (stdin issues with passphrase keys).
-# Force LF: Windows CRLF breaks bash (e.g. set -o pipefail -> invalid option).
 $remoteName = "deploy_pa_run.sh"
 $tmpUnix = Join-Path $env:TEMP "deploy_pa_unix_$PID.sh"
 $raw = Get-Content -Raw -LiteralPath $deploySh
 $unix = $raw -replace "`r`n", "`n" -replace "`r", "`n"
 [System.IO.File]::WriteAllText($tmpUnix, $unix, [System.Text.UTF8Encoding]::new($false))
 
-Write-Host ">>> Uploading script to PA..."
+Write-Host ">>> Upload deploy script to PA..."
 try {
     & scp.exe @sshOpts $tmpUnix "${UserHost}:~/${remoteName}"
     if ($LASTEXITCODE -ne 0) {
@@ -108,8 +88,8 @@ try {
     Remove-Item -LiteralPath $tmpUnix -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ">>> Running on PA (git fetch + pull + pip)..."
+Write-Host ">>> On PA: pull + pip + reload (if token configured on server)..."
 & ssh.exe @sshOpts $UserHost "chmod +x ~/${remoteName} && bash ~/${remoteName}; ec=`$?; rm -f ~/${remoteName}; exit `$ec"
 $code = $LASTEXITCODE
-Write-Host ">>> Done (exit code $code)."
+Write-Host ">>> Finished (exit code $code)."
 exit $code

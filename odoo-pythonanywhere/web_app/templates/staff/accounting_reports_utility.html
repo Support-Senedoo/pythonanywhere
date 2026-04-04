@@ -3,22 +3,56 @@
 {% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
 <h1>{{ utility_title }}</h1>
+<p style="margin:0.5rem 0 1rem;padding:0.65rem 0.85rem;background:rgba(111,45,168,0.18);border-radius:8px;line-height:1.5;font-size:0.95rem;">
+  <strong>Ajouter une base Odoo</strong> : utilisez le formulaire dans la carte juste ci-dessous (enregistrement dans <code>toolbox_clients.json</code>), sans passer par l’administration.
+  <a href="#ajouter-base-odoo" style="white-space:nowrap;">Aller au formulaire</a>
+</p>
+
+<div class="sn-card sn-card--accent" id="ajouter-base-odoo" style="scroll-margin-top:1rem;">
+  <h2 style="margin-top:0;font-size:1.1rem;">Ajouter une base Odoo au registre</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
+    Même fichier que les autres utilitaires staff (<code>toolbox_clients.json</code> sur le serveur). Après enregistrement,
+    la page se recharge avec cette base présélectionnée — vous ne quittez pas l’utilitaire.
+  </p>
+  <form method="post" action="{{ url_for('staff.rapports_comptables') }}" autocomplete="off" novalidate>
+    <input type="hidden" name="action" value="add_client">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <label for="new_client_id">Identifiant client</label>
+    <input type="text" id="new_client_id" name="new_client_id" required
+           pattern="[a-z][a-z0-9_]{0,62}"
+           placeholder="ex. la_ripaille"
+           title="Lettre minuscule, puis lettres, chiffres ou _ (max 63 car.)"
+           spellcheck="false" autocapitalize="none">
+    <label for="new_label">Libellé affiché</label>
+    <input type="text" id="new_label" name="new_label" placeholder="ex. Société XYZ">
+    <label for="new_url">URL Odoo (https://…)</label>
+    <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
+    <label for="new_db">Nom de la base (db)</label>
+    <input type="text" id="new_db" name="new_db" required placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
+    <label for="new_user">Utilisateur / e-mail API</label>
+    <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
+    <label for="new_password">Mot de passe ou clé API</label>
+    <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour un nouvel identifiant ; vide = inchangé si le client existe déjà">
+    <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
+  </form>
+</div>
 
 <details class="sn-doc" open>
   <summary>Descriptif &amp; mode d’emploi</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Cet utilitaire permet de vérifier la connexion à la base Odoo choisie (identifiants du registre client),
-    de <strong>lister et filtrer</strong> les rapports comptables (<code>account.report</code>), d’en
-    <strong>personnaliser</strong> une copie (logique Senedoo : suppression des notes « custom » sur les lignes feuilles,
-    regroupement par compte, hiérarchie des groupes de comptes, désactivation du « tout déplier ») comme l’outil
-    <code>personalize_syscohada_detail.py --fix-detail</code>, ou d’en <strong>supprimer</strong> une instance
-    (uniquement si Odoo et vos droits l’autorisent — les rapports système sont souvent protégés).
+    <strong>But.</strong> Cet utilitaire permet d’<strong>ajouter une base</strong> au registre sans quitter cet écran,
+    de vérifier la connexion, de <strong>lister et filtrer</strong> les rapports comptables (<code>account.report</code>),
+    d’en <strong>personnaliser</strong> une <strong>copie automatique</strong> du rapport choisi (logique Senedoo : notes « custom »
+    retirées sur les feuilles, regroupement par compte, hiérarchie des groupes de comptes, « tout déplier » désactivé) —
+    <strong>le rapport d’origine n’est pas modifié</strong>, ou d’en <strong>supprimer</strong> une instance
+    (si Odoo et vos droits l’autorisent).
   </p>
   <ul>
+    <li><strong>Nouvelle base</strong> : formulaire « Ajouter une base » <strong>au-dessus</strong> de ce descriptif → enregistrement puis rechargement avec la base sélectionnée.</li>
     <li>Choisissez le <strong>client / base</strong>, puis cliquez sur <strong>Actualiser</strong> : le <strong>voyant</strong> indique si l’API répond.</li>
     <li>Les <strong>noms affichés</strong> sont en <strong>français</strong> (contexte Odoo <code>fr_FR</code>, surcharge possible via variable <code>TOOLBOX_ODOO_LANG</code>). Le filtre porte sur le libellé dans cette langue.</li>
     <li>Saisissez un filtre (ex. <code>compte</code>, <code>SYSCOHADA</code>, <code>résultat</code>) pour réduire la liste.</li>
-    <li><strong>Personnaliser</strong> : renseignez l’id du rapport (souvent une <em>copie</em> du rapport standard), tapez <strong>OUI</strong> pour confirmer — l’opération modifie le rapport sur la base.</li>
+    <li><strong>Personnaliser</strong> : indiquez l’<strong>id du rapport source</strong> (standard ou existant), tapez <strong>OUI</strong> — une <strong>copie</strong> est créée dans Odoo puis seule cette copie est personnalisée.</li>
     <li><strong>Supprimer</strong> : recopiez exactement la phrase demandée (<code>SUPPRIMER-&lt;id&gt;</code>) — irréversible si Odoo accepte la suppression.</li>
   </ul>
   <p class="sn-meta-line">
@@ -115,21 +149,22 @@
 
 <div class="sn-card" id="personalize">
   <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation (détail comptes / SYSCOHADA)</h2>
-  <p class="sn-muted">Même traitement que <code>personalize_syscohada_detail.py</code> — à utiliser sur une <strong>copie</strong> du rapport, pas sur l’original éditeur sans sauvegarde.</p>
+  <p class="sn-muted">Une <strong>copie</strong> du rapport est créée dans Odoo (<code>account.report.copy</code>), puis la personnalisation Senedoo est appliquée <strong>uniquement sur cette copie</strong> — comme l’usage recommandé de <code>personalize_syscohada_detail.py</code> sur une copie.</p>
   <form method="post" action="{{ url_for('staff.rapports_comptables') }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q }}">
     <input type="hidden" name="action" value="personalize">
-    <label for="report_id_p">ID du rapport (<code>account.report</code>)</label>
-    <input type="number" id="report_id_p" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. 32">
+    <label for="report_id_p">ID du rapport <strong>source</strong> (<code>account.report</code>)</label>
+    <input type="number" id="report_id_p" name="report_id" min="1" value="{{ prefill_report_id or '' }}" placeholder="ex. rapport standard ou copie existante">
+    <p class="sn-muted" style="font-size:0.85rem;margin:-0.35rem 0 0.5rem;">Le libellé de la copie sera celui du source + « — copie Senedoo » (traductions préservées quand c’est possible).</p>
 
     <label for="confirm_p">Confirmation</label>
     <input type="text" id="confirm_p" name="confirm" placeholder="Tapez OUI en majuscules">
-    <button type="submit">Lancer la personnalisation</button>
+    <button type="submit">Créer la copie et personnaliser</button>
   </form>
 </div>
 {% else %}
-<p class="sn-muted">Choisissez une base ci-dessus pour afficher le voyant et les rapports.</p>
+<p class="sn-muted">Choisissez une base dans la liste (ou ajoutez-en une ci-dessus) pour afficher le voyant et les rapports.</p>
 {% endif %}
 
 {% endblock %}

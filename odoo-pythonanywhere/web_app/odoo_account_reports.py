@@ -155,3 +155,76 @@ def unlink_account_report(
         "unlink",
         [[report_id]],
     )
+
+
+def _copy_report_display_name(raw_name: Any, suffix: str) -> Any:
+    """Construit le nom affiché du rapport dupliqué (traductions Odoo ou chaîne simple)."""
+    if isinstance(raw_name, dict):
+        out = dict(raw_name)
+        for key in ("fr_FR", "fr_BE", "fr_CA", "en_US", "en_GB"):
+            v = out.get(key)
+            if v and isinstance(v, str) and suffix.strip() not in v:
+                out[key] = v.rstrip() + suffix
+                return out
+        for k, v in list(out.items()):
+            if v and isinstance(v, str) and suffix.strip() not in v:
+                out[k] = v.rstrip() + suffix
+                return out
+        return out
+    s = str(raw_name or "Rapport").strip()
+    return s + suffix if suffix.strip() not in s else s
+
+
+def duplicate_account_report(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    source_report_id: int,
+    *,
+    name_suffix: str = " — copie Senedoo",
+) -> int:
+    """
+    Duplique un account.report (API copy), puis renomme la copie.
+    La personnalisation Senedoo doit toujours s’appliquer sur cette copie, pas sur l’original.
+    """
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[source_report_id]],
+        {"fields": ["name"]},
+    )
+    if not rows:
+        raise ValueError(f"Rapport comptable id={source_report_id} introuvable.")
+    raw_name = rows[0].get("name")
+    new_res = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "copy",
+        [source_report_id],
+        {},
+    )
+    if isinstance(new_res, dict) and new_res.get("id") is not None:
+        new_id = int(new_res["id"])
+    elif isinstance(new_res, (list, tuple)):
+        new_id = int(new_res[0])
+    else:
+        new_id = int(new_res)
+    new_name = _copy_report_display_name(raw_name, name_suffix)
+    execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "write",
+        [[new_id], {"name": new_name}],
+    )
+    return new_id

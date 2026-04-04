@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Publier sur PythonAnywhere",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/odoo-pythonanywhere/deploy_pa.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/odoo-pythonanywhere"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "group": "build"
+    }
+  ]
+}
