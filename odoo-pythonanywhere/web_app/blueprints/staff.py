@@ -53,6 +53,7 @@ from web_app.odoo_account_reports import (
     UTILITY_TITLE_PL_BUDGET,
     UTILITY_VERSION,
     account_report_odoo_form_url,
+    account_report_odoo_runner_url,
     duplicate_account_report,
     probe_odoo_reports_access,
     read_account_report_label,
@@ -256,6 +257,7 @@ def _rapports_url_params(
     filter_host: str | None = None,
     add_base_only: bool = False,
     open_meta: bool = False,
+    balance_done: bool = False,
 ) -> dict[str, Any]:
     d: dict[str, Any] = {}
     if client_id:
@@ -272,6 +274,8 @@ def _rapports_url_params(
         d["add_base_only"] = "1"
     if open_meta:
         d["open_meta"] = "1"
+    if balance_done:
+        d["balance_done"] = "1"
     return d
 
 
@@ -598,6 +602,7 @@ def _accounting_reports_page(accounting_mode: str):
                         q=filter_q,
                         report_id=new_rid,
                         filter_host=fl_save,
+                        balance_done=True,
                     ),
                 )
             )
@@ -805,6 +810,24 @@ def _accounting_reports_page(accounting_mode: str):
             except Exception:
                 prefill_report_name = ""
 
+    balance_done_q = (request.args.get("balance_done") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    balance_runner_url = ""
+    if (
+        accounting_mode == "balance"
+        and balance_done_q
+        and selected
+        and prefill_rid
+        and prefill_rid > 0
+        and selected in reg
+    ):
+        balance_runner_url = account_report_odoo_runner_url(
+            reg[selected].url, int(prefill_rid)
+        )
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
@@ -819,6 +842,7 @@ def _accounting_reports_page(accounting_mode: str):
         reports=reports,
         prefill_report_id=prefill_rid,
         prefill_report_name=prefill_report_name,
+        balance_runner_url=balance_runner_url,
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,

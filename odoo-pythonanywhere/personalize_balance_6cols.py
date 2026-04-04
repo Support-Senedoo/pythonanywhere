@@ -10,10 +10,10 @@ Sources supportées :
     Vérifier les montants sur une base test : selon les sous-formules du rapport,
     l’écart avec une balance 4 colonnes « native » peut varier.
 
-Odoo Enterprise (balance d’essai) : un handler Python post-traite les lignes et attend une entrée
-``unaffected_earning_values`` pour chaque ``expression_label``. Les colonnes ``sn_*`` ne sont pas
-prévues → sans action, ``KeyError`` à l’affichage. Après création des colonnes, le script efface
-le handler personnalisé sur **cette copie** lorsque le modèle l’expose en écriture.
+Odoo Enterprise (balance d’essai) : le handler attache des totaux « unaffected earnings » à chaque
+``expression_label``. Les colonnes ``sn_*`` peuvent provoquer un ``KeyError`` à l’affichage.
+**Ne pas** retirer ``custom_handler_model_name`` sur la copie : les lignes au moteur « custom »
+``_report_custom_engine_trial_balance`` exigent ce handler ; sans lui, Odoo affiche « Méthode invalide ».
 """
 from __future__ import annotations
 
@@ -26,53 +26,6 @@ _SN_OPEN_DEB = "sn_open_deb"
 _SN_OPEN_CRE = "sn_open_cred"
 _SN_END_DEB = "sn_end_deb"
 _SN_END_CRE = "sn_end_cre"
-
-
-def _clear_enterprise_trial_balance_custom_handler(
-    models: Any,
-    db: str,
-    uid: int,
-    password: str,
-    report_id: int,
-) -> None:
-    """Évite KeyError sur expression_label (ex. sn_open_deb) dans account_trial_balance_report."""
-    try:
-        fg = execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report",
-            "fields_get",
-            [],
-            {"attributes": ["type", "readonly"]},
-        )
-    except Exception:
-        return
-    vals: dict[str, Any] = {}
-    for fname in ("custom_handler_model_id", "custom_handler_model_name"):
-        meta = fg.get(fname)
-        if not isinstance(meta, dict):
-            continue
-        t = meta.get("type")
-        if t == "many2one":
-            vals[fname] = False
-        elif t in ("char", "text", "selection"):
-            vals[fname] = False
-    if not vals:
-        return
-    try:
-        execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report",
-            "write",
-            [[report_id], vals],
-        )
-    except Exception:
-        pass
 
 
 def _split_sum_subformula(subformula: str | bool | None) -> tuple[str, str]:
@@ -471,5 +424,3 @@ def personalize_balance_six_columns(
     ]
     for cv in to_create:
         execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
-
-    _clear_enterprise_trial_balance_custom_handler(models, db, uid, password, report_id)

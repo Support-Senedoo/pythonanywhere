@@ -120,9 +120,9 @@
     L’original n’est pas modifié. En 4 colonnes, les soldes initiaux/finaux doivent utiliser la subformule <code>sum</code>. En 2 colonnes, les soldes sont dérivés via les champs Odoo <code>to_beginning_of_period</code> et <code>from_beginning</code> : contrôler les totaux sur une base de test ; les lignes de regroupement peuvent exiger des formules d’agrégation complémentaires.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    <strong>Odoo Enterprise / SaaS (ex. v19)</strong> : la balance d’essai standard utilise un handler qui ne connaît pas les libellés de colonnes Senedoo (<code>sn_open_deb</code>, …) et peut provoquer une erreur RPC à l’affichage.
-    Les versions récentes de l’outil retirent automatiquement ce handler sur la <strong>copie</strong> après transformation.
-    Pour une copie déjà cassée : sur la fiche <code>account.report</code> (mode développeur), videz <code>custom_handler_model_id</code> / <code>custom_handler_model_name</code> si présents, ou refaites une nouvelle copie depuis le rapport source avec l’outil à jour.
+    <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le rapport peut combiner un <strong>handler</strong> et des lignes moteur « custom » (<code>_report_custom_engine_trial_balance</code>). Il ne faut <strong>pas</strong> vider le handler sur la copie : sinon erreur « Méthode invalide » à l’ouverture.
+    Avec le handler conservé, l’ajout de colonnes <code>sn_*</code> peut encore provoquer un <code>KeyError</code> côté Odoo (totaux « unaffected earnings ») : dans ce cas, dupliquer plutôt une balance <strong>générique</strong> sans ce moteur custom, ou adapter le rapport dans Odoo.
+    Si une copie a été cassée en ayant retiré le handler : dupliquer à nouveau depuis l’original ou réaligner les champs handler comme sur le rapport source (mode développeur).
   </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -240,6 +240,12 @@
 
 {% if selected_client %}
 {% set cfg = clients[selected_client] %}
+{% if balance_runner_url %}
+<div class="sn-card sn-card--accent" style="margin-bottom:0.85rem;border-left:4px solid var(--sn-primary-bright);">
+  <p style="margin:0 0 0.65rem;line-height:1.45;"><strong>Personnalisation terminée.</strong> Ouvrir la balance dans Odoo (écran d’exécution, pas la fiche de configuration du rapport).</p>
+  <a class="sn-btn" href="{{ balance_runner_url }}" target="_blank" rel="noopener noreferrer">Voir la balance modifiée</a>
+</div>
+{% endif %}
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.1rem;">Connexion à la base</h2>
   <p class="sn-muted" style="margin:0 0 0.65rem;">

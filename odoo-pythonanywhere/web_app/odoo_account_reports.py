@@ -17,9 +17,21 @@ UTILITY_AUTHOR = app_version.TOOLBOX_APP_AUTHOR
 
 
 def account_report_odoo_form_url(base_url: str, report_id: int) -> str:
-    """Lien backend Odoo vers la fiche du rapport comptable (ouverture / exécution manuelle)."""
+    """Lien backend Odoo vers la fiche technique du rapport (modèle account.report, formulaire)."""
     base = normalize_odoo_base_url(base_url).rstrip("/")
     return f"{base}/web#id={int(report_id)}&model=account.report&view_type=form"
+
+
+def account_report_odoo_runner_url(base_url: str, report_id: int) -> str:
+    """
+    Lien Odoo vers l’écran d’exécution du rapport (balance / menu comptable), pas la fiche de configuration.
+
+    Exemple SaaS (Odoo 19) :
+    ``https://instance.odoo.com/odoo/account.report/31?model=account.report&resId=31``
+    """
+    base = normalize_odoo_base_url(base_url).rstrip("/")
+    rid = int(report_id)
+    return f"{base}/odoo/account.report/{rid}?model=account.report&resId={rid}"
 
 
 def format_report_name(val: Any) -> str:
