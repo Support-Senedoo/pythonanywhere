@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d9488">
   <title>{% block title %}Senedoo{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='senedoo-logo.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/senedoo.css') }}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="senedoo-app">
   <header class="sn-header">

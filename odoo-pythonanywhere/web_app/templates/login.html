@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Connexion — Senedoo{% endblock %}
+{% block main_class %}sn-main--auth{% endblock %}
 {% block body %}
+<div class="sn-auth-brand">
+  <img class="sn-logo-xl" src="{{ url_for('static', filename='senedoo-logo.svg') }}" width="200" height="42" alt="Senedoo">
+</div>
 <h1>Connexion</h1>
 <p class="sn-muted">
   {% if portal == 'staff' %}

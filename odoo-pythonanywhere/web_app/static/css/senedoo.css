@@ -75,6 +75,70 @@ a:hover {
   display: block;
 }
 
+/* Pages d’accueil / connexion — logo Senedoo mis en avant */
+.sn-main--auth {
+  max-width: 28rem;
+  padding-top: 2rem;
+}
+
+.sn-hero {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.sn-hero .sn-logo-hero {
+  height: 52px;
+  width: auto;
+  display: inline-block;
+  filter: drop-shadow(0 4px 20px rgba(13, 148, 136, 0.25));
+}
+
+.sn-hero-tagline {
+  margin: 0.65rem 0 0;
+  font-size: 0.95rem;
+  color: var(--sn-muted);
+  font-weight: 500;
+}
+
+.sn-auth-brand {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.sn-auth-brand .sn-logo-xl {
+  height: 56px;
+  width: auto;
+  display: inline-block;
+  filter: drop-shadow(0 4px 24px rgba(13, 148, 136, 0.3));
+}
+
+.sn-scroll-x {
+  overflow-x: auto;
+}
+
+.sn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.sn-table th,
+.sn-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--sn-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sn-table th {
+  color: var(--sn-muted);
+  font-weight: 600;
+}
+
+.sn-table tbody tr:hover {
+  background: rgba(20, 184, 166, 0.06);
+}
+
 .sn-nav ul {
   list-style: none;
   padding: 0;
