@@ -35,4 +35,14 @@ def create_app() -> Flask:
     app.register_blueprint(staff_bp, url_prefix="/staff")
     app.register_blueprint(staff_admin_bp, url_prefix="/staff")
 
+    from web_app import app_version
+
+    @app.context_processor
+    def _inject_toolbox_version() -> dict:
+        return {
+            "toolbox_version": app_version.TOOLBOX_APP_VERSION,
+            "toolbox_version_date": app_version.TOOLBOX_APP_DATE,
+            "toolbox_app_label": app_version.TOOLBOX_APP_LABEL,
+        }
+
     return app

@@ -1,6 +1,11 @@
 # Copier les variables utiles dans l’onglet Web PythonAnywhere (ou .env local pour tests).
 
 TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
+
+# Version affichée sur l’accueil (optionnel — sinon valeurs par défaut dans web_app/app_version.py)
+# TOOLBOX_APP_VERSION=1.3.0
+# TOOLBOX_APP_DATE=2026-04-03
+# TOOLBOX_APP_LABEL=Toolbox Senedoo
 # Chemins optionnels (défaut : toolbox_users.json et toolbox_clients.json à la racine du projet)
 # TOOLBOX_USERS_PATH=/home/VOTRE_USER/odoo-pythonanywhere/toolbox_users.json
 # TOOLBOX_CLIENTS_PATH=/home/VOTRE_USER/odoo-pythonanywhere/toolbox_clients.json
