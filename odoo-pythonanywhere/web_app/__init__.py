@@ -23,6 +23,7 @@ def create_app() -> Flask:
         "TOOLBOX_CLIENTS_PATH", str(_ROOT / "toolbox_clients.json")
     )
     app.config["DEBUG"] = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
+    app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
 
     from web_app.blueprints.public import bp as public_bp
     from web_app.blueprints.legacy_client import bp as legacy_bp

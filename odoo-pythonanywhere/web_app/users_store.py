@@ -210,6 +210,67 @@ def upsert_staff_user(path: str | Path, login: str, password: str | None, *, is_
     write_users_file(path, data)
 
 
+def update_portal_user(
+    path: str | Path,
+    old_login: str,
+    *,
+    new_login: str,
+    password: str | None,
+    role: str,
+    client_id: str | None,
+) -> str:
+    """Met à jour login (avec unicité), mot de passe optionnel, rôle et client. Retourne le login enregistré."""
+    old_k = _login_key(old_login)
+    new_login_v = validate_login((new_login or "").strip())
+    new_k = _login_key(new_login_v)
+    role_l = (role or "").strip().lower()
+    if role_l not in ("client", "staff"):
+        raise ValueError("Rôle invalide.")
+
+    data = read_users_file(path)
+    users: list[dict[str, Any]] = list(data.get("users", []))
+    idx: int | None = None
+    for i, row in enumerate(users):
+        if _login_key(str(row.get("login", ""))) == old_k:
+            idx = i
+            break
+    if idx is None:
+        raise ValueError("Utilisateur introuvable.")
+
+    for i, row in enumerate(users):
+        rk = _login_key(str(row.get("login", "")))
+        if rk == new_k and rk != old_k:
+            raise ValueError("Cet identifiant est déjà utilisé par un autre compte.")
+
+    row = dict(users[idx])
+    h = row.get("password_hash") or row.get("hash")
+    if password:
+        h = generate_password_hash(password)
+    if not h:
+        raise ValueError("Mot de passe requis ou laissez vide pour conserver l’actuel.")
+
+    if role_l == "staff":
+        users[idx] = {
+            "login": new_login_v,
+            "password_hash": h,
+            "role": "staff",
+        }
+    else:
+        if not (client_id or "").strip():
+            raise ValueError("Profil client Odoo requis pour un compte entreprise.")
+        cid = validate_client_id(client_id)
+        users[idx] = {
+            "login": new_login_v,
+            "password_hash": h,
+            "role": "client",
+            "client_id": cid,
+        }
+
+    data["users"] = users
+    write_users_file(path, data)
+    return new_login_v
+
+
 def delete_user(path: str | Path, login: str) -> None:
     key = _login_key(login)
     data = read_users_file(path)

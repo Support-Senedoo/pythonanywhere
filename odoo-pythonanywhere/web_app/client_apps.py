@@ -11,6 +11,12 @@ KNOWN_APPS: dict[str, dict[str, Any]] = {
         "client_endpoint": "legacy.client_odoo_status",
         "staff_endpoint": "staff.staff_apps_odoo_status",
     },
+    "pointage_import": {
+        "label": "Import fichier de pointage",
+        "description": "Dépôt et analyse d’un CSV de pointage (prévisualisation des lignes).",
+        "client_endpoint": "legacy.client_pointage_import",
+        "staff_endpoint": "staff.staff_apps_pointage_import",
+    },
 }
 
 DEFAULT_APP_IDS = ("odoo_status",)

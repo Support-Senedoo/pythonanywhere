@@ -19,6 +19,7 @@ from web_app.users_store import (
     delete_user,
     get_user_row,
     list_user_rows,
+    update_portal_user,
     upsert_client_user,
     upsert_staff_user,
 )
@@ -101,10 +102,11 @@ def client_new():
 @login_required_staff
 def client_edit(client_id: str):
     reg = load_clients_registry(_clients_path())
-    if client_id not in reg:
+    cid_key = (client_id or "").strip().lower()
+    if cid_key not in reg:
         flash("Client introuvable.", "danger")
         return redirect(url_for("staff_admin.clients_list"))
-    cfg = reg[client_id]
+    cfg = reg[cid_key]
     if request.method == "POST":
         label = (request.form.get("label") or "").strip()
         url = (request.form.get("url") or "").strip()
@@ -116,7 +118,7 @@ def client_edit(client_id: str):
         try:
             upsert_client(
                 _clients_path(),
-                client_id,
+                cid_key,
                 label,
                 url,
                 db,
@@ -139,14 +141,15 @@ def client_edit(client_id: str):
 @bp.route("/clients/<client_id>/delete", methods=["POST"])
 @login_required_staff
 def client_delete(client_id: str):
-    if (request.form.get("confirm") or "").strip() != client_id:
+    cid_key = (client_id or "").strip().lower()
+    if (request.form.get("confirm") or "").strip().casefold() != cid_key:
         flash("Tapez l’identifiant exact du client pour confirmer.", "warning")
-        return redirect(url_for("staff_admin.client_edit", client_id=client_id))
-    if count_users_for_client(_users_path(), client_id) > 0:
+        return redirect(url_for("staff_admin.client_edit", client_id=cid_key))
+    if count_users_for_client(_users_path(), cid_key) > 0:
         flash("Supprimez ou réassignez d’abord les comptes client liés à ce profil.", "danger")
-        return redirect(url_for("staff_admin.client_edit", client_id=client_id))
+        return redirect(url_for("staff_admin.client_edit", client_id=cid_key))
     try:
-        delete_client(_clients_path(), client_id)
+        delete_client(_clients_path(), cid_key)
         flash("Client supprimé.", "success")
     except ValueError as e:
         flash(str(e), "danger")
@@ -213,11 +216,19 @@ def user_edit(login: str):
     reg = load_clients_registry(_clients_path())
     role = str(row.get("role", "")).strip().lower()
     if request.method == "POST":
+        new_login = (request.form.get("login") or "").strip()
         password = (request.form.get("password") or "").strip() or None
         client_id = (request.form.get("client_id") or "").strip()
         try:
             if role == "staff":
-                upsert_staff_user(_users_path(), login, password, is_new=False)
+                final = update_portal_user(
+                    _users_path(),
+                    login,
+                    new_login=new_login,
+                    password=password,
+                    role="staff",
+                    client_id=None,
+                )
                 flash("Compte équipe mis à jour.", "success")
             else:
                 if not _client_id_in_registry(reg, client_id):
@@ -228,10 +239,17 @@ def user_edit(login: str):
                         user=row,
                         clients=reg,
                     )
-                upsert_client_user(
-                    _users_path(), login, password, client_id, is_new=False
+                final = update_portal_user(
+                    _users_path(),
+                    login,
+                    new_login=new_login,
+                    password=password,
+                    role="client",
+                    client_id=client_id,
                 )
                 flash("Compte client mis à jour.", "success")
+            if final.casefold() != (login or "").strip().casefold():
+                return redirect(url_for("staff_admin.user_edit", login=final))
             return redirect(url_for("staff_admin.users_list"))
         except ValueError as e:
             flash(str(e), "danger")

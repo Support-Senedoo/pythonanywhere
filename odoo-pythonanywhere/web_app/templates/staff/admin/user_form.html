@@ -30,7 +30,10 @@
     <label for="password">Mot de passe</label>
     <input type="password" id="password" name="password" required autocomplete="new-password">
     {% else %}
-    <p><strong>Identifiant :</strong> {{ user.login }} · <strong>Rôle :</strong> {{ user.role }}</p>
+    <p class="sn-muted"><strong>Rôle :</strong> {{ user.role }} — l’identifiant doit rester <strong>unique</strong> sur tout le portail.</p>
+    <label for="login">Identifiant de connexion</label>
+    <input type="text" id="login" name="login" required value="{{ user.login }}" autocomplete="username" pattern="[a-zA-Z0-9._@+\-]{2,80}" title="2–80 caractères : lettres, chiffres, . _ @ + -">
+
     {% if user.role == 'client' %}
     {% set ucid = (user.client_id or '')|lower %}
     <label for="client_id">Client / profil Odoo</label>
@@ -57,8 +60,9 @@
 {% if mode == 'edit' %}
 <div class="sn-card" style="border-color:var(--sn-danger);margin-top:1.5rem;">
   <h2 style="color:var(--sn-danger);margin-top:0;">Supprimer ce compte</h2>
+  <p class="sn-muted">Saisissez l’identifiant <strong>actuellement enregistré</strong> (ci-dessus avant enregistrement : <code>{{ user.login }}</code>), pas une nouvelle valeur en cours de saisie.</p>
   <form method="post" action="{{ url_for('staff_admin.user_delete', login=user.login) }}" onsubmit="return confirm('Supprimer cet utilisateur ?');">
-    <label for="confirm_login">Tapez l’identifiant exact</label>
+    <label for="confirm_login">Confirmation identifiant</label>
     <input type="text" id="confirm_login" name="confirm_login" required placeholder="{{ user.login }}" autocomplete="off">
     <button type="submit" style="background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer</button>
   </form>

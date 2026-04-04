@@ -1,11 +1,16 @@
 """Espace client : appli La Ripaille (MVP) + liens outils catalogue."""
 from __future__ import annotations
 
-from flask import Blueprint, current_app, render_template, session
+from flask import Blueprint, abort, current_app, flash, render_template, request, session, url_for
 
 from web_app.blueprints.public import login_required_client
 from web_app.client_apps import apps_for_template
 from web_app.odoo_registry import client_has_app, load_clients_registry
+from web_app.pointage_import_util import (
+    ALLOWED_SUFFIX,
+    parse_pointage_csv,
+    safe_upload_filename,
+)
 from web_app.session_odoo import get_odoo_client_for_browser_client
 
 bp = Blueprint("legacy", __name__)
@@ -36,8 +41,6 @@ def client_odoo_status():
     reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
     cfg = reg.get(cid) if cid else None
     if not cfg or not client_has_app(cfg, "odoo_status"):
-        from flask import abort
-
         abort(404)
     client_label = cfg.label if cfg else (cid or "client")
     try:
@@ -57,3 +60,50 @@ def client_odoo_status():
             f"Erreur : {e!s}",
         ]
     return render_template("client/odoo_status.html", lines=lines, client_label=client_label)
+
+
+@bp.route("/import-pointage", methods=["GET", "POST"])
+@login_required_client
+def client_pointage_import():
+    cid = (session.get("client_id") or "").strip().lower() or None
+    reg = load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
+    cfg = reg.get(cid) if cid else None
+    if not cfg or not client_has_app(cfg, "pointage_import"):
+        abort(404)
+    client_label = cfg.label
+    ctx = f"Entreprise : {client_label} · base {cfg.db}"
+
+    columns: list[str] = []
+    preview_rows: list[dict[str, str]] = []
+    parse_errors: list[str] = []
+    total_rows: int | None = None
+    last_filename = ""
+
+    if request.method == "POST":
+        f = request.files.get("file")
+        if not f or not f.filename:
+            flash("Choisissez un fichier CSV.", "warning")
+        else:
+            name = safe_upload_filename(f.filename)
+            low = name.lower()
+            if not low.endswith(ALLOWED_SUFFIX):
+                flash("Extension acceptée : .csv ou .txt.", "warning")
+            else:
+                raw = f.read()
+                columns, preview_rows, parse_errors, total_rows = parse_pointage_csv(raw)
+                last_filename = name
+                if total_rows > 0 and not parse_errors:
+                    flash(f"Fichier analysé : {total_rows} ligne(s) de données.", "success")
+                elif total_rows > 0:
+                    flash(f"Fichier lu : {total_rows} ligne(s), avec avertissements.", "warning")
+
+    return render_template(
+        "pointage_import.html",
+        context_label=ctx,
+        submit_action=url_for("legacy.client_pointage_import"),
+        columns=columns,
+        preview_rows=preview_rows,
+        parse_errors=parse_errors,
+        total_rows=total_rows,
+        last_filename=last_filename,
+    )

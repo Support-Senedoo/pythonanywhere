@@ -24,10 +24,10 @@
     <label for="db">Nom de la base Odoo</label>
     <input type="text" id="db" name="db" required value="{{ client.db if client else '' }}" placeholder="nom_technique_base">
 
-    <label for="odoo_user">Utilisateur API Odoo</label>
+    <label for="odoo_user">Login Odoo (connexion API / XML-RPC)</label>
     <input type="text" id="odoo_user" name="odoo_user" required value="{{ client.user if client else '' }}" autocomplete="off">
 
-    <label for="odoo_password">Mot de passe / clé API Odoo</label>
+    <label for="odoo_password">Mot de passe Odoo ou clé API</label>
     <input type="password" id="odoo_password" name="odoo_password" autocomplete="new-password"
            placeholder="{% if client %}Laisser vide pour ne pas changer{% else %}Obligatoire{% endif %}">
 

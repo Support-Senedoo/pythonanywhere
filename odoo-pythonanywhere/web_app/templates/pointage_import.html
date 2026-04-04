@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Import pointage — Senedoo{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>Import fichier de pointage</h1>
+<p class="sn-muted">{{ context_label }}</p>
+<p class="sn-muted">
+  CSV avec en-têtes (première ligne). Séparateur <code>;</code> ou <code>,</code> détecté automatiquement.
+  Encodage conseillé : UTF-8. Taille max 5&nbsp;Mo, jusqu’à 5000 lignes de données.
+</p>
+
+<div class="sn-card sn-card--accent">
+  <form method="post" enctype="multipart/form-data" action="{{ submit_action }}">
+    <label for="file">Fichier (.csv, .txt)</label>
+    <input type="file" id="file" name="file" accept=".csv,.txt,text/plain,text/csv">
+    <button type="submit">Analyser le fichier</button>
+  </form>
+</div>
+
+{% if last_filename %}
+<p class="sn-muted">Dernier fichier : <strong>{{ last_filename }}</strong>{% if total_rows is not none %} — <strong>{{ total_rows }}</strong> ligne(s) de données reconnue(s).{% endif %}</p>
+{% endif %}
+
+{% if parse_errors %}
+{% for e in parse_errors %}
+<div class="sn-flash warning">{{ e }}</div>
+{% endfor %}
+{% endif %}
+
+{% if columns and preview_rows %}
+<h2 style="margin-top:1.5rem;">Prévisualisation ({{ preview_rows|length }} ligne(s) sur {{ total_rows }})</h2>
+<div class="sn-scroll-x">
+<table class="sn-table">
+  <thead>
+    <tr>
+      {% for c in columns %}
+      <th>{{ c }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in preview_rows %}
+    <tr>
+      {% for c in columns %}
+      <td>{{ row.get(c, '') }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<p class="sn-muted" style="margin-top:1.25rem;font-size:0.85rem;">
+  Cette étape valide la structure du fichier. L’intégration automatique dans Odoo (ex. présences) peut être branchée selon votre modèle et vos droits API.
+</p>
+{% endblock %}
