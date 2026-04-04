@@ -346,7 +346,8 @@ def _copy_name_collides_existing(
     root_for_sibling_check: int | None,
 ) -> bool:
     """True si un autre rapport porte déjà ce nom (recherche par langue + variantes même racine)."""
-    langs = ("fr_FR", "fr_BE", "fr_CA", "en_US", "en_GB")
+    # Ne pas utiliser fr_BE / fr_CA ici : contexte RPC → Odoo refuse les langues non activées sur la base.
+    langs = ("fr_FR", "en_US")
     for s in _proposed_name_search_strings(proposed):
         for lang in langs:
             hits = execute_kw(
