@@ -119,6 +119,11 @@
     en créer une <strong>copie</strong>, puis la transformer en <strong>6 colonnes</strong> : débit initial, crédit initial, débit période, crédit période, débit final, crédit final.
     L’original n’est pas modifié. En 4 colonnes, les soldes initiaux/finaux doivent utiliser la subformule <code>sum</code>. En 2 colonnes, les soldes sont dérivés via les champs Odoo <code>to_beginning_of_period</code> et <code>from_beginning</code> : contrôler les totaux sur une base de test ; les lignes de regroupement peuvent exiger des formules d’agrégation complémentaires.
   </p>
+  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
+    <strong>Odoo Enterprise / SaaS (ex. v19)</strong> : la balance d’essai standard utilise un handler qui ne connaît pas les libellés de colonnes Senedoo (<code>sn_open_deb</code>, …) et peut provoquer une erreur RPC à l’affichage.
+    Les versions récentes de l’outil retirent automatiquement ce handler sur la <strong>copie</strong> après transformation.
+    Pour une copie déjà cassée : sur la fiche <code>account.report</code> (mode développeur), videz <code>custom_handler_model_id</code> / <code>custom_handler_model_name</code> si présents, ou refaites une nouvelle copie depuis le rapport source avec l’outil à jour.
+  </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
     <strong>Version :</strong> {{ utility_version }} ·
