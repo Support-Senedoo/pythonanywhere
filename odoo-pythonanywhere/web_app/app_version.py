@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 # À incrémenter lors des livraisons visibles pour les utilisateurs.
-_DEFAULT_VERSION = "1.3.7"
+_DEFAULT_VERSION = "1.3.8"
 _DEFAULT_DATE = "2026-04-04"
 
 # Valeurs souvent mises par erreur dans l’onglet Web PA (ne reflètent pas la livraison réelle).

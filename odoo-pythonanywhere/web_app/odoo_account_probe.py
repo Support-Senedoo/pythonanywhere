@@ -73,7 +73,7 @@ def _host_to_db_name(hostname: str) -> str:
 def _extract_instance_urls_from_portal_html(html: str) -> list[str]:
     """Repère les URL d’instances hébergées chez Odoo dans le HTML « Mes bases »."""
     found: set[str] = set()
-    for m in re.finditer(r'https://([\w.-]+\.odoo\.com)(?:/|\?|"|\'|>|<|\s)', html, re.I):
+    for m in re.finditer(r"https://([\w.-]+\.odoo\.com)\b", html, re.I):
         host = m.group(1).lower()
         if host.startswith("www.") or "odoocdn" in host:
             continue
@@ -107,37 +107,52 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
 
     cj = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-    opener.addheaders = [
-        (
-            "User-Agent",
-            "SenedooToolbox/1.2 (+urllib; +https://github.com/Support-Senedoo/pythonanywhere)",
-        )
-    ]
+    # UA « navigateur » : certains pare-feu / WAF odoo.com rejettent ou cassent la session avec un UA outil rare.
+    _ua = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 SenedooToolbox/1.3"
+    )
+    opener.addheaders = [("User-Agent", _ua), ("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")]
 
     try:
         q = urllib.parse.urlencode({"redirect": redirect_path})
-        r = opener.open(f"{login_page}?{q}", timeout=35)
+        login_url_with_q = f"{login_page}?{q}"
+        r = opener.open(login_url_with_q, timeout=35)
         html = r.read().decode("utf-8", "replace")
     except (OSError, urllib.error.HTTPError) as e:
         return [], f"Réseau / portail Odoo.com (page login) : {e!s}"
 
-    m = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', html)
-    if not m:
-        return [], "Impossible de lire le formulaire de connexion odoo.com (jeton CSRF manquant)."
+    csrf = None
+    for pat in (
+        r'name="csrf_token"[^>]*\bvalue="([^"]+)"',
+        r'\bvalue="([^"]+)"[^>]*name="csrf_token"',
+        r"name='csrf_token'[^>]*\bvalue='([^']+)'",
+        r"\bvalue='([^']+)'[^>]*name='csrf_token'",
+    ):
+        m = re.search(pat, html, re.I)
+        if m:
+            csrf = m.group(1)
+            break
+    if not csrf:
+        return [], "Impossible de lire le formulaire de connexion odoo.com (jeton CSRF manquant — le portail a peut‑être changé)."
 
     data = urllib.parse.urlencode(
         {
-            "csrf_token": m.group(1),
+            "csrf_token": csrf,
             "login": login_c,
             "password": pwd,
             "redirect": redirect_path,
         }
     ).encode()
     req = urllib.request.Request(
-        login_page,
+        login_url_with_q,
         data=data,
         method="POST",
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": login_url_with_q,
+            "Origin": origin,
+        },
     )
     try:
         r2 = opener.open(req, timeout=35)
@@ -153,9 +168,20 @@ def fetch_odoo_com_portal_probes(login: str, password: str) -> tuple[list[tuple[
         return [], f"Lecture « Mes bases » : {e!s}"
 
     if "web/login" in final_u:
+        hint = ""
+        low = db_html.lower()
+        if "two-factor" in low or "two factor" in low or "authenticator" in low or "2fa" in low:
+            hint = (
+                " La page renvoyée évoque une double authentification : ce script ne peut pas la valider — "
+                "désactivez temporairement la 2FA sur le portail odoo.com, ou utilisez le mode avec URL d’instance."
+            )
+        elif "captcha" in low or "recaptcha" in low:
+            hint = " Un captcha semble requis : connexion automatique impossible depuis la toolbox."
         return [], (
             "Échec de connexion au portail Odoo.com (e-mail, mot de passe, ou accès « Mes bases »). "
-            "Vérifiez aussi la 2FA / sécurité du compte."
+            "Vérifiez identifiants, droits sur « Mes bases », et si le compte impose une connexion via accounts.odoo.com / SSO uniquement."
+            + hint
+            + f" (URL finale : {final_u})"
         )
 
     raw_urls = _extract_instance_urls_from_portal_html(db_html)

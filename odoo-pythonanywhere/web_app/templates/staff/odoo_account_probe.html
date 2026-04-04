@@ -19,6 +19,7 @@
     <li>Mode URL : si <code>db.list()</code> est absent (souvent Odoo SaaS 19+), la liste reste vide — utilisez alors le mode sans URL.</li>
     <li>Maximum <strong>{{ max_probe }}</strong> bases testées par requête (sécurité / performance).</li>
     <li>Ne pas utiliser sur une machine partagée sans confiance : identifiants transmis à odoo.com et aux instances.</li>
+    <li>Si le portail refuse la connexion : compte avec <strong>2FA</strong> ou <strong>captcha</strong>, ou SSO uniquement — préférez le mode avec <strong>URL d’instance</strong> (si <code>db.list()</code> est disponible).</li>
   </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> Senedoo · <strong>Version :</strong> {{ util_version }} · <strong>Date :</strong> {{ util_date }}
