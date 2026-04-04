@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 """
-Vérifie que la page « Rapports comptables » rend bien le HTML attendu (session staff simulée).
-
-À lancer après toute modification de accounting_reports_utility.html ou de la vue associée :
+Vérifie que les pages de personnalisation de rapports rendent le HTML attendu (session staff simulée).
 
   cd odoo-pythonanywhere
   python scripts/verify_accounting_reports_page.py
 
-Sortie 0 = les marqueurs obligatoires sont présents dans le HTML généré localement.
-Pour une URL déployée (optionnel, cookie de session staff requis) :
-
-  set TOOLBOX_VERIFY_URL=https://votre-site.pythonanywhere.com/staff/utilities/rapports-comptables
-  set TOOLBOX_VERIFY_COOKIE="session=...."
-  python scripts/verify_accounting_reports_page.py --remote
+Sortie 0 = marqueurs obligatoires présents.
 """
 from __future__ import annotations
 
@@ -25,8 +18,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-# Toujours présents (même sans base sélectionnée)
-REQUIRED_ALWAYS = [
+# Présents sur chaque page utilitaire rapports (sans base sélectionnée)
+REQUIRED_COMMON = [
     'id="ajouter-base-odoo"',
     'name="filter_host"',
     'name="new_db"',
@@ -35,20 +28,22 @@ REQUIRED_ALWAYS = [
     "Ajouter une nouvelle base",
     "Enregistrer la base",
     "sn-page-bottom-flash",
-    "copie automatique",
-    # Apostrophes typographiques du gabarit Jinja
-    "le rapport d\u2019origine n\u2019est pas modifié",
+    "Autres personnalisations",
 ]
 
-REQUIRED_BALANCE_PAGE = [
-    'id="ajouter-base-odoo"',
-    'name="filter_host"',
-    'name="new_db"',
-    'value="add_client"',
-    "Ajouter une nouvelle base",
-    "Enregistrer la base",
-    "sn-page-bottom-flash",
+REQUIRED_PL_STANDARD_BASE = [
+    "Compte de résultat — personnalisation (détail / SYSCOHADA)",
+    "compte de résultat personnalisé",
+]
+
+REQUIRED_BALANCE_PAGE = REQUIRED_COMMON + [
     "6 colonnes",
+    "Balance comptable — 6 colonnes",
+]
+
+REQUIRED_PL_BUDGET_BASE = [
+    "Compte de résultat — analytique et budget",
+    "P&amp;L analytique et budget",
 ]
 
 REQUIRED_BALANCE_WITH_CLIENT_EXTRA = [
@@ -56,13 +51,20 @@ REQUIRED_BALANCE_WITH_CLIENT_EXTRA = [
     'value="personalize_balance"',
 ]
 
-# Uniquement si ?client_id=… pointe vers un client connu du registre
-REQUIRED_WITH_CLIENT = [
+REQUIRED_WITH_CLIENT_PL_STANDARD = [
     'id="sn-reports-list"',
     'id="report_id_p"',
     'id="form-personalize-report"',
     "sn-personalize-overlay",
     "Créer la copie et personnaliser",
+]
+
+REQUIRED_WITH_CLIENT_PL_BUDGET = [
+    'id="sn-reports-list"',
+    'id="report_id_ab"',
+    'id="form-personalize-pl-budget"',
+    "sn-personalize-overlay",
+    "Créer la copie (détail + analytique / budget)",
 ]
 
 
@@ -85,12 +87,30 @@ def verify_local() -> int:
     reg = load_clients_registry(app.config["TOOLBOX_CLIENTS_PATH"])
     first_cid = next(iter(reg.keys()), None)
 
-    urls = (
-        ("/staff/utilities/rapports-comptables", REQUIRED_ALWAYS),
-        ("/staff/utilities/personalize-report", REQUIRED_ALWAYS),
-        ("/staff/utilities/personalize-balance", REQUIRED_BALANCE_PAGE),
-    )
-    for path, required in urls:
+    pages: list[tuple[str, list[str], list[str]]] = [
+        (
+            "/staff/utilities/rapports-comptables",
+            REQUIRED_COMMON + REQUIRED_PL_STANDARD_BASE,
+            REQUIRED_WITH_CLIENT_PL_STANDARD,
+        ),
+        (
+            "/staff/utilities/personalize-report",
+            REQUIRED_COMMON + REQUIRED_PL_STANDARD_BASE,
+            REQUIRED_WITH_CLIENT_PL_STANDARD,
+        ),
+        (
+            "/staff/utilities/personalize-pl-budget",
+            REQUIRED_COMMON + REQUIRED_PL_BUDGET_BASE,
+            REQUIRED_WITH_CLIENT_PL_BUDGET,
+        ),
+        (
+            "/staff/utilities/personalize-balance",
+            REQUIRED_BALANCE_PAGE,
+            REQUIRED_BALANCE_WITH_CLIENT_EXTRA + ["Ouvrir dans Odoo", 'id="sn-reports-list"'],
+        ),
+    ]
+
+    for path, required, extra_with_client in pages:
         r = client.get(path)
         if r.status_code != 200:
             print(f"ERREUR {path} : HTTP {r.status_code}", file=sys.stderr)
@@ -102,7 +122,7 @@ def verify_local() -> int:
             for m in missing:
                 print(f"  - {m!r}", file=sys.stderr)
             return 1
-        print(f"OK {path} ({len(html)} caractères) — bloc « ajouter base »")
+        print(f"OK {path} ({len(html)} caractères)")
 
         if first_cid:
             r2 = client.get(f"{path}?client_id={first_cid}")
@@ -110,21 +130,16 @@ def verify_local() -> int:
                 print(f"ERREUR {path}?client_id=… : HTTP {r2.status_code}", file=sys.stderr)
                 return 1
             html2 = r2.get_data(as_text=True)
-            if path == "/staff/utilities/personalize-balance":
-                extra = REQUIRED_BALANCE_WITH_CLIENT_EXTRA + ["Ouvrir dans Odoo", 'id="sn-reports-list"']
-            else:
-                extra = REQUIRED_WITH_CLIENT
-            missing2 = _missing_markers(html2, required + extra)
+            missing2 = _missing_markers(html2, required + extra_with_client)
             if missing2:
                 print(f"ERREUR {path}?client_id={first_cid} : marqueurs absents :", file=sys.stderr)
                 for m in missing2:
                     print(f"  - {m!r}", file=sys.stderr)
                 return 1
-            print(f"OK {path}?client_id={first_cid} ({len(html2)} car.) — personnalisation")
+            print(f"OK {path}?client_id={first_cid} ({len(html2)} car.) — zone personnalisation")
         else:
             print(
-                "Note : aucun client dans toolbox_clients.json — sous-partie « personnaliser » non vérifiée "
-                "(normal en clone sans fichier clients)."
+                "Note : aucun client dans toolbox_clients.json — zone personnalisation avec client non vérifiée."
             )
     return 0
 
@@ -160,22 +175,19 @@ def verify_remote() -> int:
     except OSError as e:
         print(f"ERREUR réseau : {e}", file=sys.stderr)
         return 1
-    missing = _missing_markers(html, REQUIRED_ALWAYS)
+    required = REQUIRED_COMMON + REQUIRED_PL_STANDARD_BASE
+    missing = _missing_markers(html, required)
     if missing:
         print("ERREUR déploiement : le HTML distant ne contient pas les marqueurs de base :", file=sys.stderr)
         for m in missing:
             print(f"  - {m!r}", file=sys.stderr)
-        print(
-            "\nCause fréquente : pas de git pull / Reload sur PythonAnywhere, ou cache navigateur.",
-            file=sys.stderr,
-        )
         return 1
     print(f"OK distant {url} ({len(html)} caractères)")
     return 0
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Vérifie le HTML de la page Rapports comptables.")
+    p = argparse.ArgumentParser(description="Vérifie le HTML des pages personnalisation rapports.")
     p.add_argument(
         "--remote",
         action="store_true",

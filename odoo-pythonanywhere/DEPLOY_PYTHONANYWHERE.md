@@ -15,7 +15,7 @@ si vous clonez le repo dans `/home/senedoo/pythonanywhere`. (Si vous ne gardez q
 ## Ce qui est déployé (état attendu)
 
 - **Application** : Flask « toolbox » (`web_app`), WSGI = **`pythonanywhere_wsgi.py`** ou **`pa_wsgi.py`** (équivalent).
-- **Portails** : accueil `/` (client / Senedoo), login, espace client sous `/client/`, staff sous `/staff/`, utilitaire personnalisation rapport sous `/staff/utilities/personalize-report`.
+- **Portails** : accueil `/` (client / Senedoo), login, espace client sous `/client/`, staff sous `/staff/`, utilitaires rapports sous `/staff/utilities/` (liste : `utilities` ; P&L SYSCOHADA : `rapports-comptables` / `personalize-report` ; balance 6 col. : `personalize-balance` ; P&L budget : `personalize-pl-budget`).
 - **Secrets sur le serveur uniquement** (jamais dans Git) :
   - `toolbox_users.json` — comptes + `password_hash` (Werkzeug)
   - `toolbox_clients.json` — URL / base / user API Odoo par `client_id`
@@ -204,10 +204,12 @@ Host pythonanywhere
 - **Mot de passe** et **cookie** : non réinjectés dans le HTML après POST ; le login peut être mémorisé côté navigateur (localStorage) pour la sonde.
 - Version / date affichées : **`app_version.TOOLBOX_APP_VERSION`** / **`TOOLBOX_APP_DATE`**, injectées par **`web_app/blueprints/staff.py`** (`util_version`, `util_date`).
 
-### Utilitaire « Rapports comptables Odoo » (personnalisation / exports)
+### Utilitaires personnalisation rapports (`account.report`)
 
-- Fichier principal : **`web_app/odoo_account_reports.py`**. Les métadonnées **version**, **date** et **auteur** viennent de la même source que le reste de la toolbox : **`web_app/app_version.py`** (`TOOLBOX_APP_VERSION`, `TOOLBOX_APP_DATE`, `TOOLBOX_APP_AUTHOR` — ce dernier surchargeable via env `TOOLBOX_APP_AUTHOR`, voir **`toolbox-env-exemple.txt`**).
-- **P&L — analytique et budget (Odoo SaaS)** : sur `/staff/utilities/rapports-comptables`, action **« Créer la copie (détail + analytique / budget) »** — duplication `account.report`, même personnalisation détail que le bouton « Personnaliser » ([`personalize_syscohada_detail.py`](personalize_syscohada_detail.py)), puis écriture des options `filter_analytic` et `filter_budget` (si le champ existe) via [`personalize_pl_analytic_budget.py`](personalize_pl_analytic_budget.py). **Sonde budget / analytique** : bouton lecture seule qui compte les lignes de budget avec analytique renseigné (`account.budget.line` ou `crossovered.budget.lines`).
+- Fichier principal : **`web_app/odoo_account_reports.py`**. Métadonnées **version** / **date** / **auteur** : **`web_app/app_version.py`** (et env `TOOLBOX_APP_*`, voir **`toolbox-env-exemple.txt`**).
+- **Compte de résultat personnalisé (SYSCOHADA / détail comptes)** : `/staff/utilities/rapports-comptables` (alias `/staff/utilities/personalize-report`) — copie + [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py).
+- **Balance 6 colonnes** : `/staff/utilities/personalize-balance` — [`personalize_balance_6cols.py`](personalize_balance_6cols.py).
+- **P&L analytique et budget (Odoo SaaS)** : `/staff/utilities/personalize-pl-budget` — même détail comptes, puis options `filter_analytic` / `filter_budget` via [`personalize_pl_analytic_budget.py`](personalize_pl_analytic_budget.py). **Sonde budget / analytique** (lecture seule) sur cette page uniquement.
 - **CLI (hors Flask)** : `python personalize_pl_analytic_budget.py --report-id <id>` sur une copie déjà créée ; `--probe-only` pour la sonde seule.
 
 #### Checklist budget financier × compte analytique (SaaS)
@@ -224,7 +226,7 @@ Host pythonanywhere
 
 ---
 
-*Dernière mise à jour de cette section : avril 2026 — sonde bases : mode cookie session navigateur après captcha manuel ; version via `app_version` ; rapports comptables : P&L analytique/budget + sonde budget ; piège `deploy_pa.ps1` / encodage PowerShell sur Mon Drive ; rappel Reload Web après `git pull`.*
+*Dernière mise à jour de cette section : avril 2026 — trois écrans staff (P&L SYSCOHADA, balance 6 col., P&L budget) ; sonde budget sur l’écran budget ; rappel Reload Web après `git pull`.*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 

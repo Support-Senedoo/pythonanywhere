@@ -50,6 +50,7 @@ from web_app.odoo_account_reports import (
     UTILITY_DATE,
     UTILITY_TITLE,
     UTILITY_TITLE_BALANCE,
+    UTILITY_TITLE_PL_BUDGET,
     UTILITY_VERSION,
     account_report_odoo_form_url,
     duplicate_account_report,
@@ -275,7 +276,8 @@ def _rapports_url_params(
 
 
 _ACCOUNTING_EP = {
-    "standard": "staff.rapports_comptables",
+    "pl_standard": "staff.rapports_comptables",
+    "pl_budget": "staff.rapports_pl_budget",
     "balance": "staff.rapports_balance",
 }
 
@@ -389,7 +391,7 @@ def _accounting_reports_page(accounting_mode: str):
                     **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
                 )
             )
-        if action == "budget_probe" and accounting_mode == "standard":
+        if action == "budget_probe" and accounting_mode == "pl_budget":
             try:
                 msg = probe_financial_budget_analytic_summary(models, db, uid, pwd)
                 if len(msg) > 900:
@@ -406,7 +408,7 @@ def _accounting_reports_page(accounting_mode: str):
                     ),
                 )
             )
-        if action == "personalize" and accounting_mode == "standard":
+        if action == "personalize" and accounting_mode == "pl_standard":
             try:
                 rid = int(request.form.get("report_id") or "0")
             except ValueError:
@@ -462,7 +464,7 @@ def _accounting_reports_page(accounting_mode: str):
                     ),
                 )
             )
-        if action == "personalize_pl_budget" and accounting_mode == "standard":
+        if action == "personalize_pl_budget" and accounting_mode == "pl_budget":
             try:
                 rid = int(request.form.get("report_id") or "0")
             except ValueError:
@@ -770,7 +772,12 @@ def _accounting_reports_page(accounting_mode: str):
                         sr["msg"] = str(e)
                 sibling_rows.append(sr)
 
-    utitle = UTILITY_TITLE_BALANCE if accounting_mode == "balance" else UTILITY_TITLE
+    if accounting_mode == "balance":
+        utitle = UTILITY_TITLE_BALANCE
+    elif accounting_mode == "pl_budget":
+        utitle = UTILITY_TITLE_PL_BUDGET
+    else:
+        utitle = UTILITY_TITLE
     report_open_urls: dict[int, str] = {}
     if selected and conn_status == "ok" and reports and selected in reg:
         bu = reg[selected].url
@@ -815,7 +822,13 @@ def _accounting_reports_page(accounting_mode: str):
 @bp.route("/utilities/rapports-comptables", methods=["GET", "POST"])
 @login_required_staff
 def rapports_comptables():
-    return _accounting_reports_page("standard")
+    return _accounting_reports_page("pl_standard")
+
+
+@bp.route("/utilities/personalize-pl-budget", methods=["GET", "POST"])
+@login_required_staff
+def rapports_pl_budget():
+    return _accounting_reports_page("pl_budget")
 
 
 @bp.route("/utilities/personalize-balance", methods=["GET", "POST"])

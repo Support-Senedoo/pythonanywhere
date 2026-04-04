@@ -8,8 +8,9 @@ from personalize_syscohada_detail import execute_kw
 from web_app import app_version
 
 # Titre spécifique à l’écran ; version / date / auteur = source unique app_version.py
-UTILITY_TITLE = "Rapports comptables Odoo"
+UTILITY_TITLE = "Compte de résultat — personnalisation (détail / SYSCOHADA)"
 UTILITY_TITLE_BALANCE = "Balance comptable — 6 colonnes (Senedoo)"
+UTILITY_TITLE_PL_BUDGET = "Compte de résultat — analytique et budget"
 UTILITY_VERSION = app_version.TOOLBOX_APP_VERSION
 UTILITY_DATE = app_version.TOOLBOX_APP_DATE
 UTILITY_AUTHOR = app_version.TOOLBOX_APP_AUTHOR
