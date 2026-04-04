@@ -4,12 +4,13 @@ from __future__ import annotations
 from typing import Any
 
 from personalize_syscohada_detail import execute_kw
+from web_app import app_version
 
-# Métadonnées affichées dans l’interface (à jour à chaque évolution fonctionnelle).
+# Titre spécifique à l’écran ; version / date / auteur = source unique app_version.py
 UTILITY_TITLE = "Rapports comptables Odoo"
-UTILITY_VERSION = "1.2.0"
-UTILITY_DATE = "2026-04-03"
-UTILITY_AUTHOR = "Senedoo"
+UTILITY_VERSION = app_version.TOOLBOX_APP_VERSION
+UTILITY_DATE = app_version.TOOLBOX_APP_DATE
+UTILITY_AUTHOR = app_version.TOOLBOX_APP_AUTHOR
 
 
 def format_report_name(val: Any) -> str:
