@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Sonde bases Odoo (compte) — Senedoo{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>Sonde des bases Odoo par compte</h1>
+
+<details class="sn-doc" open>
+  <summary>But &amp; principe</summary>
+  <p style="margin:0.65rem 0 0;line-height:1.5;">
+    Cet utilitaire interroge le serveur Odoo indiqué avec un <strong>login</strong> et un <strong>mot de passe</strong>
+    (non enregistrés : traitement immédiat puis oubli côté application). Il récupère d’abord la liste des bases
+    via <code>/xmlrpc/2/db</code> <code>list()</code> lorsque le serveur l’autorise, fusionne avec des noms que vous
+    ajoutez manuellement, puis tente une <strong>authentification</strong> sur chaque base. Pour les accès réussis,
+    il affiche des <strong>indications</strong> : sociétés (<code>res.company</code>), version du module <code>base</code>,
+    et informations sur l’utilisateur connecté.
+  </p>
+  <ul>
+    <li>Odoo SaaS / hébergements fermés peuvent <strong>désactiver</strong> <code>db.list()</code> : utilisez alors la zone « Bases supplémentaires ».</li>
+    <li>Maximum <strong>{{ max_probe }}</strong> bases testées par requête (sécurité / performance).</li>
+    <li>Ne pas utiliser sur une machine partagée sans confiance : le mot de passe transite vers le serveur Odoo cible.</li>
+  </ul>
+  <p class="sn-meta-line">
+    <strong>Auteur :</strong> Senedoo · <strong>Version :</strong> {{ util_version }} · <strong>Date :</strong> {{ util_date }}
+  </p>
+</details>
+
+<div class="sn-card sn-card--accent">
+  <form method="post" autocomplete="off">
+    <label for="odoo_url">URL du serveur Odoo</label>
+    <input type="url" id="odoo_url" name="odoo_url" required
+           value="{{ request.form.get('odoo_url', '') }}"
+           placeholder="https://votre-instance.odoo.com">
+
+    <label for="odoo_login">Login Odoo</label>
+    <input type="text" id="odoo_login" name="odoo_login" required
+           value="{{ request.form.get('odoo_login', '') }}" autocomplete="off">
+
+    <label for="odoo_password">Mot de passe</label>
+    <input type="password" id="odoo_password" name="odoo_password" value="" autocomplete="new-password"
+           placeholder="Saisie à chaque analyse (non mémorisée par l’appli)">
+
+    <label for="extra_databases">Bases supplémentaires à tester (optionnel)</label>
+    <textarea id="extra_databases" name="extra_databases" rows="3"
+              placeholder="Une base par ligne, ou séparées par virgule / point-virgule">{{ request.form.get('extra_databases', '') }}</textarea>
+
+    <button type="submit">Analyser les bases</button>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+  </form>
+</div>
+
+{% if result %}
+<div class="sn-card">
+  <h2 style="margin-top:0;font-size:1.1rem;">Résultat</h2>
+  {% if result.url_error %}
+  <div class="sn-flash danger">{{ result.url_error }}</div>
+  {% else %}
+  {% if result.server_version %}
+  <h3 style="font-size:0.95rem;color:var(--sn-muted);margin:0 0 0.5rem;">Version / infos serveur (common.version)</h3>
+  <pre class="sn-pre" style="max-height:10rem;">{{ result.server_version | tojson(indent=2) }}</pre>
+  {% endif %}
+  {% if result.db_list_error %}
+  <p class="sn-muted"><strong>db.list() :</strong> {{ result.db_list_error }} — poursuite avec les bases saisies manuellement éventuelles.</p>
+  {% endif %}
+  {% if result.truncated %}
+  <p class="sn-flash warning">Liste tronquée à {{ max_probe }} bases.</p>
+  {% endif %}
+  <p class="sn-muted">Bases candidates : <strong>{{ result.candidate_names|length }}</strong>
+    {% if result.candidate_names %}({{ result.candidate_names|join(', ') }}){% endif %}
+  </p>
+
+  {% if result.rows %}
+  <div class="sn-scroll-x">
+  <table class="sn-table">
+    <thead>
+      <tr>
+        <th>Base</th>
+        <th>Accès</th>
+        <th>UID</th>
+        <th>Module base</th>
+        <th>Sociétés (extrait)</th>
+        <th>Détails</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in result.rows %}
+      <tr>
+        <td><code>{{ r.database }}</code></td>
+        <td>{% if r.accessible %}<span class="sn-pill" style="background:rgba(52,211,153,0.2);color:var(--sn-success);">OK</span>{% else %}<span class="sn-muted">Non</span>{% endif %}</td>
+        <td>{% if r.uid %}{{ r.uid }}{% else %}—{% endif %}</td>
+        <td class="sn-muted" style="font-size:0.88rem;">{{ r.base_version or '—' }}</td>
+        <td style="font-size:0.88rem;max-width:14rem;">{% if r.companies %}{{ r.companies | join(' · ') }}{% else %}—{% endif %}</td>
+        <td style="font-size:0.85rem;">{{ r.detail or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
