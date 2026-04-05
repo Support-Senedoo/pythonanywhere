@@ -29,6 +29,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from account_report_portable import apply_record_field_translations
 from personalize_syscohada_detail import execute_kw
 
 _SN_OPEN_DEB = "sn_open_deb"
@@ -585,52 +586,83 @@ def personalize_balance_six_columns(
 
     fig_open = cols[0].get("figure_type") or "monetary"
 
-    def _norm_col_name(raw: Any, fr: str, en: str) -> Any:
+    def _norm_col_name_pair(raw: Any, fr: str, en: str) -> tuple[str, str]:
         if isinstance(raw, dict) and raw:
-            return raw
+            return (
+                str(raw.get("fr_FR") or fr),
+                str(raw.get("en_US") or en),
+            )
         if isinstance(raw, str) and raw.strip():
-            return raw
-        return {"fr_FR": fr, "en_US": en}
+            s = raw.strip()
+            return (s, s)
+        return (fr, en)
 
-    def _c(seq: int, name: Any, expr_lbl: str, fig: str) -> dict[str, Any]:
+    def _col_vals(seq: int, fr: str, expr_lbl: str, fig: str) -> dict[str, Any]:
         return {
             "report_id": report_id,
             "sequence": seq,
-            "name": name,
+            "name": fr,
             "expression_label": expr_lbl,
             "figure_type": fig,
             "sortable": False,
             "blank_if_zero": False,
         }
 
-    to_create = [
-        _c(10, {"fr_FR": "Débit initial", "en_US": "Opening debit"}, _SN_OPEN_DEB, fig_open),
-        _c(20, {"fr_FR": "Crédit initial", "en_US": "Opening credit"}, _SN_OPEN_CRE, fig_open),
-        _c(
-            30,
-            _norm_col_name(cols[1].get("name"), "Débit", "Debit")
-            if ncols == 4
-            else _norm_col_name(cols[0].get("name"), "Débit", "Debit"),
-            lbl_deb,
-            (cols[1].get("figure_type") or "monetary")
-            if ncols == 4
-            else (cols[0].get("figure_type") or "monetary"),
-        ),
-        _c(
-            40,
-            _norm_col_name(cols[2].get("name"), "Crédit", "Credit")
-            if ncols == 4
-            else _norm_col_name(cols[1].get("name"), "Crédit", "Credit"),
-            lbl_cred,
-            (cols[2].get("figure_type") or "monetary")
-            if ncols == 4
-            else (cols[1].get("figure_type") or "monetary"),
-        ),
-        _c(50, {"fr_FR": "Débit final", "en_US": "Closing debit"}, _SN_END_DEB, fig_open),
-        _c(60, {"fr_FR": "Crédit final", "en_US": "Closing credit"}, _SN_END_CRE, fig_open),
+    deb_fr, deb_en = (
+        _norm_col_name_pair(cols[1].get("name"), "Débit", "Debit")
+        if ncols == 4
+        else _norm_col_name_pair(cols[0].get("name"), "Débit", "Debit")
+    )
+    cred_fr, cred_en = (
+        _norm_col_name_pair(cols[2].get("name"), "Crédit", "Credit")
+        if ncols == 4
+        else _norm_col_name_pair(cols[1].get("name"), "Crédit", "Credit")
+    )
+    fig_deb = (
+        (cols[1].get("figure_type") or "monetary")
+        if ncols == 4
+        else (cols[0].get("figure_type") or "monetary")
+    )
+    fig_cred = (
+        (cols[2].get("figure_type") or "monetary")
+        if ncols == 4
+        else (cols[1].get("figure_type") or "monetary")
+    )
+
+    to_create_specs: list[tuple[int, str, str, str, str]] = [
+        (10, "Débit initial", "Opening debit", _SN_OPEN_DEB, fig_open),
+        (20, "Crédit initial", "Opening credit", _SN_OPEN_CRE, fig_open),
+        (30, deb_fr, deb_en, lbl_deb, fig_deb),
+        (40, cred_fr, cred_en, lbl_cred, fig_cred),
+        (50, "Débit final", "Closing debit", _SN_END_DEB, fig_open),
+        (60, "Crédit final", "Closing credit", _SN_END_CRE, fig_open),
     ]
-    for cv in to_create:
-        execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
+    ctx_fr = {"context": {"lang": "fr_FR"}}
+    for seq, fr_lbl, en_lbl, expr_lbl, fig in to_create_specs:
+        cv = _col_vals(seq, fr_lbl, expr_lbl, fig)
+        col_id = int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.column",
+                "create",
+                [cv],
+                ctx_fr,
+            )
+        )
+        apply_record_field_translations(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.column",
+            col_id,
+            "name",
+            fr_lbl,
+            en_lbl,
+        )
     try:
         names_end = _account_report_field_names(models, db, uid, password)
         execute_kw(

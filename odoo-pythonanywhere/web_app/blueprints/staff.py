@@ -43,6 +43,7 @@ from odoo_client import OdooClient, normalize_odoo_base_url
 from create_balance_6cols_via_api import (
     BALANCE_OHADA_NAME_FR,
     create_toolbox_balance_ohada,
+    find_all_balance_ohada_report_ids,
     find_balance_ohada_report_id,
 )
 from personalize_pl_analytic_budget import (
@@ -526,12 +527,18 @@ def _accounting_reports_page(accounting_mode: str):
             )
         if action == "create_balance_ohada" and accounting_mode == "balance":
             try:
+                prior_ohada = find_all_balance_ohada_report_ids(models, db, uid, pwd)
                 new_rid = create_toolbox_balance_ohada(models, db, uid, pwd)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
                 msg = (
                     f"« {rlabel or BALANCE_OHADA_NAME_FR} » créé sur Odoo "
                     f"(account.report id={new_rid}) — balance 6 colonnes OHADA."
                 )
+                if prior_ohada:
+                    msg += (
+                        " Une ou plusieurs instances précédentes (menus / actions inclus) "
+                        f"ont été retirées (anciens id : {', '.join(str(x) for x in prior_ohada)})."
+                    )
                 try:
                     _ba, menu_mid = ensure_account_report_reporting_menu(
                         models,

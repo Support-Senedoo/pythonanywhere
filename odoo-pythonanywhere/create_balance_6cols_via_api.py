@@ -14,6 +14,11 @@ négatif), pas nécessairement les bruts débit et crédit comme un vieux gabari
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
 
+**Rapport déjà créé avec des en-têtes ``{'fr_FR': ...}`` en clair :** anciennes versions
+passaient un dict via XML-RPC → Odoo stockait une chaîne. Supprimer le rapport depuis la
+toolbox et le recréer (ou réécrire les ``name`` des colonnes/lignes avec deux ``write``
+contexte ``fr_FR`` / ``en_US``, comme ``apply_record_field_translations``).
+
 Prérequis : comptabilité + rapports configurables (account_reports), droits de
 création sur ``account.report`` et sous-modèles.
 
@@ -42,7 +47,11 @@ try:
 except ImportError:
     pass
 
-from account_report_portable import apply_report_name_translations, execute_kw
+from account_report_portable import (
+    apply_record_field_translations,
+    apply_report_name_translations,
+    execute_kw,
+)
 from odoo_client import OdooClient
 
 # Rapport créé par la toolbox web (repère : account.report.line.code)
@@ -66,15 +75,15 @@ def _report_create_vals(field_names: set[str]) -> dict[str, Any]:
     return vals
 
 
-def _column(
+def _column_vals(
     sequence: int,
     fr: str,
-    en: str,
     expression_label: str,
 ) -> dict[str, Any]:
+    """Libellé FR seul à la création ; EN appliqué via ``apply_record_field_translations``."""
     return {
         "sequence": sequence,
-        "name": {"fr_FR": fr, "en_US": en},
+        "name": fr,
         "expression_label": expression_label,
         "figure_type": "monetary",
     }
@@ -147,13 +156,13 @@ def create_balance_six_columns_rpc(
 ) -> int:
     rep_fields = _fields(models, db, uid, password, "account.report")
 
-    cols_payload = [
-        _column(10, "Débit initial", "Opening debit", "debit_initial"),
-        _column(20, "Crédit initial", "Opening credit", "credit_initial"),
-        _column(30, "Débit", "Debit", "debit"),
-        _column(40, "Crédit", "Credit", "credit"),
-        _column(50, "Débit final", "Closing debit", "debit_final"),
-        _column(60, "Crédit final", "Closing credit", "credit_final"),
+    cols_spec = [
+        (10, "Débit initial", "Opening debit", "debit_initial"),
+        (20, "Crédit initial", "Opening credit", "credit_initial"),
+        (30, "Débit", "Debit", "debit"),
+        (40, "Crédit", "Credit", "credit"),
+        (50, "Débit final", "Closing debit", "debit_final"),
+        (60, "Crédit final", "Closing credit", "credit_final"),
     ]
 
     rep_vals = _report_create_vals(rep_fields)
@@ -182,16 +191,38 @@ def create_balance_six_columns_rpc(
         name_en,
     )
 
-    for cv in cols_payload:
-        cv = dict(cv)
+    for seq, fr_lbl, en_lbl, expr_lbl in cols_spec:
+        cv = _column_vals(seq, fr_lbl, expr_lbl)
         cv["report_id"] = report_id
-        execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
+        col_id = int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.column",
+                "create",
+                [cv],
+                {"context": {"lang": "fr_FR"}},
+            )
+        )
+        apply_record_field_translations(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.column",
+            col_id,
+            "name",
+            fr_lbl,
+            en_lbl,
+        )
 
     # Ligne parente sans groupby (Odoo 19 : aggregation + groupby interdit sur la même ligne).
     section_code = _section_line_code(line_code)
     parent_vals: dict[str, Any] = {
         "report_id": report_id,
-        "name": {"fr_FR": "Balance", "en_US": "Balance"},
+        "name": "Balance",
         "code": section_code,
         "sequence": 10,
     }
@@ -204,7 +235,19 @@ def create_balance_six_columns_rpc(
             "account.report.line",
             "create",
             [parent_vals],
+            {"context": {"lang": "fr_FR"}},
         )
+    )
+    apply_record_field_translations(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        parent_id,
+        "name",
+        "Balance",
+        "Balance",
     )
 
     exprs = _expressions_domain_grouped_line()
@@ -213,7 +256,7 @@ def create_balance_six_columns_rpc(
     child_vals: dict[str, Any] = {
         "report_id": report_id,
         "parent_id": parent_id,
-        "name": {"fr_FR": "Comptes", "en_US": "Accounts"},
+        "name": "Comptes",
         "code": line_code,
         "groupby": "account_id",
         "sequence": 20,
@@ -222,8 +265,20 @@ def create_balance_six_columns_rpc(
     if "foldable" in line_field_names:
         child_vals["foldable"] = True
 
+    ctx_fr = {"context": {"lang": "fr_FR"}}
     try:
-        execute_kw(models, db, uid, password, "account.report.line", "create", [child_vals])
+        child_id = int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.line",
+                "create",
+                [child_vals],
+                ctx_fr,
+            )
+        )
     except Exception:
         child_vals.pop("expression_ids", None)
         child_id = int(
@@ -235,6 +290,7 @@ def create_balance_six_columns_rpc(
                 "account.report.line",
                 "create",
                 [child_vals],
+                ctx_fr,
             )
         )
         for e in exprs:
@@ -249,6 +305,18 @@ def create_balance_six_columns_rpc(
                 "create",
                 [ev],
             )
+
+    apply_record_field_translations(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        child_id,
+        "name",
+        "Comptes",
+        "Accounts",
+    )
 
     return report_id
 
@@ -272,17 +340,17 @@ def create_balance_six_columns(
     )
 
 
-def find_balance_ohada_report_id(
+def find_all_balance_ohada_report_ids(
     models: Any,
     db: str,
     uid: int,
     password: str,
     *,
     line_code: str = BALANCE_OHADA_LINE_CODE,
-) -> int | None:
+) -> list[int]:
     """
-    Retourne l'id ``account.report`` du rapport toolbox OHADA, identifié par le code
-    de ligne feuille (défaut ``bal_ohada``).
+    Tous les ``account.report`` qui contiennent une ligne feuille avec ce ``code``
+    (défaut ``bal_ohada``), triés par id croissant.
     """
     line_ids = execute_kw(
         models,
@@ -292,10 +360,9 @@ def find_balance_ohada_report_id(
         "account.report.line",
         "search",
         [[("code", "=", line_code)]],
-        {"limit": 20},
     )
     if not line_ids:
-        return None
+        return []
     report_ids: set[int] = set()
     rows = execute_kw(
         models,
@@ -314,11 +381,27 @@ def find_balance_ohada_report_id(
                 report_ids.add(int(r[0]))
             except (TypeError, ValueError):
                 pass
-    if not report_ids:
+    return sorted(report_ids)
+
+
+def find_balance_ohada_report_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    *,
+    line_code: str = BALANCE_OHADA_LINE_CODE,
+) -> int | None:
+    """
+    Retourne un id ``account.report`` toolbox OHADA (repère : ligne ``bal_ohada``).
+    S’il y en a plusieurs, retourne le plus petit id (affichage / liens).
+    """
+    ids = find_all_balance_ohada_report_ids(
+        models, db, uid, password, line_code=line_code
+    )
+    if not ids:
         return None
-    if len(report_ids) > 1:
-        return min(report_ids)
-    return report_ids.pop()
+    return min(ids) if len(ids) > 1 else ids[0]
 
 
 def create_toolbox_balance_ohada(
@@ -327,13 +410,16 @@ def create_toolbox_balance_ohada(
     uid: int,
     password: str,
 ) -> int:
-    """Crée « Balance OHADA » si absent. Lève ``ValueError`` si un rapport ``bal_ohada`` existe déjà."""
-    existing = find_balance_ohada_report_id(models, db, uid, password)
-    if existing is not None:
-        raise ValueError(
-            f"Un rapport Balance OHADA existe déjà sur cette base (account.report id={existing}). "
-            "Supprimez-le depuis la toolbox avant d’en créer un autre."
-        )
+    """
+    Retire toute instance existante (rapport, menus et actions client liés), puis crée
+    « Balance OHADA » à neuf.
+    """
+    from web_app.odoo_account_reports import unlink_account_report
+
+    for rid in sorted(
+        find_all_balance_ohada_report_ids(models, db, uid, password), reverse=True
+    ):
+        unlink_account_report(models, db, uid, password, rid)
     return create_balance_six_columns_rpc(
         models,
         db,

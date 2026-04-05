@@ -115,10 +115,10 @@
 <details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi — Balance OHADA</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Créer sur la base un nouveau rapport comptable nommé <strong>Balance OHADA</strong> (six colonnes : débit/crédit initiaux, débit/crédit période, débit/crédit finaux), sans partir d’une copie d’un rapport existant. La toolbox peut aussi <strong>supprimer</strong> ce rapport (et menus / actions liés) sur Odoo.
+    <strong>But.</strong> Créer sur la base un rapport comptable nommé <strong>Balance OHADA</strong> (six colonnes : débit/crédit initiaux, débit/crédit période, débit/crédit finaux), sans partir d’une copie d’un rapport existant. Une <strong>nouvelle création</strong> retire d’abord toute instance existante (repère <code>bal_ohada</code>), y compris les entrées de menu et actions client associées. La toolbox propose aussi une <strong>suppression seule</strong> avec confirmation.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    Repère technique : ligne feuille <code>account.report.line</code> avec <code>code = bal_ohada</code>. Une seule instance par base : si elle existe déjà, supprimez-la avant une nouvelle création.
+    Repère technique : ligne feuille <code>account.report.line</code> avec <code>code = bal_ohada</code>.
   </p>
   <p style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     <strong>Alternatives hors navigateur :</strong> script <code>create_balance_6cols_via_api.py</code>,
@@ -529,7 +529,7 @@
   {% if accounting_mode == 'balance' %}
   <h2 style="margin-top:0;font-size:1.1rem;">Balance OHADA</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
-    Crée un <strong>nouveau</strong> <code>account.report</code> nommé « Balance OHADA » (six colonnes, ligne feuille <code>bal_ohada</code>), ou supprime ce rapport sur Odoo (menus / actions liés inclus).
+    Crée un <code>account.report</code> « Balance OHADA » (six colonnes, ligne <code>bal_ohada</code>). Si un rapport toolbox existe déjà, il est <strong>d’abord supprimé</strong> (menus / actions liés inclus), puis recréé. Vous pouvez aussi ne faire que la suppression via le formulaire ci-dessous.
   </p>
   {% if conn_status == 'ok' %}
     {% if balance_ohada_report_id %}
@@ -546,11 +546,11 @@
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
     <input type="hidden" name="action" value="create_balance_ohada">
     <button type="submit" class="sn-btn" style="margin-top:0.25rem;"
-      {% if conn_status != 'ok' or balance_ohada_report_id %}disabled{% endif %}>
-      Créer Balance OHADA sur Odoo
+      {% if conn_status != 'ok' %}disabled{% endif %}>
+      {% if balance_ohada_report_id %}Recréer{% else %}Créer{% endif %} Balance OHADA sur Odoo
     </button>
     {% if balance_ohada_report_id %}
-    <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.85rem;">Supprimez d’abord le rapport existant pour en créer un autre.</p>
+    <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.85rem;">L’instance actuelle (id {{ balance_ohada_report_id }}) sera remplacée.</p>
     {% endif %}
   </form>
   {% if balance_ohada_report_id %}

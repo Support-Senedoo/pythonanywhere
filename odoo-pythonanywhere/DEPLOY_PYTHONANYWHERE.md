@@ -214,7 +214,7 @@ Host pythonanywhere
 - **Suppression depuis la toolbox** : avant `account.report.unlink`, le code retire les **`ir.ui.menu`** pointant sur l’action **`ir.actions.client`** (tag `account_report`, contexte avec ce `report_id`), puis supprime ces actions — évite les entrées de menu orphelines (`web_app/odoo_account_reports.py` : `unlink_account_report`).
 - Fichier principal : **`web_app/odoo_account_reports.py`**. Métadonnées **version** / **date** / **auteur** : **`web_app/app_version.py`** (et env `TOOLBOX_APP_*`, voir **`toolbox-env-exemple.txt`**).
 - **Compte de résultat personnalisé (SYSCOHADA / détail comptes)** : `/staff/utilities/rapports-comptables` (alias `/staff/utilities/personalize-report`) — liste des rapports, copie + [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py). Champ optionnel renommage copie avant menu ; suppression avec confirmation `SUPPRIMER-<id>`.
-- **Balance OHADA (6 colonnes)** : `/staff/utilities/personalize-balance` — **pas** de liste de rapports sur cette page. Création d’un **`account.report`** neuf « Balance OHADA » via [`create_balance_6cols_via_api.py`](create_balance_6cols_via_api.py) (`create_toolbox_balance_ohada`, ligne feuille **`bal_ohada`**), suppression dédiée avec confirmation **`SUPPRIMER-BALANCE-OHADA`**. Après création : **`ensure_account_report_reporting_menu`** sous **Grands livres** si les droits le permettent. L’ancien flux « copie + [`personalize_balance_6cols.py`](personalize_balance_6cols.py) » n’est plus exposé dans l’UI ; le module reste dans le dépôt pour référence éventuelle.
+- **Balance OHADA (6 colonnes)** : `/staff/utilities/personalize-balance` — **pas** de liste de rapports sur cette page. **`create_toolbox_balance_ohada`** retire d’abord toute instance existante (repère ligne **`bal_ohada`**) via **`unlink_account_report`** (menus + actions client), puis crée un **`account.report`** neuf. Suppression seule toujours possible avec confirmation **`SUPPRIMER-BALANCE-OHADA`**. Après création : **`ensure_account_report_reporting_menu`** sous **Grands livres** si les droits le permettent. L’ancien flux « copie + [`personalize_balance_6cols.py`](personalize_balance_6cols.py) » n’est plus exposé dans l’UI ; le module reste dans le dépôt pour référence éventuelle.
 - **P&L analytique et budget (Odoo SaaS)** : `/staff/utilities/personalize-pl-budget` — même détail comptes, puis options `filter_analytic` / `filter_budget` via [`personalize_pl_analytic_budget.py`](personalize_pl_analytic_budget.py). **Sonde budget / analytique** (lecture seule) sur cette page uniquement.
 - **CLI (hors Flask)** : `python personalize_pl_analytic_budget.py --report-id <id>` sur une copie déjà créée ; `--probe-only` pour la sonde seule.
 
@@ -232,7 +232,7 @@ Host pythonanywhere
 
 ---
 
-*Dernière mise à jour de cette section : avril 2026 — Balance OHADA : création / suppression web (`bal_ohada`) ; P&L inchangé (liste + copie) ; `deploy_pa.ps1 -SkipGitPush` ; Reload Web si pas de token API reload.*
+*Dernière mise à jour de cette section : avril 2026 — Balance OHADA : création remplace l’existant + suppression web (`bal_ohada`) ; P&L inchangé (liste + copie) ; `deploy_pa.ps1 -SkipGitPush` ; Reload Web si pas de token API reload.*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 

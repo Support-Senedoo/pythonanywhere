@@ -385,6 +385,48 @@ def _resolve_import_names(
     return fr, en
 
 
+def apply_record_field_translations(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    model: str,
+    record_id: int,
+    field: str,
+    fr: str,
+    en: str,
+) -> None:
+    """
+    Écrit un champ traduit (Char translate=True) en fr_FR et en_US.
+
+    Via XML-RPC, passer un dict ``{\"fr_FR\": ..., \"en_US\": ...}`` est souvent stocké
+    comme chaîne (repr Python) : l’UI affiche alors ``{'fr_FR': '…'}``. D’où deux
+    ``write`` avec contexte langue, comme pour le nom du rapport.
+    """
+    fr = (fr or "").strip() or "—"
+    en = (en or "").strip() or fr
+    execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        model,
+        "write",
+        [[record_id], {field: fr}],
+        {"context": {"lang": "fr_FR"}},
+    )
+    execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        model,
+        "write",
+        [[record_id], {field: en}],
+        {"context": {"lang": "en_US"}},
+    )
+
+
 def apply_report_name_translations(
     models: Any,
     db: str,
@@ -403,25 +445,8 @@ def apply_report_name_translations(
     """
     fr = (fr or "").strip() or "Rapport"
     en = (en or "").strip() or fr
-    execute_kw(
-        models,
-        db,
-        uid,
-        password,
-        "account.report",
-        "write",
-        [[report_id], {"name": fr}],
-        {"context": {"lang": "fr_FR"}},
-    )
-    execute_kw(
-        models,
-        db,
-        uid,
-        password,
-        "account.report",
-        "write",
-        [[report_id], {"name": en}],
-        {"context": {"lang": "en_US"}},
+    apply_record_field_translations(
+        models, db, uid, password, "account.report", report_id, "name", fr, en
     )
 
 
