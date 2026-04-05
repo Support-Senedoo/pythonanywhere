@@ -10,25 +10,18 @@ Sources supportées :
     Vérifier les montants sur une base test : selon les sous-formules du rapport,
     l’écart avec une balance 4 colonnes « native » peut varier.
 
-Odoo Enterprise (balance d’essai) : le handler attache des totaux « unaffected earnings » à chaque
-``expression_label``. Les colonnes ``sn_*`` provoquent un ``KeyError`` (ex. ``sn_open_deb``) si la copie
-reste une **variante** (``root_report_id``) : le post-processeur s’aligne sur le schéma racine
-(4 colonnes) alors que l’affichage utilise les 6 colonnes. Dès qu’un ``root_report_id`` est présent,
-la toolbox le **vide sans condition sur le handler** (sur Odoo 19 SaaS le modèle technique peut ne pas
-contenir « trial_balance »), **avant** les colonnes `sn_*`. Après ``copy``, ``duplicate_account_report``
-avec ``attach_to_root=False`` force aussi ``root_report_id`` à vide une fois les options recopiées.
-Les filtres sont resynchronisés depuis la racine au détachement. Sur Odoo 17+, le champ
-``section_main_report_ids`` (« Section de ») peut aussi faire hériter le comportement d’un rapport
-composite : il est **vidé** en même temps que ``root_report_id``, sinon le post-processeur trial balance
-peut continuer à indexer les totaux sur le schéma d’origine → ``KeyError: sn_open_deb``.
+Odoo Enterprise (balance d’essai) : le **handler** du rapport (``custom_handler_model_*``) fournit le
+moteur ``_report_custom_engine_trial_balance`` pour les lignes concernées. **Ne pas le vider** : sans
+handler, Odoo lève « Méthode invalide ``_report_custom_engine_trial_balance`` ».
 
-Après création des 6 colonnes, la toolbox **vide le handler personnalisé** (champs
-``custom_handler_model_id`` / ``custom_handler_model_name``) : sur Odoo 19 Enterprise, le
-post-processeur trial balance lève un ``KeyError`` sur les ``sn_*`` car il ne remplit
-``unaffected_earning_values`` que pour le schéma d’origine. Sans ce handler, le moteur des lignes
-« trial balance » continue de calculer les montants ; seul l’ajustement « unaffected earnings » de
-ce post-traitement est sauté. Si Odoo affiche encore « Méthode invalide » sur une base atypique,
-signaler la version exacte.
+Le handler attache aussi des totaux « unaffected earnings » par ``expression_label``. Les colonnes
+``sn_*`` peuvent provoquer un ``KeyError`` (ex. ``sn_open_deb``) si la copie reste une **variante**
+(``root_report_id``) : le post-processeur peut s’aligner sur le schéma racine (4 colonnes) alors que
+l’affichage utilise 6 colonnes. La toolbox **vide ``root_report_id`` et ``section_main_report_ids``**
+(**avant** les colonnes ``sn_*``), et la duplication avec ``attach_to_root=False`` réitère un rapport
+**autonome** après recopie des options. Les filtres sont resynchronisés depuis la racine au détachement.
+Si un ``KeyError`` sur ``sn_*`` persiste malgré cela, signaler la version Odoo exacte (limitation
+côté post-processeur Enterprise).
 """
 from __future__ import annotations
 
@@ -77,56 +70,6 @@ def _standalone_account_report_write_vals(names: set[str]) -> dict[str, Any]:
     if "section_main_report_ids" in names:
         vals["section_main_report_ids"] = [(5, 0, 0)]
     return vals
-
-
-def _clear_trial_balance_custom_handler_after_six_columns(
-    models: Any,
-    db: str,
-    uid: int,
-    password: str,
-    report_id: int,
-) -> dict[str, Any]:
-    """
-    Odoo 19 Enterprise : ``account_trial_balance_report._custom_line_postprocessor`` fait
-    ``unaffected_earning_values[…][expression_label]`` pour chaque colonne ; les clés ne couvrent
-    pas les ``sn_*`` → ``KeyError: sn_open_deb``. Vider le handler évite cet appel ; les lignes au
-    moteur ``_report_custom_engine_trial_balance`` restent en place.
-    """
-    names = _account_report_field_names(models, db, uid, password)
-    vals: dict[str, Any] = {}
-    if "custom_handler_model_id" in names:
-        vals["custom_handler_model_id"] = False
-    if "custom_handler_model_name" in names:
-        vals["custom_handler_model_name"] = False
-    if not vals:
-        return {"handler_cleared": False, "handler_note": "champs handler absents sur account.report"}
-    try:
-        execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report",
-            "write",
-            [[report_id], vals],
-        )
-        return {"handler_cleared": True}
-    except Exception as e:
-        if "custom_handler_model_id" in names and len(vals) > 1:
-            try:
-                execute_kw(
-                    models,
-                    db,
-                    uid,
-                    password,
-                    "account.report",
-                    "write",
-                    [[report_id], {"custom_handler_model_id": False}],
-                )
-                return {"handler_cleared": True, "handler_note": "id seul (name readonly)"}
-            except Exception as e2:
-                return {"handler_cleared": False, "handler_error": str(e2)}
-        return {"handler_cleared": False, "handler_error": str(e)}
 
 
 def _detach_trial_balance_variant_after_six_columns(
@@ -628,7 +571,4 @@ def personalize_balance_six_columns(
         )
     except Exception:
         pass
-    handler_meta = _clear_trial_balance_custom_handler_after_six_columns(
-        models, db, uid, password, report_id
-    )
-    return {**detach_meta, **handler_meta}
+    return detach_meta
