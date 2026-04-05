@@ -1,6 +1,7 @@
 """Espace Senedoo : choix client / apps + utilitaires (personnalisation rapport)."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -12,6 +13,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -38,7 +40,11 @@ from web_app.pointage_import_util import (
     safe_upload_filename,
 )
 from odoo_client import OdooClient, normalize_odoo_base_url
-from personalize_balance_6cols import personalize_balance_six_columns
+from create_balance_6cols_via_api import (
+    BALANCE_OHADA_NAME_FR,
+    create_toolbox_balance_ohada,
+    find_balance_ohada_report_id,
+)
 from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
     probe_financial_budget_analytic_summary,
@@ -518,45 +524,14 @@ def _accounting_reports_page(accounting_mode: str):
                     ),
                 )
             )
-        if action == "personalize_balance" and accounting_mode == "balance":
+        if action == "create_balance_ohada" and accounting_mode == "balance":
             try:
-                rid = int(request.form.get("report_id") or "0")
-            except ValueError:
-                rid = 0
-            if rid <= 0:
-                flash("Indiquez un identifiant de rapport balance (account.report) valide.", "danger")
-                return redirect(
-                    ru(
-                        **_rapports_url_params(client_id=cid, q=filter_q, filter_host=fl_save),
-                    )
-                )
-            try:
-                new_rid = duplicate_account_report(
-                    models,
-                    db,
-                    uid,
-                    pwd,
-                    rid,
-                    name_suffix=" — copie Senedoo (6 col.)",
-                    attach_to_root=False,
-                )
-                bal_meta = personalize_balance_six_columns(models, db, uid, pwd, new_rid)
-                copy_display_name = (request.form.get("copy_display_name") or "").strip()
-                if copy_display_name:
-                    write_account_report_name(
-                        models, db, uid, pwd, new_rid, copy_display_name
-                    )
-                src_label = read_account_report_label(models, db, uid, pwd, rid)
+                new_rid = create_toolbox_balance_ohada(models, db, uid, pwd)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
                 msg = (
-                    f"Balance : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »), "
-                    f"6 colonnes (débit/crédit initiaux et finaux). Copie autonome (sans lien racine Odoo), "
-                    f"pour éviter les erreurs Enterprise sur les colonnes supplémentaires. L’original n’a pas été modifié."
+                    f"« {rlabel or BALANCE_OHADA_NAME_FR} » créé sur Odoo "
+                    f"(account.report id={new_rid}) — balance 6 colonnes OHADA."
                 )
-                if bal_meta.get("detach_error"):
-                    msg += (
-                        f" Note : post-traitement racine Enterprise : {bal_meta['detach_error']!s}."
-                    )
                 try:
                     _ba, menu_mid = ensure_account_report_reporting_menu(
                         models,
@@ -564,25 +539,24 @@ def _accounting_reports_page(accounting_mode: str):
                         uid,
                         pwd,
                         new_rid,
-                        rlabel,
+                        (rlabel or BALANCE_OHADA_NAME_FR).strip()[:240] or BALANCE_OHADA_NAME_FR,
                         under_trial_balance=True,
                     )
                     if menu_mid:
                         msg += (
-                            " Une entrée de menu a été créée dans le sous-menu Grands livres "
-                            "(Analyse › …, libellés selon la langue Odoo) — ouvrez-la pour lancer l’analyse."
+                            " Une entrée de menu a été ajoutée sous Grands livres "
+                            "(selon droits Odoo) — utilisez le lien ci-dessous pour l’analyse."
                         )
                 except Exception:
                     pass
                 flash(msg, "success")
             except Exception as e:
-                flash(f"Échec personnalisation balance : {e!s}", "danger")
+                flash(f"Échec création Balance OHADA : {e!s}", "danger")
                 return redirect(
                     ru(
                         **_rapports_url_params(
                             client_id=cid,
                             q=filter_q,
-                            report_id=rid if rid > 0 else None,
                             filter_host=fl_save,
                         ),
                     )
@@ -595,6 +569,60 @@ def _accounting_reports_page(accounting_mode: str):
                         report_id=new_rid,
                         filter_host=fl_save,
                         balance_done=True,
+                    ),
+                )
+            )
+        if action == "unlink_balance_ohada" and accounting_mode == "balance":
+            if (request.form.get("confirm_delete") or "").strip() != "SUPPRIMER-BALANCE-OHADA":
+                flash(
+                    "Confirmation incorrecte : saisissez exactement SUPPRIMER-BALANCE-OHADA.",
+                    "danger",
+                )
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            ohada_id = find_balance_ohada_report_id(models, db, uid, pwd)
+            if not ohada_id:
+                flash(
+                    "Aucun rapport Balance OHADA sur cette base (repère : ligne feuille code bal_ohada).",
+                    "warning",
+                )
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            try:
+                rlabel = read_account_report_label(models, db, uid, pwd, ohada_id)
+                meta = unlink_account_report(models, db, uid, pwd, ohada_id)
+                extra = ""
+                if meta.get("menus_unlinked") or meta.get("client_actions_unlinked"):
+                    extra = (
+                        f" Menus Odoo : {meta.get('menus_unlinked', 0)}, "
+                        f"actions client : {meta.get('client_actions_unlinked', 0)}."
+                    )
+                flash(
+                    f"Balance OHADA supprimée (« {rlabel} », id={ohada_id}).{extra}",
+                    "success",
+                )
+            except Exception as e:
+                flash(f"Suppression impossible : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        filter_host=fl_save,
                     ),
                 )
             )
@@ -705,6 +733,7 @@ def _accounting_reports_page(accounting_mode: str):
     conn_status = "idle"
     conn_detail = ""
     reports: list = []
+    balance_ohada_report_id: int | None = None
     instance_meta_rows: list[tuple[str, str]] = []
     label_picker_rows: list[dict[str, Any]] = []
     sibling_rows: list[dict[str, Any]] = []
@@ -739,7 +768,13 @@ def _accounting_reports_page(accounting_mode: str):
             conn_detail = msg
             if ok:
                 conn_status = "ok"
-                reports = search_account_reports(models, db, uid, pwd, filter_q)
+                if accounting_mode == "balance":
+                    reports = []
+                    balance_ohada_report_id = find_balance_ohada_report_id(
+                        models, db, uid, pwd
+                    )
+                else:
+                    reports = search_account_reports(models, db, uid, pwd, filter_q)
                 try:
                     instance_meta_rows = collect_authenticated_instance_metadata(
                         models, db, uid, pwd, reg[selected].url
@@ -824,12 +859,35 @@ def _accounting_reports_page(accounting_mode: str):
         and cid_param in reg
     ):
         runner_client = cid_param
+
+    brid_for_balance_links: int | None = None
+    if accounting_mode == "balance" and selected in reg and conn_status == "ok":
+        brid_for_balance_links = balance_ohada_report_id
+        if balance_done_q and prefill_rid and prefill_rid > 0:
+            brid_for_balance_links = int(prefill_rid)
+
+    if (
+        accounting_mode == "balance"
+        and selected in reg
+        and conn_status == "ok"
+        and brid_for_balance_links
+        and brid_for_balance_links > 0
+        and not (prefill_report_name or "").strip()
+    ):
+        try:
+            m, dbn, u, p = get_xmlrpc_for_staff_client_id(selected)
+            prefill_report_name = (
+                read_account_report_label(m, dbn, u, p, int(brid_for_balance_links)) or ""
+            ).strip()
+        except Exception:
+            prefill_report_name = ""
+
     balance_show_links = (
         accounting_mode == "balance"
-        and balance_done_q
-        and runner_client
-        and prefill_rid
-        and prefill_rid > 0
+        and runner_client in reg
+        and conn_status == "ok"
+        and brid_for_balance_links is not None
+        and brid_for_balance_links > 0
     )
     balance_exec_url = ""
     balance_form_url = ""
@@ -837,14 +895,18 @@ def _accounting_reports_page(accounting_mode: str):
     balance_menu_id: int | None = None
     if balance_show_links:
         bu = reg[runner_client].url
-        brid = int(prefill_rid)
+        brid = int(brid_for_balance_links or 0)
         balance_form_url = account_report_odoo_form_url(bu, brid)
         try:
             m, dbn, u, p = get_xmlrpc_for_staff_client_id(runner_client)
             list_aid = find_account_report_backend_list_action_id(m, dbn, u, p)
             if list_aid:
                 balance_list_url = account_report_backend_list_url(bu, list_aid)
-            act_name = (prefill_report_name or f"Balance id={brid}").strip()[:240] or f"Rapport {brid}"
+            act_name = (
+                (prefill_report_name or BALANCE_OHADA_NAME_FR or f"Rapport {brid}")
+                .strip()[:240]
+                or f"Rapport {brid}"
+            )
             aid, menu_mid = ensure_account_report_reporting_menu(
                 m,
                 dbn,
@@ -881,6 +943,7 @@ def _accounting_reports_page(accounting_mode: str):
         balance_form_url=balance_form_url,
         balance_list_url=balance_list_url,
         balance_menu_id=balance_menu_id,
+        balance_ohada_report_id=balance_ohada_report_id,
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,
         instance_meta_rows=instance_meta_rows,
@@ -913,3 +976,23 @@ def rapports_pl_budget():
 @login_required_staff
 def rapports_balance():
     return _accounting_reports_page("balance")
+
+
+_BALANCE_6COL_EXAMPLE_XML = (
+    Path(__file__).resolve().parents[2] / "examples" / "balance_generale_6_col_studio.example.xml"
+)
+
+
+@bp.route("/utilities/balance-6col-example.xml", methods=["GET"])
+@login_required_staff
+def download_balance_6col_example_xml():
+    """Gabarit XML balance 6 colonnes (Studio / module) — pas d’import automatique vers Odoo."""
+    if not _BALANCE_6COL_EXAMPLE_XML.is_file():
+        abort(404)
+    return send_file(
+        _BALANCE_6COL_EXAMPLE_XML,
+        as_attachment=True,
+        download_name="balance_generale_6_col_studio.example.xml",
+        mimetype="application/xml",
+        max_age=0,
+    )

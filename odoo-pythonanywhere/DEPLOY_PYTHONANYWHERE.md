@@ -15,7 +15,7 @@ si vous clonez le repo dans `/home/senedoo/pythonanywhere`. (Si vous ne gardez q
 ## Ce qui est déployé (état attendu)
 
 - **Application** : Flask « toolbox » (`web_app`), WSGI = **`pythonanywhere_wsgi.py`** ou **`pa_wsgi.py`** (équivalent).
-- **Portails** : accueil `/` (client / Senedoo), login, espace client sous `/client/`, staff sous `/staff/`, utilitaires rapports sous `/staff/utilities/` (liste : `utilities` ; P&L SYSCOHADA : `rapports-comptables` / `personalize-report` ; balance 6 col. : `personalize-balance` ; P&L budget : `personalize-pl-budget`).
+- **Portails** : accueil `/` (client / Senedoo), login, espace client sous `/client/`, staff sous `/staff/`, utilitaires rapports sous `/staff/utilities/` (liste : `utilities` ; P&L SYSCOHADA : `rapports-comptables` / `personalize-report` ; **Balance OHADA** (création / suppression rapport neuf) : `personalize-balance` ; P&L budget : `personalize-pl-budget`).
 - **Secrets sur le serveur uniquement** (jamais dans Git) :
   - `toolbox_users.json` — comptes + `password_hash` (Werkzeug)
   - `toolbox_clients.json` — URL / base / user API Odoo par `client_id`
@@ -212,11 +212,9 @@ Host pythonanywhere
 ### Utilitaires personnalisation rapports (`account.report`)
 
 - **Suppression depuis la toolbox** : avant `account.report.unlink`, le code retire les **`ir.ui.menu`** pointant sur l’action **`ir.actions.client`** (tag `account_report`, contexte avec ce `report_id`), puis supprime ces actions — évite les entrées de menu orphelines (`web_app/odoo_account_reports.py` : `unlink_account_report`).
-- **Balance 6 col. — nom menu = nom rapport** : champ optionnel **`copy_display_name`** sur le formulaire ; renommage de la copie **avant** `ensure_account_report_reporting_menu`. Les actions client existantes sont resynchronisées (`ensure_account_report_client_action` + `sync_menu_labels_for_client_action`).
-
 - Fichier principal : **`web_app/odoo_account_reports.py`**. Métadonnées **version** / **date** / **auteur** : **`web_app/app_version.py`** (et env `TOOLBOX_APP_*`, voir **`toolbox-env-exemple.txt`**).
-- **Compte de résultat personnalisé (SYSCOHADA / détail comptes)** : `/staff/utilities/rapports-comptables` (alias `/staff/utilities/personalize-report`) — copie + [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py).
-- **Balance 6 colonnes** : `/staff/utilities/personalize-balance` — [`personalize_balance_6cols.py`](personalize_balance_6cols.py). La copie est **`attach_to_root=False`** (rapport **autonome**, limite les `KeyError` Enterprise type `sn_open_deb` / trial balance). Le script **vide `root_report_id` et `section_main_report_ids`** (« Section de ») en premier, puis réécrit les options depuis la racine si besoin ; la duplication autonome fait de même après recopie des options. Réécriture **autonome** répétée en fin de script. **Handler trial balance** : **conservé** (sans lui, erreur « Méthode invalide `_report_custom_engine_trial_balance` » sur les lignes concernées). Le post-processeur Enterprise attend des libellés de colonne du type `debit` / `credit` / `balance` pour les blocs initial/période : des libellés `sn_*` peuvent encore provoquer un `KeyError` ; **alternative** documentée sur la page staff (Odoo v19 : moteur `aggregation`, `subformula` `positive` / `negative`, option **Inclure le solde initial**, `groupby` compte ; gabarit XML [`examples/balance_generale_6_col_studio.example.xml`](examples/balance_generale_6_col_studio.example.xml)). Copie déjà cassée (handler vide) : refaire une copie avec la toolbox à jour ou réaligner le handler sur la balance standard ; on peut aussi vider **Racine du rapport** / **Section de** depuis les rapports comptables. Après succès : création **`ir.actions.client`** + entrée **`ir.ui.menu`** dans le sous-menu **Grands livres** (parent = celui du **Grand livre général** si xmlid `menu_action_account_report_general_ledger` ; fin de liste des enfants ; repli après balance comptable puis **Reporting**), lien **`/web#menu_id=…&action=…`**, liste **`account.report`** en secours. Plus de confirmation « OUI » sur les formulaires copie (le bouton suffit).
+- **Compte de résultat personnalisé (SYSCOHADA / détail comptes)** : `/staff/utilities/rapports-comptables` (alias `/staff/utilities/personalize-report`) — liste des rapports, copie + [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py). Champ optionnel renommage copie avant menu ; suppression avec confirmation `SUPPRIMER-<id>`.
+- **Balance OHADA (6 colonnes)** : `/staff/utilities/personalize-balance` — **pas** de liste de rapports sur cette page. Création d’un **`account.report`** neuf « Balance OHADA » via [`create_balance_6cols_via_api.py`](create_balance_6cols_via_api.py) (`create_toolbox_balance_ohada`, ligne feuille **`bal_ohada`**), suppression dédiée avec confirmation **`SUPPRIMER-BALANCE-OHADA`**. Après création : **`ensure_account_report_reporting_menu`** sous **Grands livres** si les droits le permettent. L’ancien flux « copie + [`personalize_balance_6cols.py`](personalize_balance_6cols.py) » n’est plus exposé dans l’UI ; le module reste dans le dépôt pour référence éventuelle.
 - **P&L analytique et budget (Odoo SaaS)** : `/staff/utilities/personalize-pl-budget` — même détail comptes, puis options `filter_analytic` / `filter_budget` via [`personalize_pl_analytic_budget.py`](personalize_pl_analytic_budget.py). **Sonde budget / analytique** (lecture seule) sur cette page uniquement.
 - **CLI (hors Flask)** : `python personalize_pl_analytic_budget.py --report-id <id>` sur une copie déjà créée ; `--probe-only` pour la sonde seule.
 
@@ -234,7 +232,7 @@ Host pythonanywhere
 
 ---
 
-*Dernière mise à jour de cette section : avril 2026 — balance 6 col. : handler trial balance conservé (évite « Méthode invalide ») ; menu groupe Grands livres (ancrage Grand livre) ; sans confirmation OUI ; détachement racine avant `sn_*` ; `deploy_pa.ps1 -SkipGitPush` ; Reload Web si pas de token API reload.*
+*Dernière mise à jour de cette section : avril 2026 — Balance OHADA : création / suppression web (`bal_ohada`) ; P&L inchangé (liste + copie) ; `deploy_pa.ps1 -SkipGitPush` ; Reload Web si pas de token API reload.*
 
 ## Générer un hash mot de passe (utilisateurs toolbox)
 

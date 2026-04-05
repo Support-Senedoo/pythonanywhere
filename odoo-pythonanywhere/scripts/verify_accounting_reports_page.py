@@ -41,7 +41,7 @@ REQUIRED_PL_STANDARD_BASE = [
 
 REQUIRED_BALANCE_PAGE = REQUIRED_COMMON + [
     "6 colonnes",
-    "Balance comptable — 6 colonnes",
+    "Balance OHADA",
 ]
 
 REQUIRED_PL_BUDGET_BASE = [
@@ -50,8 +50,9 @@ REQUIRED_PL_BUDGET_BASE = [
 ]
 
 REQUIRED_BALANCE_WITH_CLIENT_EXTRA = [
-    'id="form-personalize-balance"',
-    'value="personalize_balance"',
+    'id="form-create-balance-ohada"',
+    'value="create_balance_ohada"',
+    "Créer Balance OHADA sur Odoo",
 ]
 
 REQUIRED_WITH_CLIENT_PL_STANDARD = [
@@ -109,7 +110,7 @@ def verify_local() -> int:
         (
             "/staff/utilities/personalize-balance",
             REQUIRED_BALANCE_PAGE,
-            REQUIRED_BALANCE_WITH_CLIENT_EXTRA + ["Ouvrir dans Odoo", 'id="sn-reports-list"'],
+            REQUIRED_BALANCE_WITH_CLIENT_EXTRA,
         ),
     ]
 

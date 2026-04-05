@@ -3,33 +3,26 @@
 Transforme une copie de balance (account.report) en 6 colonnes :
   débit initial, crédit initial, débit période, crédit période, débit final, crédit final.
 
-Sources supportées :
-  - 4 colonnes (solde initial, débit, crédit, solde final) : comportement historique ;
-  - 2 colonnes (débit et crédit sur la période uniquement) : ajout d’expressions
-    dupliquées avec date_scope Odoo ``to_beginning_of_period`` et ``from_beginning``.
-    Vérifier les montants sur une base test : selon les sous-formules du rapport,
-    l’écart avec une balance 4 colonnes « native » peut varier.
+**Interface web :** le bouton staff « copie + 6 colonnes » a été **retiré** ; la toolbox
+crée désormais **Balance OHADA** via ``create_toolbox_balance_ohada`` (page staff).
+Ce module reste utilisable en **script** pour des cas très spécifiques ; en général
+préférez l’API / XML pour un rapport neuf fiable.
 
-Odoo Enterprise (balance d’essai) : le **handler** du rapport (``custom_handler_model_*``) fournit le
-moteur ``_report_custom_engine_trial_balance`` pour les lignes concernées. **Ne pas le vider** : sans
-handler, Odoo lève « Méthode invalide ``_report_custom_engine_trial_balance`` ».
+Sources supportées (si la base correspond exactement au schéma attendu) :
+  - 4 colonnes (solde initial, débit, crédit, solde final) ;
+  - 2 colonnes (débit et crédit période uniquement) : expressions dupliquées avec
+    ``to_beginning_of_period`` / ``from_beginning``.
 
-Le handler attache aussi des totaux « unaffected earnings » par ``expression_label``. Les colonnes
-``sn_*`` peuvent provoquer un ``KeyError`` (ex. ``sn_open_deb``) si la copie reste une **variante**
-(``root_report_id``) : le post-processeur peut s’aligner sur le schéma racine (4 colonnes) alors que
-l’affichage utilise 6 colonnes. La toolbox **vide ``root_report_id`` et ``section_main_report_ids``**
-(**avant** les colonnes ``sn_*``), et la duplication avec ``attach_to_root=False`` réitère un rapport
-**autonome** après recopie des options. Les filtres sont resynchronisés depuis la racine au détachement.
-Si un ``KeyError`` sur ``sn_*`` persiste malgré cela, c’est cohérent avec le post-processeur Enterprise
-(``account_trial_balance_report._custom_line_postprocessor``) : il indexe les ajustements « unaffected
-earnings » par ``col['expression_label']`` avec des clés internes ``debit`` / ``credit`` / ``balance``
-pour les blocs ``initial_balance`` et ``period``, pas des libellés arbitraires ``sn_*``. Contournement
-côté consultant : configuration **manuelle** en mode développeur sur un rapport adapté (souvent type
-**Grand livre / balance générale** selon le menu), en séparant solde initial et solde final en débit /
-crédit avec les variables natives proposées par l’UI (ex. ``initial_debit``, ``initial_credit``, ``debit``,
-``credit``) — sur **v19** souvent en moteur ``aggregation`` avec ``subformula`` ``positive`` / ``negative``
-(équivalent pratique à ``max(x,0)`` pour les colonnes débit-crédit) ; gabarit XML dans
-``examples/balance_generale_6_col_studio.example.xml``. Voir l’aide **Alternative manuelle** sur la page toolbox balance.
+**Exclu — balance d’essai Enterprise (handler trial balance)** : si le rapport utilise
+``account.trial.balance.report.handler``, la personnalisation est **refusée``. Le post-processeur
+``_custom_line_postprocessor`` n’indexe les ajustements « unaffected earnings » que sur les libellés
+``debit`` / ``credit`` / ``balance`` pour les blocs initial/période ; les libellés ``sn_*`` de la
+toolbox provoquent un ``KeyError`` (ex. ``sn_open_deb``) — ce n’est pas corrigeable par détachement
+racine. Utiliser le Grand livre / une balance générale configurée en Studio (voir page staff,
+``examples/balance_generale_6_col_studio.example.xml``).
+
+Pour les autres rapports : détachement ``root_report_id`` / ``section_main_report_ids`` en début de
+traitement ; duplication autonome ``attach_to_root=False`` côté Flask.
 """
 from __future__ import annotations
 
@@ -42,6 +35,9 @@ _SN_OPEN_DEB = "sn_open_deb"
 _SN_OPEN_CRE = "sn_open_cred"
 _SN_END_DEB = "sn_end_deb"
 _SN_END_CRE = "sn_end_cre"
+
+# Handler Enterprise : incompatible avec des libellés de colonnes arbitraires (sn_*).
+_ENTERPRISE_TRIAL_BALANCE_HANDLER = "account.trial.balance.report.handler"
 
 # Champs account.report recalculés depuis root_report_id (addons/account/models/account_report.py).
 _ROOT_MIRROR_OPTION_FIELDS: tuple[str, ...] = (
@@ -70,6 +66,62 @@ _ROOT_MIRROR_OPTION_FIELDS: tuple[str, ...] = (
 def _account_report_field_names(models: Any, db: str, uid: int, password: str) -> set[str]:
     fg = execute_kw(models, db, uid, password, "account.report", "fields_get", [], {})
     return set(fg.keys())
+
+
+def _effective_custom_handler_model_name(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    names: set[str],
+) -> str | None:
+    """Handler du rapport ou, si variante sans handler propre, celui de la racine."""
+    fields: list[str] = []
+    if "custom_handler_model_name" in names:
+        fields.append("custom_handler_model_name")
+    if "root_report_id" in names:
+        fields.append("root_report_id")
+    if not fields:
+        return None
+    row = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[report_id]],
+        {"fields": fields},
+    )[0]
+    h = row.get("custom_handler_model_name")
+    if h:
+        return str(h)
+    root = row.get("root_report_id")
+    if isinstance(root, (list, tuple)) and root and root[0] and "custom_handler_model_name" in names:
+        try:
+            root_id = int(root[0])
+        except (TypeError, ValueError):
+            return None
+        r2 = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "read",
+            [[root_id]],
+            {"fields": ["custom_handler_model_name"]},
+        )[0]
+        h2 = r2.get("custom_handler_model_name")
+        return str(h2) if h2 else None
+    return None
+
+
+def _refuses_enterprise_trial_balance_handler(handler_name: str | None) -> bool:
+    if not handler_name:
+        return False
+    return handler_name == _ENTERPRISE_TRIAL_BALANCE_HANDLER
 
 
 def _standalone_account_report_write_vals(names: set[str]) -> dict[str, Any]:
@@ -304,6 +356,19 @@ def personalize_balance_six_columns(
     )
     if not rep_rows:
         raise ValueError(f"Rapport id={report_id} introuvable.")
+    names_f = _account_report_field_names(models, db, uid, password)
+    eff_handler = _effective_custom_handler_model_name(models, db, uid, password, report_id, names_f)
+    if _refuses_enterprise_trial_balance_handler(eff_handler):
+        raise ValueError(
+            "Cette balance utilise le handler Enterprise « balance d’essai » "
+            f"({_ENTERPRISE_TRIAL_BALANCE_HANDLER}). La toolbox ne peut pas la passer en 6 colonnes : "
+            "Odoo lèverait KeyError: sn_open_deb (ou équivalent) dans le post-processeur unaffected earnings, "
+            "qui ne gère que les libellés debit / credit / balance pour les colonnes initiales/période. "
+            "Créez une balance 6 colonnes via le Grand livre / rapports configurables (Studio, v19 : moteur "
+            "aggregation, subformula positive), ou importez le gabarit "
+            "odoo-pythonanywhere/examples/balance_generale_6_col_studio.example.xml — voir l’aide « Alternative "
+            "manuelle » sur la page utilitaire balance."
+        )
     col_ids = rep_rows[0].get("column_ids") or []
     ncols = len(col_ids)
     if ncols not in (2, 4):
