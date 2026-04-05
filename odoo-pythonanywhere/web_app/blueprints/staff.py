@@ -557,6 +557,14 @@ def _accounting_reports_page(accounting_mode: str):
                     msg += (
                         f" Note : post-traitement racine Enterprise : {bal_meta['detach_error']!s}."
                     )
+                if bal_meta.get("handler_error"):
+                    msg += (
+                        f" Note : neutralisation du handler trial balance : {bal_meta['handler_error']!s}."
+                    )
+                elif bal_meta.get("handler_cleared"):
+                    msg += (
+                        " Handler Enterprise trial balance neutralisé (correctif Odoo 19 / KeyError sn_*)."
+                    )
                 try:
                     _ba, menu_mid = ensure_account_report_reporting_menu(
                         models,
