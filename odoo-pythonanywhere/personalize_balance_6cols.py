@@ -11,12 +11,13 @@ Sources supportées :
     l’écart avec une balance 4 colonnes « native » peut varier.
 
 Odoo Enterprise (balance d’essai) : le handler attache des totaux « unaffected earnings » à chaque
-``expression_label``. Les colonnes ``sn_*`` provoquaient un ``KeyError`` si la copie restait une
-**variante** (``root_report_id``) : le post-processeur semble caler les clés sur le schéma racine
-(4 colonnes) alors que l’affichage utilise les 6 colonnes de la copie. Après sélection du rapport (2 ou 4 colonnes), la toolbox **détache d’abord** la copie de la racine
-pour les handlers « trial balance », **avant** de recréer les colonnes `sn_*` : ainsi on évite tout
-état persistant « variante + colonnes supplémentaires » (cause typique du `KeyError: sn_open_deb` sur
-Odoo 19 Enterprise). Les options de filtre sont recopiées depuis la racine lors du détachement.
+``expression_label``. Les colonnes ``sn_*`` provoquent un ``KeyError`` (ex. ``sn_open_deb``) si la copie
+reste une **variante** (``root_report_id``) : le post-processeur s’aligne sur le schéma racine
+(4 colonnes) alors que l’affichage utilise les 6 colonnes. Dès qu’un ``root_report_id`` est présent,
+la toolbox le **vide sans condition sur le handler** (sur Odoo 19 SaaS le modèle technique peut ne pas
+contenir « trial_balance »), **avant** les colonnes `sn_*`. Après ``copy``, ``duplicate_account_report``
+avec ``attach_to_root=False`` force aussi ``root_report_id`` à vide une fois les options recopiées.
+Les filtres sont resynchronisés depuis la racine au détachement.
 
 **Ne pas** retirer ``custom_handler_model_name`` sur la copie : les lignes au moteur « custom »
 ``_report_custom_engine_trial_balance`` exigent ce handler ; sans lui, Odoo affiche « Méthode invalide ».
@@ -62,41 +63,6 @@ def _account_report_field_names(models: Any, db: str, uid: int, password: str) -
     return set(fg.keys())
 
 
-def _handler_looks_like_trial_balance(
-    models: Any,
-    db: str,
-    uid: int,
-    password: str,
-    handler_value: Any,
-) -> bool:
-    """True si le handler Enterprise ressemble à celui de la balance d’essai (trial balance)."""
-    if handler_value in (None, False):
-        return False
-    if isinstance(handler_value, str):
-        s = handler_value.lower().replace(".", "_")
-        return "trial_balance" in s or "trialbalance" in s
-    if isinstance(handler_value, (list, tuple)) and handler_value:
-        try:
-            mid = int(handler_value[0])
-        except (TypeError, ValueError):
-            return False
-        rows = execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "ir.model",
-            "read",
-            [[mid]],
-            {"fields": ["model"]},
-        )
-        if not rows:
-            return False
-        mod = (rows[0].get("model") or "").lower().replace(".", "_")
-        return "trial_balance" in mod or "trialbalance" in mod
-    return False
-
-
 def _detach_trial_balance_variant_after_six_columns(
     models: Any,
     db: str,
@@ -105,22 +71,15 @@ def _detach_trial_balance_variant_after_six_columns(
     report_id: int,
 ) -> dict[str, Any]:
     """
-    Coupe ``root_report_id`` sur une copie « trial balance » liée à une racine Enterprise,
-    puis réécrit les options héritées de la racine (sinon elles retombent sur les défauts du cœur).
-    Appelé en **début** de ``personalize_balance_six_columns`` (avant les colonnes ``sn_*``) pour
-    éviter l’état variante + colonnes supplémentaires.
+    Vide ``root_report_id`` dès qu’il est renseigné, puis réécrit les options depuis la racine
+    (sinon elles retombent sur les défauts du cœur). Sans condition sur le handler : sur Odoo 19
+    Enterprise le nom du modèle handler peut ne pas contenir « trial_balance » alors que le
+    post-processeur reste celui de la balance d’essai — sans détachement, ``KeyError: sn_open_deb``.
+    Appelé en **début** de ``personalize_balance_six_columns`` (avant les colonnes ``sn_*``).
     """
     names = _account_report_field_names(models, db, uid, password)
     if "root_report_id" not in names:
         return {"detached_from_root": False, "detach_note": "champ root_report_id absent"}
-    handler_field: str | None = None
-    for key in ("custom_handler_model_name", "custom_handler_model_id"):
-        if key in names:
-            handler_field = key
-            break
-    read_fields = ["root_report_id"]
-    if handler_field:
-        read_fields.append(handler_field)
     row = execute_kw(
         models,
         db,
@@ -129,7 +88,7 @@ def _detach_trial_balance_variant_after_six_columns(
         "account.report",
         "read",
         [[report_id]],
-        {"fields": read_fields},
+        {"fields": ["root_report_id"]},
     )[0]
     root = row.get("root_report_id")
     root_id: int | None = None
@@ -140,27 +99,6 @@ def _detach_trial_balance_variant_after_six_columns(
             root_id = None
     if root_id is None:
         return {"detached_from_root": False, "detach_note": "déjà autonome (sans root_report_id)"}
-    if not handler_field:
-        return {
-            "detached_from_root": False,
-            "detach_note": "champ handler absent — pas de détachement automatique",
-        }
-    handler_val = row.get(handler_field)
-    if handler_val in (None, False, "") and root_id:
-        root_h = execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report",
-            "read",
-            [[root_id]],
-            {"fields": [handler_field]},
-        )
-        if root_h:
-            handler_val = root_h[0].get(handler_field)
-    if not _handler_looks_like_trial_balance(models, db, uid, password, handler_val):
-        return {"detached_from_root": False, "detach_note": "handler différent de la balance d’essai"}
     option_fields = [f for f in _ROOT_MIRROR_OPTION_FIELDS if f in names]
     snap_fields = list(option_fields)
     for extra in ("availability_condition", "country_id"):

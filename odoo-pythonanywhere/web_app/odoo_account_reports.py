@@ -1064,6 +1064,19 @@ def duplicate_account_report(
             int(source_report_id),
             new_id,
         )
+        if _account_report_has_field(models, db, uid, password, "root_report_id"):
+            try:
+                execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.report",
+                    "write",
+                    [[new_id], {"root_report_id": False}],
+                )
+            except Exception:
+                pass
     _write_duplicate_unique_name(
         models,
         db,
