@@ -5,11 +5,11 @@ Crée sur la base Odoo un rapport « balance générale 6 colonnes » via XML-RP
 **Odoo 19** : le moteur ``aggregation`` (« Aggregate Other Formulas ») est **incompatible**
 avec ``groupby`` sur la même ligne (contrainte ``account.report.expression._validate_engine``).
 Ce script crée donc une **ligne section** (sans groupby) puis une ligne enfant avec
-``groupby = account_id`` et des expressions moteur **domain** (sous-formules ``sum`` /
-``sum_if_pos`` / ``sum_if_neg`` selon la doc comptable v19). Les montants période
-``débit`` / ``crédit`` reflètent le **découpage du solde net** de la période (positif /
-négatif), pas nécessairement les bruts débit et crédit comme un vieux gabarit XML en
-``aggregation``.
+``groupby = account_id`` et des expressions moteur **domain**. Les colonnes **solde initial /
+final** utilisent ``sum_if_pos`` / ``-sum_if_neg`` sur le **solde** (répartition nette débit /
+crédit par compte). Les colonnes **mouvements de période** somment les **bruts** ``debit`` /
+``credit`` des lignes d’écriture (domaines ``debit > 0`` / ``credit > 0``), comme une balance
+6 colonnes classique — pas le seul côté du solde net de période.
 
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
@@ -96,7 +96,11 @@ def _section_line_code(leaf_code: str) -> str:
 def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     """
     Expressions moteur « domain » compatibles avec groupby (Odoo 19+).
-    Formule ``[]`` = toutes les lignes d’écriture pertinentes pour le compte (contexte groupby).
+
+    - Initial / final : domaine vide + ``sum_if_pos`` / ``-sum_if_neg`` sur le **solde**
+      (une seule colonne non nulle par compte selon le signe du cumul).
+    - Période (``strict_range``) : totaux **bruts** débit et crédit (même compte peut avoir
+      les deux colonnes > 0), via filtre sur les champs ``debit`` / ``credit`` des lignes.
     """
     return [
         {
@@ -116,15 +120,15 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
         {
             "label": "debit",
             "engine": "domain",
-            "formula": "[]",
-            "subformula": "sum_if_pos",
+            "formula": "[('debit', '>', 0)]",
+            "subformula": "sum",
             "date_scope": "strict_range",
         },
         {
             "label": "credit",
             "engine": "domain",
-            "formula": "[]",
-            "subformula": "-sum_if_neg",
+            "formula": "[('credit', '>', 0)]",
+            "subformula": "-sum",
             "date_scope": "strict_range",
         },
         {
@@ -340,6 +344,103 @@ def create_balance_six_columns(
     )
 
 
+def _report_ids_from_line_codes(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    line_codes: tuple[str, ...],
+) -> set[int]:
+    out: set[int] = set()
+    for code in line_codes:
+        line_ids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "search",
+            [[("code", "=", code)]],
+        )
+        if not line_ids:
+            continue
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "read",
+            [line_ids],
+            {"fields": ["report_id"]},
+        )
+        for row in rows:
+            r = row.get("report_id")
+            if isinstance(r, (list, tuple)) and r and r[0]:
+                try:
+                    out.add(int(r[0]))
+                except (TypeError, ValueError):
+                    pass
+    return out
+
+
+def collect_balance_ohada_report_ids_for_cleanup(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> set[int]:
+    """
+    Identifiants des ``account.report`` créés par **cette** toolbox : uniquement ceux qui
+    portent une ligne ``account.report.line`` avec le code feuille ``bal_ohada`` ou la ligne
+    section ``bal_ohada_section`` (constantes toolbox). Aucune recherche par libellé : un
+    rapport Studio nommé « Balance OHADA » sans ces codes n’est **pas** touché.
+    """
+    section = _section_line_code(BALANCE_OHADA_LINE_CODE)
+    return _report_ids_from_line_codes(
+        models,
+        db,
+        uid,
+        password,
+        (BALANCE_OHADA_LINE_CODE, section),
+    )
+
+
+def purge_balance_ohada_instances(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> set[int]:
+    """
+    Supprime menus + actions client + ``account.report`` pour tout ce qui est reconnu comme
+    Balance OHADA (voir ``collect_balance_ohada_report_ids_for_cleanup``). Retourne l’ensemble
+    d’ids qui étaient ciblés (même si certains ``unlink`` ont échoué).
+    """
+    from web_app.odoo_account_reports import (
+        unlink_all_account_report_client_actions_for_report_ids,
+    )
+
+    to_remove = collect_balance_ohada_report_ids_for_cleanup(models, db, uid, password)
+    unlink_all_account_report_client_actions_for_report_ids(
+        models, db, uid, password, to_remove
+    )
+    for rid in sorted(to_remove, reverse=True):
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "unlink",
+                [[rid]],
+            )
+        except Exception:
+            continue
+    return to_remove
+
+
 def find_all_balance_ohada_report_ids(
     models: Any,
     db: str,
@@ -352,36 +453,11 @@ def find_all_balance_ohada_report_ids(
     Tous les ``account.report`` qui contiennent une ligne feuille avec ce ``code``
     (défaut ``bal_ohada``), triés par id croissant.
     """
-    line_ids = execute_kw(
-        models,
-        db,
-        uid,
-        password,
-        "account.report.line",
-        "search",
-        [[("code", "=", line_code)]],
+    return sorted(
+        _report_ids_from_line_codes(
+            models, db, uid, password, (line_code,)
+        )
     )
-    if not line_ids:
-        return []
-    report_ids: set[int] = set()
-    rows = execute_kw(
-        models,
-        db,
-        uid,
-        password,
-        "account.report.line",
-        "read",
-        [line_ids],
-        {"fields": ["report_id"]},
-    )
-    for row in rows:
-        r = row.get("report_id")
-        if isinstance(r, (list, tuple)) and r and r[0]:
-            try:
-                report_ids.add(int(r[0]))
-            except (TypeError, ValueError):
-                pass
-    return sorted(report_ids)
 
 
 def find_balance_ohada_report_id(
@@ -413,13 +489,10 @@ def create_toolbox_balance_ohada(
     """
     Retire toute instance existante (rapport, menus et actions client liés), puis crée
     « Balance OHADA » à neuf.
-    """
-    from web_app.odoo_account_reports import unlink_account_report
 
-    for rid in sorted(
-        find_all_balance_ohada_report_ids(models, db, uid, password), reverse=True
-    ):
-        unlink_account_report(models, db, uid, password, rid)
+    Nettoyage : voir ``purge_balance_ohada_instances``.
+    """
+    purge_balance_ohada_instances(models, db, uid, password)
     return create_balance_six_columns_rpc(
         models,
         db,

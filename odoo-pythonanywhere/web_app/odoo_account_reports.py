@@ -303,6 +303,74 @@ def _unlink_account_report_related_menus_and_client_actions(
     return menus_total, actions_total
 
 
+def unlink_all_account_report_client_actions_for_report_ids(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_ids: set[int],
+) -> tuple[int, int]:
+    """
+    Parcourt **toutes** les ``ir.actions.client`` (tag ``account_report``) et supprime celles
+    dont le contexte référence un ``report_id`` dans ``report_ids``, ainsi que les
+    ``ir.ui.menu`` qui y sont liés.
+
+    Utile après coup ou lorsque ``find_all_account_report_client_action_ids`` n’a pas reconnu
+    le format de ``context`` (guillemets, espaces, JSON).
+    """
+    if not report_ids:
+        return 0, 0
+    rid_set = {int(x) for x in report_ids}
+    menus_total = 0
+    actions_total = 0
+    try:
+        aids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.actions.client",
+            "search",
+            [[("tag", "=", "account_report")]],
+            {"limit": 4000},
+        )
+    except Exception:
+        return 0, 0
+    if not aids:
+        return 0, 0
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "ir.actions.client",
+        "read",
+        [aids],
+        {"fields": ["id", "context"]},
+    )
+    target_aids: list[int] = []
+    for row in rows:
+        prid = _report_id_from_account_report_client_context(row.get("context"))
+        if prid is not None and int(prid) in rid_set:
+            target_aids.append(int(row["id"]))
+    for aid in target_aids:
+        menus_total += _unlink_menus_bound_to_client_action(models, db, uid, password, aid)
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.actions.client",
+                "unlink",
+                [[aid]],
+            )
+            actions_total += 1
+        except Exception:
+            pass
+    return menus_total, actions_total
+
+
 def ensure_account_report_client_action(
     models: Any,
     db: str,

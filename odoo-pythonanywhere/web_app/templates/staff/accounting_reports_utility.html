@@ -115,7 +115,7 @@
 <details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi — Balance OHADA</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Créer sur la base un rapport comptable nommé <strong>Balance OHADA</strong> (six colonnes : débit/crédit initiaux, débit/crédit période, débit/crédit finaux), sans partir d’une copie d’un rapport existant. Une <strong>nouvelle création</strong> retire d’abord toute instance existante (repère <code>bal_ohada</code>), y compris les entrées de menu et actions client associées. La toolbox propose aussi une <strong>suppression seule</strong> avec confirmation.
+    <strong>But.</strong> Créer sur la base un rapport comptable nommé <strong>Balance OHADA</strong> (six colonnes : débit/crédit initiaux, débit/crédit période, débit/crédit finaux), sans partir d’une copie d’un rapport existant. Une <strong>nouvelle création</strong> retire d’abord uniquement les rapports <strong>créés par cette toolbox</strong> (codes de ligne <code>bal_ohada</code> / <code>bal_ohada_section</code>), avec menus et actions client associés — pas un autre rapport nommé pareil dans Studio. Suppression seule avec confirmation possible.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     Repère technique : ligne feuille <code>account.report.line</code> avec <code>code = bal_ohada</code>.
@@ -529,7 +529,7 @@
   {% if accounting_mode == 'balance' %}
   <h2 style="margin-top:0;font-size:1.1rem;">Balance OHADA</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
-    Crée un <code>account.report</code> « Balance OHADA » (six colonnes, ligne <code>bal_ohada</code>). Si un rapport toolbox existe déjà, il est <strong>d’abord supprimé</strong> (menus / actions liés inclus), puis recréé. Vous pouvez aussi ne faire que la suppression via le formulaire ci-dessous.
+    Crée un <code>account.report</code> « Balance OHADA » (six colonnes, ligne <code>bal_ohada</code>). Si une <strong>instance toolbox</strong> existe déjà (même repère technique), elle est <strong>d’abord supprimée</strong> (menus / actions liés à ce rapport uniquement), puis recréée. Autres rapports comptables inchangés.
   </p>
   {% if conn_status == 'ok' %}
     {% if balance_ohada_report_id %}

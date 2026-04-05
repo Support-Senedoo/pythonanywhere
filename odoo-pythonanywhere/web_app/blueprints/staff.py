@@ -42,9 +42,10 @@ from web_app.pointage_import_util import (
 from odoo_client import OdooClient, normalize_odoo_base_url
 from create_balance_6cols_via_api import (
     BALANCE_OHADA_NAME_FR,
+    collect_balance_ohada_report_ids_for_cleanup,
     create_toolbox_balance_ohada,
-    find_all_balance_ohada_report_ids,
     find_balance_ohada_report_id,
+    purge_balance_ohada_instances,
 )
 from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
@@ -527,7 +528,9 @@ def _accounting_reports_page(accounting_mode: str):
             )
         if action == "create_balance_ohada" and accounting_mode == "balance":
             try:
-                prior_ohada = find_all_balance_ohada_report_ids(models, db, uid, pwd)
+                prior_ohada = sorted(
+                    collect_balance_ohada_report_ids_for_cleanup(models, db, uid, pwd)
+                )
                 new_rid = create_toolbox_balance_ohada(models, db, uid, pwd)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
                 msg = (
@@ -536,8 +539,9 @@ def _accounting_reports_page(accounting_mode: str):
                 )
                 if prior_ohada:
                     msg += (
-                        " Une ou plusieurs instances précédentes (menus / actions inclus) "
-                        f"ont été retirées (anciens id : {', '.join(str(x) for x in prior_ohada)})."
+                        " Une ou plusieurs instances toolbox précédentes (codes bal_ohada ; "
+                        "menus / actions liés à ces rapports uniquement) ont été retirées "
+                        f"(anciens id : {', '.join(str(x) for x in prior_ohada)})."
                     )
                 try:
                     _ba, menu_mid = ensure_account_report_reporting_menu(
@@ -594,10 +598,11 @@ def _accounting_reports_page(accounting_mode: str):
                         ),
                     )
                 )
-            ohada_id = find_balance_ohada_report_id(models, db, uid, pwd)
-            if not ohada_id:
+            to_remove = collect_balance_ohada_report_ids_for_cleanup(models, db, uid, pwd)
+            if not to_remove:
                 flash(
-                    "Aucun rapport Balance OHADA sur cette base (repère : ligne feuille code bal_ohada).",
+                    "Aucune instance toolbox Balance OHADA sur cette base "
+                    "(repère technique : lignes de rapport code bal_ohada ou bal_ohada_section).",
                     "warning",
                 )
                 return redirect(
@@ -610,16 +615,11 @@ def _accounting_reports_page(accounting_mode: str):
                     )
                 )
             try:
-                rlabel = read_account_report_label(models, db, uid, pwd, ohada_id)
-                meta = unlink_account_report(models, db, uid, pwd, ohada_id)
-                extra = ""
-                if meta.get("menus_unlinked") or meta.get("client_actions_unlinked"):
-                    extra = (
-                        f" Menus Odoo : {meta.get('menus_unlinked', 0)}, "
-                        f"actions client : {meta.get('client_actions_unlinked', 0)}."
-                    )
+                purge_balance_ohada_instances(models, db, uid, pwd)
+                ids_txt = ", ".join(str(x) for x in sorted(to_remove))
                 flash(
-                    f"Balance OHADA supprimée (« {rlabel} », id={ohada_id}).{extra}",
+                    f"Rapport(s) toolbox Balance OHADA retiré(s) (id : {ids_txt}). "
+                    "Menus et actions client pointant sur ces id ont été nettoyés lorsque l’API y a accès.",
                     "success",
                 )
             except Exception as e:
