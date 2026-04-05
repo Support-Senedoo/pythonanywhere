@@ -408,6 +408,7 @@
                 <input type="hidden" name="filter_host" value="{{ filter_host }}">
                 <input type="hidden" name="action" value="unlink">
                 <input type="hidden" name="report_id" value="{{ r.id }}">
+                <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Supprime aussi, dans Odoo, le <strong>menu</strong> et l’<strong>action client</strong> d’exécution (<code>account_report</code>) liés à cette copie, s’ils existent.</p>
                 <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Tapez exactement : <code>SUPPRIMER-{{ r.id }}</code></p>
                 <input type="text" name="confirm_delete" placeholder="SUPPRIMER-{{ r.id }}" autocomplete="off" style="margin-top:0;">
                 <button type="submit" style="margin-top:0.5rem;background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer définitivement</button>

@@ -1,6 +1,7 @@
 """Liste / filtre des rapports comptables Odoo (account.report) pour l’utilitaire staff."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from odoo_client import normalize_odoo_base_url
@@ -163,6 +164,143 @@ def find_account_report_client_action_id(
             if f"{rid}" in str(ctx) and "report_id" in str(ctx):
                 return int(row["id"])
     return None
+
+
+_CTX_REPORT_ID_RE = re.compile(r"""['"]?report_id['"]?\s*:\s*(\d+)""")
+
+
+def _report_id_from_account_report_client_context(ctx: Any) -> int | None:
+    """Extrait l’id de rapport depuis le contexte d’une action client ``account_report``."""
+    m = _CTX_REPORT_ID_RE.search(str(ctx or ""))
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+
+def find_all_account_report_client_action_ids(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> list[int]:
+    """
+    Toutes les ``ir.actions.client`` (tag ``account_report``) dont le contexte fixe ce ``report_id``.
+    """
+    rid = int(report_id)
+    needles = (
+        f"'report_id': {rid}",
+        f'"report_id": {rid}',
+        f"'report_id':{rid}",
+    )
+    seen: set[int] = set()
+    for needle in needles:
+        try:
+            aids = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.actions.client",
+                "search",
+                [[("tag", "=", "account_report"), ("context", "ilike", needle)]],
+                {"limit": 120},
+            )
+        except Exception:
+            continue
+        for a in aids or []:
+            seen.add(int(a))
+    if not seen:
+        return []
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "ir.actions.client",
+        "read",
+        [list(seen)],
+        {"fields": ["id", "context"]},
+    )
+    out: list[int] = []
+    for row in rows:
+        if _report_id_from_account_report_client_context(row.get("context")) == rid:
+            out.append(int(row["id"]))
+    return out
+
+
+def _unlink_menus_bound_to_client_action(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    client_action_id: int,
+) -> int:
+    """Supprime les ``ir.ui.menu`` dont l’action est ``ir.actions.client,<id>``. Retourne le nombre supprimé."""
+    ref = f"ir.actions.client,{int(client_action_id)}"
+    try:
+        mids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "search",
+            [[("action", "=", ref)]],
+            {"limit": 500},
+        )
+    except Exception:
+        return 0
+    if not mids:
+        return 0
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "unlink",
+            [mids],
+        )
+        return len(mids)
+    except Exception:
+        return 0
+
+
+def _unlink_account_report_related_menus_and_client_actions(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> tuple[int, int]:
+    """
+    Avant suppression d’un ``account.report`` : enlève menus + actions client créés pour l’exécution
+    (tag ``account_report``, contexte avec ce ``report_id``).
+    """
+    aids = find_all_account_report_client_action_ids(models, db, uid, password, report_id)
+    menus_total = 0
+    actions_total = 0
+    for aid in aids:
+        menus_total += _unlink_menus_bound_to_client_action(models, db, uid, password, aid)
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.actions.client",
+                "unlink",
+                [[aid]],
+            )
+            actions_total += 1
+        except Exception:
+            pass
+    return menus_total, actions_total
 
 
 def ensure_account_report_client_action(
@@ -710,7 +848,14 @@ def unlink_account_report(
     uid: int,
     password: str,
     report_id: int,
-) -> None:
+) -> dict[str, int]:
+    """
+    Supprime le rapport et, au préalable, les entrées de menu + actions client ``account_report``
+    pointant sur ce ``report_id`` (évite les entrées orphelines dans Odoo).
+    """
+    menus_n, actions_n = _unlink_account_report_related_menus_and_client_actions(
+        models, db, uid, password, int(report_id)
+    )
     execute_kw(
         models,
         db,
@@ -720,6 +865,7 @@ def unlink_account_report(
         "unlink",
         [[report_id]],
     )
+    return {"menus_unlinked": menus_n, "client_actions_unlinked": actions_n}
 
 
 def _merge_report_name_for_rename(raw_name: Any, new_label: str) -> Any:

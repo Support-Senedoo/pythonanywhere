@@ -684,8 +684,14 @@ def _accounting_reports_page(accounting_mode: str):
                 )
             try:
                 rlabel = read_account_report_label(models, db, uid, pwd, rid)
-                unlink_account_report(models, db, uid, pwd, rid)
-                flash(f"Rapport « {rlabel} » (id={rid}) supprimé.", "success")
+                meta = unlink_account_report(models, db, uid, pwd, rid)
+                extra = ""
+                if meta.get("menus_unlinked") or meta.get("client_actions_unlinked"):
+                    extra = (
+                        f" Menus Odoo supprimés : {meta.get('menus_unlinked', 0)}, "
+                        f"actions client : {meta.get('client_actions_unlinked', 0)}."
+                    )
+                flash(f"Rapport « {rlabel} » (id={rid}) supprimé.{extra}", "success")
             except Exception as e:
                 flash(f"Suppression impossible : {e!s}", "danger")
             return redirect(
