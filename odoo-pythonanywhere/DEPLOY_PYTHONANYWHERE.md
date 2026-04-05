@@ -64,6 +64,8 @@ Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le di
 
 **À chaque publication** : **commit** + **push**, puis sur votre PC **`.\deploy_pa.ps1`** (ou **`.\deploy.ps1`** depuis la racine du dépôt). Cela pousse le code sur GitHub, se connecte en SSH à PA et lance **`deploy_pa.sh`** : **`git pull`**, **`pip`**, puis **reload du site** (voir paragraphe précédent : fichier **`~/.pythonanywhere_api_token`** sur PA). Sans ce fichier token, le script vous le rappelle : il faut alors cliquer **Reload** à la main dans l’onglet **Web**.
 
+**Assistant Cursor (règle projet)** : après des changements livrables sous **`odoo-pythonanywhere/`**, **enchaîner systématiquement** commit + push + **`deploy_pa.ps1 -SkipGitPush`** (sans attendre une demande explicite « déploie »), tant que l’environnement local le permet.
+
 **Sur la machine du développeur** (PC avec Git + clé SSH PA sans passphrase, ex. `%USERPROFILE%\.ssh\id_ed25519_pa_cursor`) : l’assistant Cursor peut lancer **`.\deploy_pa.ps1 -SkipGitPush`** depuis `odoo-pythonanywhere/` après un **`git push`** — cela exécute sur PA **`deploy_pa.sh`** : **`git pull`**, **`pip`**, **reload API** si `~/.pythonanywhere_api_token` existe. **Sans** cette machine / cette clé, seul **vous** (PowerShell local, Bash PA, ou bouton Reload) déclenchez la mise à jour effective du worker WSGI.
 
 ### Si `deploy_pa.ps1` plante au démarrage (ParserError, accents « cassés »)

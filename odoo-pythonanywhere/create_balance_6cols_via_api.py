@@ -5,11 +5,11 @@ Crée sur la base Odoo un rapport « balance générale 6 colonnes » via XML-RP
 **Odoo 19** : le moteur ``aggregation`` (« Aggregate Other Formulas ») est **incompatible**
 avec ``groupby`` sur la même ligne (contrainte ``account.report.expression._validate_engine``).
 Ce script crée donc une **ligne section** (sans groupby) puis une ligne enfant avec
-``groupby = account_id`` et des expressions moteur **domain**. Les colonnes **solde initial /
-final** utilisent ``sum_if_pos`` / ``-sum_if_neg`` sur le **solde** (répartition nette débit /
-crédit par compte). Les colonnes **mouvements de période** somment les **bruts** ``debit`` /
-``credit`` des lignes d’écriture (domaines ``debit > 0`` / ``credit > 0``), comme une balance
-6 colonnes classique — pas le seul côté du solde net de période.
+``groupby = account_id`` et des expressions moteur **domain**. **Colonnes extérieures**
+(initial / final) : solde net par plage — ``[]`` + ``sum_if_pos`` / ``-sum_if_neg`` (une seule
+colonne non nulle ; côté créditeur en positif en crédit). **Colonnes centrales** (période) :
+comme une balance classique, **cumuls bruts** débit et crédit sur la période — domaines
+``debit > 0`` / ``credit > 0`` + ``sum`` / ``-sum`` + ``strict_range``.
 
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
@@ -97,10 +97,9 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     """
     Expressions moteur « domain » compatibles avec groupby (Odoo 19+).
 
-    - Initial / final : domaine vide + ``sum_if_pos`` / ``-sum_if_neg`` sur le **solde**
-      (une seule colonne non nulle par compte selon le signe du cumul).
-    - Période (``strict_range``) : totaux **bruts** débit et crédit (même compte peut avoir
-      les deux colonnes > 0), via filtre sur les champs ``debit`` / ``credit`` des lignes.
+    - **Initial / final** : ``[]`` + ``sum_if_pos`` / ``-sum_if_neg`` (solde net, une colonne).
+    - **Période (milieu)** : cumuls **bruts** des montants débit / crédit des lignes sur
+      ``strict_range`` (balance classique à deux colonnes de mouvement).
     """
     return [
         {

@@ -14,6 +14,16 @@ Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte 
 - Dépôt Git cible du script de déploiement : `Support-Senedoo/pythonanywhere` → clone sous `~/pythonanywhere`, appli dans `~/pythonanywhere/odoo-pythonanywhere`.
 - WSGI PA (référence) : `.../odoo-pythonanywhere/pythonanywhere_wsgi.py`.
 
+## Déploiement systématique après modification (obligatoire pour l’agent)
+
+Dès qu’il y a une **modification** dans le dépôt sous **`odoo-pythonanywhere/`** (ou ailleurs qui impacte la toolbox en ligne) et que le travail est **prêt à être livré** :
+
+1. **`git add`** les fichiers concernés, **`git commit`** avec un message clair (en français si besoin).
+2. **`git push origin master`** (dépôt `Support-Senedoo/pythonanywhere`).
+3. Sur la machine où la clé SSH PA fonctionne : depuis **`odoo-pythonanywhere/`**, lancer **`.\deploy_pa.ps1 -SkipGitPush`** (pull sur PA + pip + reload API si token).
+
+Ne pas attendre une phrase du type « fais le » : **enchaîner commit + push + déploiement** dans la même session dès que les changements sont cohérents, sauf si l’utilisateur a explicitement demandé de ne pas pousser / pas déployer. Si le push ou le déploiement échoue, diagnostiquer et réessayer ou le signaler clairement.
+
 ## Automatisation sans toi (agent + MCP, sans phrase secrète à chaque fois)
 
 Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **jamais dans Git**.
