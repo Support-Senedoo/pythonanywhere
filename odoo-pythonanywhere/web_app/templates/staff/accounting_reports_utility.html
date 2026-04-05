@@ -120,8 +120,48 @@
     L’original n’est pas modifié. En 4 colonnes, les soldes initiaux/finaux doivent utiliser la subformule <code>sum</code>. En 2 colonnes, les soldes sont dérivés via les champs Odoo <code>to_beginning_of_period</code> et <code>from_beginning</code> : contrôler les totaux sur une base de test ; les lignes de regroupement peuvent exiger des formules d’agrégation complémentaires.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le <strong>handler</strong> du rapport (<code>custom_handler_model_*</code>) est <strong>conservé</strong> sur la copie : il est requis pour le moteur <code>_report_custom_engine_trial_balance</code> (sans lui, Odoo affiche « Méthode invalide »). La copie est rendue <strong>autonome</strong> (sans <code>root_report_id</code>, <code>section_main_report_ids</code> vidés) pour limiter les <code>KeyError: sn_*</code> du post-processeur « unaffected earnings » liés aux colonnes supplémentaires. La toolbox détache la racine <strong>avant</strong> de recréer les colonnes. Pour une copie déjà cassée (ex. handler vidé manuellement) : refaire une copie avec la toolbox à jour, ou réaffecter le handler comme sur la balance standard. Mode développeur → <strong>Rapports comptables</strong> : on peut aussi vider <strong>Racine du rapport</strong> et <strong>Section de</strong> puis enregistrer. La toolbox crée une <strong>entrée de menu</strong> dans le sous-menu <strong>Grands livres</strong> (même parent que le Grand livre général si trouvé ; repli après balance comptable ; libellés selon la langue Odoo), et un lien liste « rapports comptables » en configuration. Vous pouvez <strong>définir le nom du rapport et du menu</strong> (champ optionnel) <strong>avant</strong> la création du menu ; à la suppression du rapport dans la toolbox, menu et action client sont retirés ensemble. Les options de filtre du modèle source sont recopiées sur la copie.
+    <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le <strong>handler</strong> du rapport (<code>custom_handler_model_*</code>) est <strong>conservé</strong> sur la copie : il est requis pour le moteur <code>_report_custom_engine_trial_balance</code> (sans lui, Odoo affiche « Méthode invalide »). La copie est rendue <strong>autonome</strong> (sans <code>root_report_id</code>, <code>section_main_report_ids</code> vidés). Le post-processeur « unaffected earnings » d’Enterprise ne gère que des libellés de colonne du type <code>debit</code> / <code>credit</code> / <code>balance</code> pour les blocs initial / période : des libellés techniques du type <code>sn_open_deb</code> peuvent provoquer un <code>KeyError</code> à l’exécution. En cas d’erreur RPC sur une copie toolbox, envisager l’<strong>alternative manuelle</strong> ci‑dessous (souvent sur le <strong>Grand livre / balance générale</strong> selon votre menu) ou un rapport sans ce handler. Pour une copie déjà cassée : refaire une copie ou réaligner le handler sur la balance standard. La toolbox crée une <strong>entrée de menu</strong> sous <strong>Grands livres</strong> ; nom du rapport / menu optionnel avant création du menu.
   </p>
+  <details class="sn-doc" style="margin:0.75rem 0 0;border:1px solid rgba(0,0,0,0.08);border-radius:6px;padding:0.5rem 0.65rem;background:rgba(0,0,0,0.02);">
+    <summary style="cursor:pointer;font-weight:600;">Alternative manuelle — 6 colonnes (Odoo v19 / Studio)</summary>
+    <p style="margin:0.55rem 0 0;line-height:1.45;font-size:0.92rem;">
+      Pour une <strong>balance générale</strong> type OHADA (débit/crédit initiaux et finaux séparés), en <strong>v19</strong> : utiliser le moteur <strong><code>aggregation</code></strong> sur les expressions (pas une formule Python libre). Variables usuelles : <code>initial_debit</code>, <code>initial_credit</code>, <code>debit</code>, <code>credit</code>. Ce n’est pas le même schéma que la balance d’essai Enterprise « trial balance handler ».
+    </p>
+    <p style="margin:0.45rem 0 0;line-height:1.45;font-size:0.92rem;"><strong>Subformules (v19)</strong> — à la place de <code>max(x, 0)</code> :</p>
+    <table style="width:100%;border-collapse:collapse;margin:0.35rem 0 0;font-size:0.88rem;">
+      <thead>
+        <tr style="text-align:left;border-bottom:1px solid #ccc;">
+          <th style="padding:0.25rem 0.35rem;"><code>subformula</code></th>
+          <th style="padding:0.25rem 0.35rem;">Effet</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:0.25rem 0.35rem;"><code>positive</code></td><td style="padding:0.25rem 0.35rem;">Garde uniquement les valeurs <strong>&gt; 0</strong> (côté débit affiché).</td></tr>
+        <tr><td style="padding:0.25rem 0.35rem;"><code>negative</code></td><td style="padding:0.25rem 0.35rem;">Garde uniquement les valeurs <strong>&lt; 0</strong> (utile pour certains découpages crédit).</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:0.45rem 0 0;line-height:1.45;font-size:0.92rem;"><strong>Colonnes (6)</strong> — schéma type (formule d’agrégation + <code>positive</code> pour les soldes décomposés) :</p>
+    <table style="width:100%;border-collapse:collapse;margin:0.35rem 0 0;font-size:0.88rem;">
+      <thead>
+        <tr style="text-align:left;border-bottom:1px solid #ccc;">
+          <th style="padding:0.25rem 0.35rem;">Colonne</th>
+          <th style="padding:0.25rem 0.35rem;"><code>formula</code> (aggregation)</th>
+          <th style="padding:0.25rem 0.35rem;"><code>subformula</code></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:0.25rem 0.35rem;">Débit initial</td><td style="padding:0.25rem 0.35rem;"><code>initial_debit - initial_credit</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
+        <tr><td style="padding:0.25rem 0.35rem;">Crédit initial</td><td style="padding:0.25rem 0.35rem;"><code>initial_credit - initial_debit</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
+        <tr><td style="padding:0.25rem 0.35rem;">Débit période</td><td style="padding:0.25rem 0.35rem;"><code>debit</code></td><td style="padding:0.25rem 0.35rem;">—</td></tr>
+        <tr><td style="padding:0.25rem 0.35rem;">Crédit période</td><td style="padding:0.25rem 0.35rem;"><code>credit</code></td><td style="padding:0.25rem 0.35rem;">—</td></tr>
+        <tr><td style="padding:0.25rem 0.35rem;">Débit final</td><td style="padding:0.25rem 0.35rem;"><code>(initial_debit + debit) - (initial_credit + credit)</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
+        <tr><td style="padding:0.25rem 0.35rem;">Crédit final</td><td style="padding:0.25rem 0.35rem;"><code>(initial_credit + credit) - (initial_debit + debit)</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
+      </tbody>
+    </table>
+    <p class="sn-muted" style="margin:0.45rem 0 0;line-height:1.45;font-size:0.85rem;">
+      <strong>Obligatoire :</strong> dans les options du rapport, activer <strong>Inclure le solde initial</strong> (libellé peut varier selon la langue) — sinon les colonnes initiales restent à 0. <strong>Groupement :</strong> <code>groupby = account_id</code> sur la ligne. <strong>Filtre période</strong> : cohérent avec l’analyse. <strong>Studio SaaS :</strong> mode développeur → <strong>Import XML</strong> ; si l’import échoue, essayer en <strong>deux fois</strong> (d’abord les colonnes, puis ligne + rapport). Gabarit XML dans le dépôt : <code>odoo-pythonanywhere/examples/balance_generale_6_col_studio.example.xml</code>. Si <code>max()</code> est proposé dans un autre éditeur : remplacer <code>max(a, 0)</code> par <code>(a) if a &gt; 0 else 0</code> quand la syntaxe l’exige.
+    </p>
+  </details>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
     <strong>Version :</strong> {{ utility_version }} ·

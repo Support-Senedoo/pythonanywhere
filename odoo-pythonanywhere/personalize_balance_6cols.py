@@ -20,8 +20,16 @@ Le handler attache aussi des totaux « unaffected earnings » par ``expression_l
 l’affichage utilise 6 colonnes. La toolbox **vide ``root_report_id`` et ``section_main_report_ids``**
 (**avant** les colonnes ``sn_*``), et la duplication avec ``attach_to_root=False`` réitère un rapport
 **autonome** après recopie des options. Les filtres sont resynchronisés depuis la racine au détachement.
-Si un ``KeyError`` sur ``sn_*`` persiste malgré cela, signaler la version Odoo exacte (limitation
-côté post-processeur Enterprise).
+Si un ``KeyError`` sur ``sn_*`` persiste malgré cela, c’est cohérent avec le post-processeur Enterprise
+(``account_trial_balance_report._custom_line_postprocessor``) : il indexe les ajustements « unaffected
+earnings » par ``col['expression_label']`` avec des clés internes ``debit`` / ``credit`` / ``balance``
+pour les blocs ``initial_balance`` et ``period``, pas des libellés arbitraires ``sn_*``. Contournement
+côté consultant : configuration **manuelle** en mode développeur sur un rapport adapté (souvent type
+**Grand livre / balance générale** selon le menu), en séparant solde initial et solde final en débit /
+crédit avec les variables natives proposées par l’UI (ex. ``initial_debit``, ``initial_credit``, ``debit``,
+``credit``) — sur **v19** souvent en moteur ``aggregation`` avec ``subformula`` ``positive`` / ``negative``
+(équivalent pratique à ``max(x,0)`` pour les colonnes débit-crédit) ; gabarit XML dans
+``examples/balance_generale_6_col_studio.example.xml``. Voir l’aide **Alternative manuelle** sur la page toolbox balance.
 """
 from __future__ import annotations
 

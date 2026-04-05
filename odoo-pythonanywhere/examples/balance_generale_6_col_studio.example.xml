@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Balance générale 6 colonnes (visée OHADA) — gabarit Studio / module custom, Odoo v19+.
+
+      Points clés v19 :
+      - engine = aggregation (pas de formule « python » pour ce schéma).
+      - subformula = positive : garde uniquement la partie > 0 (équivalent pratique à max(x, 0)).
+      - subformula = negative : garde uniquement la partie < 0 (côté crédit si besoin).
+      - Formules : initial_debit, initial_credit, debit, credit (variables autorisées dans ce contexte).
+      - Option rapport : « Inclure le solde initial » (ou libellé équivalent) activée, sinon colonnes initiales à 0.
+      - groupby = account_id sur la ligne feuille.
+      - Chaque expression : date_scope obligatoire (ex. strict_range).
+
+      Import Studio (SaaS) : en cas d’erreur, importer en deux temps (colonnes puis ligne + rapport).
+
+      Si votre build refuse « positive » à la validation, repli possible : subformula if_above(EUR(0))
+      en adaptant le code devise (EUR → XOF, etc.).
+
+      Ce fichier n’est pas chargé par la toolbox : copie / import manuel uniquement.
+    -->
+
+    <record id="report_balance_6_col_example" model="account.report">
+        <field name="name">Balance générale 6 colonnes (exemple)</field>
+    </record>
+
+    <record id="col_debit_initial_example" model="account.report.column">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="sequence" eval="10"/>
+        <field name="name">Débit initial</field>
+        <field name="expression_label">debit_initial</field>
+    </record>
+
+    <record id="col_credit_initial_example" model="account.report.column">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="sequence" eval="20"/>
+        <field name="name">Crédit initial</field>
+        <field name="expression_label">credit_initial</field>
+    </record>
+
+    <record id="col_debit_example" model="account.report.column">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="sequence" eval="30"/>
+        <field name="name">Débit</field>
+        <field name="expression_label">debit</field>
+    </record>
+
+    <record id="col_credit_example" model="account.report.column">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="sequence" eval="40"/>
+        <field name="name">Crédit</field>
+        <field name="expression_label">credit</field>
+    </record>
+
+    <record id="col_debit_final_example" model="account.report.column">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="sequence" eval="50"/>
+        <field name="name">Débit final</field>
+        <field name="expression_label">debit_final</field>
+    </record>
+
+    <record id="col_credit_final_example" model="account.report.column">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="sequence" eval="60"/>
+        <field name="name">Crédit final</field>
+        <field name="expression_label">credit_final</field>
+    </record>
+
+    <record id="line_balance_accounts_example" model="account.report.line">
+        <field name="report_id" ref="report_balance_6_col_example"/>
+        <field name="name">Balance</field>
+        <field name="code">bal6_example</field>
+        <field name="groupby">account_id</field>
+        <field name="expression_ids" eval="[
+            (0, 0, {
+                'label': 'debit_initial',
+                'engine': 'aggregation',
+                'formula': 'initial_debit - initial_credit',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'credit_initial',
+                'engine': 'aggregation',
+                'formula': 'initial_credit - initial_debit',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'debit',
+                'engine': 'aggregation',
+                'formula': 'debit',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'credit',
+                'engine': 'aggregation',
+                'formula': 'credit',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'debit_final',
+                'engine': 'aggregation',
+                'formula': '(initial_debit + debit) - (initial_credit + credit)',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'credit_final',
+                'engine': 'aggregation',
+                'formula': '(initial_credit + credit) - (initial_debit + debit)',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
+            }),
+        ]"/>
+    </record>
+</odoo>
