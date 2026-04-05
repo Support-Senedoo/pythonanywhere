@@ -629,6 +629,160 @@ def _find_general_ledger_menu_id(
     return int(rid) if rid else None
 
 
+def find_general_ledger_account_report_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> int | None:
+    """
+    Rapport ``account.report`` du Grand livre / balance générale standard, pour lier une
+    variante (``root_report_id``) et disposer des variables ``initial_debit``,
+    ``initial_credit``, etc. en moteur ``aggregation``.
+
+    Ordre : xmlid ``account.report`` → menu Grand livre → action ``ir.actions.client`` /
+    ``ir.actions.act_window`` → recherche par nom (hors handler balance d’essai Enterprise).
+    """
+    xmlid_pairs: tuple[tuple[str, str], ...] = (
+        ("account_reports", "account_financial_report_general_ledger"),
+        ("account_reports", "account_general_ledger_report"),
+        ("account_reports", "account_report_general_ledger"),
+        ("account", "account_general_ledger_report"),
+        ("account", "account_financial_report_general_ledger"),
+    )
+    for mod, name in xmlid_pairs:
+        try:
+            rows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.model.data",
+                "search_read",
+                [
+                    [
+                        ("module", "=", mod),
+                        ("name", "=", name),
+                        ("model", "=", "account.report"),
+                    ]
+                ],
+                {"fields": ["res_id"], "limit": 1},
+            )
+        except Exception:
+            rows = []
+        if rows and rows[0].get("res_id"):
+            try:
+                return int(rows[0]["res_id"])
+            except (TypeError, ValueError):
+                pass
+
+    gl_mid = _find_general_ledger_menu_id(models, db, uid, password)
+    if gl_mid:
+        try:
+            mrows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.ui.menu",
+                "read",
+                [[int(gl_mid)]],
+                {"fields": ["action"]},
+            )
+        except Exception:
+            mrows = []
+        if mrows:
+            act = mrows[0].get("action")
+            if isinstance(act, str) and "," in act:
+                amodel, _, ares = act.partition(",")
+                amodel = amodel.strip()
+                try:
+                    aid = int(ares.strip())
+                except ValueError:
+                    aid = None
+                if aid:
+                    if amodel == "ir.actions.client":
+                        try:
+                            crows = execute_kw(
+                                models,
+                                db,
+                                uid,
+                                password,
+                                "ir.actions.client",
+                                "read",
+                                [[aid]],
+                                {"fields": ["tag", "context"]},
+                            )
+                        except Exception:
+                            crows = []
+                        if crows and str(crows[0].get("tag") or "") == "account_report":
+                            rid = _report_id_from_account_report_client_context(
+                                crows[0].get("context")
+                            )
+                            if rid:
+                                return int(rid)
+                    elif amodel == "ir.actions.act_window":
+                        try:
+                            aw_rows = execute_kw(
+                                models,
+                                db,
+                                uid,
+                                password,
+                                "ir.actions.act_window",
+                                "read",
+                                [[aid]],
+                                {"fields": ["res_model", "res_id"]},
+                            )
+                        except Exception:
+                            aw_rows = []
+                        if aw_rows:
+                            if aw_rows[0].get("res_model") == "account.report":
+                                r = aw_rows[0].get("res_id")
+                                if r:
+                                    try:
+                                        return int(r)
+                                    except (TypeError, ValueError):
+                                        pass
+
+    for domain in (
+        [("name", "ilike", "general ledger")],
+        [("name", "ilike", "grand livre")],
+        [("name", "ilike", "balance générale")],
+    ):
+        try:
+            rids = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "search",
+                [domain],
+                {"limit": 20, "order": "id asc"},
+            )
+        except Exception:
+            rids = []
+        for rid in rids or []:
+            try:
+                row = execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.report",
+                    "read",
+                    [[int(rid)]],
+                    {"fields": ["custom_handler_model_name", "name"]},
+                )[0]
+            except Exception:
+                continue
+            h = (row.get("custom_handler_model_name") or "").lower()
+            if "trial.balance" in h:
+                continue
+            return int(rid)
+    return None
+
+
 def resolve_parent_menu_in_grands_livres_group(
     models: Any,
     db: str,

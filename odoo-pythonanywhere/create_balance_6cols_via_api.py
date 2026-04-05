@@ -2,14 +2,21 @@
 """
 Crée sur la base Odoo un rapport « balance générale 6 colonnes » via XML-RPC.
 
-**Odoo 19** : le moteur ``aggregation`` (« Aggregate Other Formulas ») est **incompatible**
-avec ``groupby`` sur la même ligne (contrainte ``account.report.expression._validate_engine``).
-Ce script crée donc une **ligne section** (sans groupby) puis une ligne enfant avec
-``groupby = account_id`` et des expressions moteur **domain**. **Colonnes extérieures**
-(initial / final) : solde net par plage — ``[]`` + ``sum_if_pos`` / ``-sum_if_neg`` (une seule
-colonne non nulle ; côté créditeur en positif en crédit). **Colonnes centrales** (période) :
-comme une balance classique, **cumuls bruts** débit et crédit sur la période — domaines
-``debit > 0`` / ``credit > 0`` + ``sum`` / ``-sum`` + ``strict_range``.
+**Découpage solde → débit / crédit (positifs affichés)** : uniquement sur les **quatre
+colonnes extérieures** — **Débit initial**, **Crédit initial**, **Débit final**, **Crédit
+final** (solde net : partie ≥ 0 en débit, partie ≤ 0 en valeur absolue en crédit). Les **deux
+colonnes centrales de période** (**Débit** / **Crédit**) restent des **cumuls bruts** de
+mouvement sur la période ; ne pas les remplacer par un solde net.
+
+Référence staff / gabarit ``examples/balance_generale_6_col_studio.example.xml`` : en
+``aggregation``, ``positive`` sur initiaux/finaux ; période = ``debit`` / ``credit`` bruts.
+Un ``root_report_id`` vers le **Grand livre** (si résolu) alimente les variables
+``initial_*`` en agrégation.
+
+**Création** : si une racine Grand livre est trouvée, on tente d’abord les expressions
+``aggregation`` + ``positive`` (correct pour initiaux/finaux). Si Odoo refuse (ex. v19
+``groupby`` + ``aggregation`` sur la même ligne), repli : ``root_report_id`` effacé et
+moteur **domain** (moins fiable pour le découpage solde ; à éviter si possible).
 
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
@@ -53,6 +60,11 @@ from account_report_portable import (
     execute_kw,
 )
 from odoo_client import OdooClient
+from web_app.odoo_account_reports import (
+    copy_account_report_options_from_source,
+    find_general_ledger_account_report_id,
+    unlink_all_account_report_client_actions_for_report_ids,
+)
 
 # Rapport créé par la toolbox web (repère : account.report.line.code)
 BALANCE_OHADA_NAME_FR = "Balance OHADA"
@@ -65,11 +77,15 @@ def _fields(models: Any, db: str, uid: int, password: str, model: str) -> set[st
     return set(fg.keys())
 
 
-def _report_create_vals(field_names: set[str]) -> dict[str, Any]:
-    """Rapport autonome (comme le XML : pas de variante racine)."""
+def _report_create_vals(
+    field_names: set[str],
+    *,
+    root_report_id: int | None = None,
+) -> dict[str, Any]:
+    """Rapport variante (``root_report_id``) ou autonome si aucune racine résolue."""
     vals: dict[str, Any] = {}
     if "root_report_id" in field_names:
-        vals["root_report_id"] = False
+        vals["root_report_id"] = int(root_report_id) if root_report_id else False
     if "section_main_report_ids" in field_names:
         vals["section_main_report_ids"] = [(5, 0, 0)]
     return vals
@@ -97,9 +113,10 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     """
     Expressions moteur « domain » compatibles avec groupby (Odoo 19+).
 
-    - **Initial / final** : ``[]`` + ``sum_if_pos`` / ``-sum_if_neg`` (solde net, une colonne).
-    - **Période (milieu)** : cumuls **bruts** des montants débit / crédit des lignes sur
-      ``strict_range`` (balance classique à deux colonnes de mouvement).
+    - **Initial / final** : ``[]`` + ``sum_if_pos`` / ``-sum_if_neg`` — découpage du **solde
+      net** (ne pas appliquer ce schéma aux colonnes de période).
+    - **Période (2 colonnes du milieu)** : **inchangé** — filtres ``debit > 0`` / ``credit > 0``
+      + ``sum`` / ``-sum`` (cumuls **bruts** des écritures sur la période).
     """
     return [
         {
@@ -116,6 +133,7 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
             "subformula": "-sum_if_neg",
             "date_scope": "to_beginning_of_period",
         },
+        # Période : mouvements bruts (ne pas remplacer par un solde net débit − crédit).
         {
             "label": "debit",
             "engine": "domain",
@@ -130,6 +148,7 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
             "subformula": "-sum",
             "date_scope": "strict_range",
         },
+        # Finaux : solde net décomposé (comme les initiaux).
         {
             "label": "debit_final",
             "engine": "domain",
@@ -145,6 +164,116 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
             "date_scope": "from_beginning",
         },
     ]
+
+
+def _expressions_aggregation_ohada_line() -> list[dict[str, Any]]:
+    """
+    Gabarit « procédure manuelle » / XML : ``aggregation`` + ``subformula`` ``positive`` pour
+    les **soldes** (initiaux + finaux uniquement). Les expressions **debit** / **credit** de
+    période restent les variables brutes ``debit`` et ``credit`` (pas de ``positive``).
+
+    Nécessite un ``root_report_id`` valide (Grand livre) : sans cela, les variables
+    ``initial_*`` ne sont pas disponibles. Préféré à la création tant qu’Odoo accepte
+    ``aggregation`` avec ``groupby``.
+    """
+    return [
+        {
+            "label": "debit_initial",
+            "engine": "aggregation",
+            "formula": "initial_debit - initial_credit",
+            "subformula": "positive",
+            "date_scope": "strict_range",
+        },
+        {
+            "label": "credit_initial",
+            "engine": "aggregation",
+            "formula": "initial_credit - initial_debit",
+            "subformula": "positive",
+            "date_scope": "strict_range",
+        },
+        # Période : uniquement mouvements bruts (ne pas mettre debit - credit ici).
+        {
+            "label": "debit",
+            "engine": "aggregation",
+            "formula": "debit",
+            "date_scope": "strict_range",
+        },
+        {
+            "label": "credit",
+            "engine": "aggregation",
+            "formula": "credit",
+            "date_scope": "strict_range",
+        },
+        {
+            "label": "debit_final",
+            "engine": "aggregation",
+            "formula": "(initial_debit + debit) - (initial_credit + credit)",
+            "subformula": "positive",
+            "date_scope": "strict_range",
+        },
+        {
+            "label": "credit_final",
+            "engine": "aggregation",
+            "formula": "(initial_credit + credit) - (initial_debit + debit)",
+            "subformula": "positive",
+            "date_scope": "strict_range",
+        },
+    ]
+
+
+def _create_report_line_with_expressions(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    child_vals_base: dict[str, Any],
+    exprs: list[dict[str, Any]],
+) -> int:
+    """Crée une ligne avec ``expression_ids`` ; repli création ligne puis expressions une à une."""
+    expr_cmds = [(0, 0, dict(e)) for e in exprs]
+    child_vals = dict(child_vals_base)
+    child_vals["expression_ids"] = expr_cmds
+    ctx_fr = {"context": {"lang": "fr_FR"}}
+    try:
+        return int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.line",
+                "create",
+                [child_vals],
+                ctx_fr,
+            )
+        )
+    except Exception:
+        child_vals.pop("expression_ids", None)
+        child_id = int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.line",
+                "create",
+                [child_vals],
+                ctx_fr,
+            )
+        )
+        for e in exprs:
+            ev = dict(e)
+            ev["report_line_id"] = child_id
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.expression",
+                "create",
+                [ev],
+            )
+        return child_id
 
 
 def create_balance_six_columns_rpc(
@@ -168,7 +297,8 @@ def create_balance_six_columns_rpc(
         (60, "Crédit final", "Closing credit", "credit_final"),
     ]
 
-    rep_vals = _report_create_vals(rep_fields)
+    root_id = find_general_ledger_account_report_id(models, db, uid, password)
+    rep_vals = _report_create_vals(rep_fields, root_report_id=root_id)
     rep_vals["name"] = name_fr
 
     report_id = int(
@@ -253,61 +383,74 @@ def create_balance_six_columns_rpc(
         "Balance",
     )
 
-    exprs = _expressions_domain_grouped_line()
-    expr_cmds = [(0, 0, dict(e)) for e in exprs]
     line_field_names = _fields(models, db, uid, password, "account.report.line")
-    child_vals: dict[str, Any] = {
+    child_vals_base: dict[str, Any] = {
         "report_id": report_id,
         "parent_id": parent_id,
         "name": "Comptes",
         "code": line_code,
         "groupby": "account_id",
         "sequence": 20,
-        "expression_ids": expr_cmds,
     }
     if "foldable" in line_field_names:
-        child_vals["foldable"] = True
+        child_vals_base["foldable"] = True
 
     ctx_fr = {"context": {"lang": "fr_FR"}}
-    try:
-        child_id = int(
-            execute_kw(
+
+    if root_id:
+        try:
+            copy_account_report_options_from_source(
+                models, db, uid, password, root_id, report_id
+            )
+        except Exception:
+            pass
+        agg_vals = dict(child_vals_base)
+        agg_vals["expression_ids"] = [
+            (0, 0, dict(e)) for e in _expressions_aggregation_ohada_line()
+        ]
+        try:
+            child_id = int(
+                execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.report.line",
+                    "create",
+                    [agg_vals],
+                    ctx_fr,
+                )
+            )
+        except Exception:
+            try:
+                execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.report",
+                    "write",
+                    [[report_id], {"root_report_id": False}],
+                )
+            except Exception:
+                pass
+            child_id = _create_report_line_with_expressions(
                 models,
                 db,
                 uid,
                 password,
-                "account.report.line",
-                "create",
-                [child_vals],
-                ctx_fr,
+                child_vals_base,
+                _expressions_domain_grouped_line(),
             )
+    else:
+        child_id = _create_report_line_with_expressions(
+            models,
+            db,
+            uid,
+            password,
+            child_vals_base,
+            _expressions_domain_grouped_line(),
         )
-    except Exception:
-        child_vals.pop("expression_ids", None)
-        child_id = int(
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report.line",
-                "create",
-                [child_vals],
-                ctx_fr,
-            )
-        )
-        for e in exprs:
-            ev = dict(e)
-            ev["report_line_id"] = child_id
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report.expression",
-                "create",
-                [ev],
-            )
 
     apply_record_field_translations(
         models,
