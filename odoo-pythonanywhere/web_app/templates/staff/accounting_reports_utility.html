@@ -221,7 +221,7 @@
 {% endif %}
 
 <div class="sn-card sn-card--accent">
-  <h2 style="margin-top:0;font-size:1.05rem;">Base Odoo et filtre des rapports</h2>
+  <h2 style="margin-top:0;font-size:1.05rem;">{% if accounting_mode == 'balance' %}Base Odoo{% else %}Base Odoo et filtre des rapports{% endif %}</h2>
   <form method="get" action="{{ request.path }}" novalidate>
     <label for="filter_host">Serveur Odoo (hôte de l’URL)</label>
     <select id="filter_host" name="filter_host">
@@ -230,7 +230,11 @@
       <option value="{{ h }}" {% if filter_host == h %}selected{% endif %}>{{ h }}</option>
       {% endfor %}
     </select>
+    {% if accounting_mode == 'balance' %}
+    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Sans hôte : la liste des bases et le tableau de choix ci‑dessous couvrent <strong>toutes les bases enregistrées</strong> après « Actualiser ». Avec un hôte : uniquement les bases de ce serveur.</p>
+    {% else %}
     <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Sans hôte : la liste déroulante et le tableau ci‑dessous montrent <strong>toutes les bases</strong> après « Actualiser ». Avec un hôte : seules les bases sur ce serveur.</p>
+    {% endif %}
 
     <label for="client_id">Base à utiliser (nom technique db)</label>
     <select id="client_id" name="client_id">
@@ -251,7 +255,7 @@
     {% endif %}
 
     <div id="ajouter-base-odoo" class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
-      <button type="submit">Actualiser la liste</button>
+      <button type="submit">{% if accounting_mode == 'balance' %}Actualiser{% else %}Actualiser la liste{% endif %}</button>
       <button type="button" id="btn-toggle-add-base" class="sn-btn sn-btn--ghost">Ajouter une base</button>
       <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
     </div>

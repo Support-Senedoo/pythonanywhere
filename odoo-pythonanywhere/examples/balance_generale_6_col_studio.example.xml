@@ -3,7 +3,12 @@
     <!--
       Balance générale 6 colonnes (visée OHADA) — gabarit Studio / module custom, Odoo v19+.
 
-      Points clés v19 :
+      Attention Odoo 19 : sur une ligne avec groupby (ex. account_id), le moteur
+      « aggregation » est refusé par le serveur. Utiliser le moteur « domain » et une
+      hiérarchie ligne parente + ligne groupée, ou créer via la toolbox
+      (create_balance_6cols_via_api.py) qui applique ce schéma.
+
+      Points clés (gabarit historique aggregation + XML Studio) :
       - engine = aggregation (pas de formule « python » pour ce schéma).
       - subformula = positive : garde uniquement la partie > 0 (équivalent pratique à max(x, 0)).
       - subformula = negative : garde uniquement la partie < 0 (côté crédit si besoin).

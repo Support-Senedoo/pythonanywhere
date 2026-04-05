@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Crée sur la base Odoo un rapport « balance générale 6 colonnes » via XML-RPC,
-équivalent au gabarit ``examples/balance_generale_6_col_studio.example.xml``
-(Odoo Comptabilité / rapports configurables, moteur aggregation, v19+ visé).
+Crée sur la base Odoo un rapport « balance générale 6 colonnes » via XML-RPC.
+
+**Odoo 19** : le moteur ``aggregation`` (« Aggregate Other Formulas ») est **incompatible**
+avec ``groupby`` sur la même ligne (contrainte ``account.report.expression._validate_engine``).
+Ce script crée donc une **ligne section** (sans groupby) puis une ligne enfant avec
+``groupby = account_id`` et des expressions moteur **domain** (sous-formules ``sum`` /
+``sum_if_pos`` / ``sum_if_neg`` selon la doc comptable v19). Les montants période
+``débit`` / ``crédit`` reflètent le **découpage du solde net** de la période (positif /
+négatif), pas nécessairement les bruts débit et crédit comme un vieux gabarit XML en
+``aggregation``.
 
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
-``find_balance_ohada_report_id`` pour l’utilitaire web et un rapport reconnaissable
-(ligne feuille ``code = bal_ohada``).
+``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
 
 Prérequis : comptabilité + rapports configurables (account_reports), droits de
 création sur ``account.report`` et sous-modèles.
@@ -74,48 +80,57 @@ def _column(
     }
 
 
-def _expressions() -> list[dict[str, Any]]:
-    """Même logique que balance_generale_6_col_studio.example.xml."""
+def _section_line_code(leaf_code: str) -> str:
+    return f"{leaf_code}_section"
+
+
+def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
+    """
+    Expressions moteur « domain » compatibles avec groupby (Odoo 19+).
+    Formule ``[]`` = toutes les lignes d’écriture pertinentes pour le compte (contexte groupby).
+    """
     return [
         {
             "label": "debit_initial",
-            "engine": "aggregation",
-            "formula": "initial_debit - initial_credit",
-            "subformula": "positive",
-            "date_scope": "strict_range",
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "sum_if_pos",
+            "date_scope": "to_beginning_of_period",
         },
         {
             "label": "credit_initial",
-            "engine": "aggregation",
-            "formula": "initial_credit - initial_debit",
-            "subformula": "positive",
-            "date_scope": "strict_range",
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "-sum_if_neg",
+            "date_scope": "to_beginning_of_period",
         },
         {
             "label": "debit",
-            "engine": "aggregation",
-            "formula": "debit",
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "sum_if_pos",
             "date_scope": "strict_range",
         },
         {
             "label": "credit",
-            "engine": "aggregation",
-            "formula": "credit",
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "-sum_if_neg",
             "date_scope": "strict_range",
         },
         {
             "label": "debit_final",
-            "engine": "aggregation",
-            "formula": "(initial_debit + debit) - (initial_credit + credit)",
-            "subformula": "positive",
-            "date_scope": "strict_range",
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "sum_if_pos",
+            "date_scope": "from_beginning",
         },
         {
             "label": "credit_final",
-            "engine": "aggregation",
-            "formula": "(initial_credit + credit) - (initial_debit + debit)",
-            "subformula": "positive",
-            "date_scope": "strict_range",
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "-sum_if_neg",
+            "date_scope": "from_beginning",
         },
     ]
 
@@ -172,20 +187,46 @@ def create_balance_six_columns_rpc(
         cv["report_id"] = report_id
         execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
 
-    expr_cmds = [(0, 0, dict(e)) for e in _expressions()]
-    line_vals: dict[str, Any] = {
+    # Ligne parente sans groupby (Odoo 19 : aggregation + groupby interdit sur la même ligne).
+    section_code = _section_line_code(line_code)
+    parent_vals: dict[str, Any] = {
         "report_id": report_id,
         "name": {"fr_FR": "Balance", "en_US": "Balance"},
+        "code": section_code,
+        "sequence": 10,
+    }
+    parent_id = int(
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "create",
+            [parent_vals],
+        )
+    )
+
+    exprs = _expressions_domain_grouped_line()
+    expr_cmds = [(0, 0, dict(e)) for e in exprs]
+    line_field_names = _fields(models, db, uid, password, "account.report.line")
+    child_vals: dict[str, Any] = {
+        "report_id": report_id,
+        "parent_id": parent_id,
+        "name": {"fr_FR": "Comptes", "en_US": "Accounts"},
         "code": line_code,
         "groupby": "account_id",
+        "sequence": 20,
         "expression_ids": expr_cmds,
     }
+    if "foldable" in line_field_names:
+        child_vals["foldable"] = True
 
     try:
-        execute_kw(models, db, uid, password, "account.report.line", "create", [line_vals])
+        execute_kw(models, db, uid, password, "account.report.line", "create", [child_vals])
     except Exception:
-        line_vals.pop("expression_ids", None)
-        line_id = int(
+        child_vals.pop("expression_ids", None)
+        child_id = int(
             execute_kw(
                 models,
                 db,
@@ -193,12 +234,12 @@ def create_balance_six_columns_rpc(
                 password,
                 "account.report.line",
                 "create",
-                [line_vals],
+                [child_vals],
             )
         )
-        for e in _expressions():
+        for e in exprs:
             ev = dict(e)
-            ev["report_line_id"] = line_id
+            ev["report_line_id"] = child_id
             execute_kw(
                 models,
                 db,
