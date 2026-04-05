@@ -8,15 +8,17 @@ final** (solde net : partie ≥ 0 en débit, partie ≤ 0 en valeur absolue en c
 colonnes centrales de période** (**Débit** / **Crédit**) restent des **cumuls bruts** de
 mouvement sur la période ; ne pas les remplacer par un solde net.
 
-Référence staff / gabarit ``examples/balance_generale_6_col_studio.example.xml`` : en
-``aggregation``, ``positive`` sur initiaux/finaux ; période = ``debit`` / ``credit`` bruts.
-Un ``root_report_id`` vers le **Grand livre** (si résolu) alimente les variables
-``initial_*`` en agrégation.
+**Odoo 19 (constat code source communautaire)** : le moteur ``aggregation`` est **refusé**
+dès qu’une ligne porte un ``groupby`` (ex. ``account_id``). Une balance par compte **ne peut
+donc pas** utiliser ``initial_debit - initial_credit`` + ``positive`` sur cette ligne : la
+création échoue et on retombait sur le domaine — avec en plus un ``root_report_id`` vers le
+Grand livre, le rapport se comporte souvent comme une **variante** et affiche encore le **solde
+signé** dans la colonne débit au lieu du découpage attendu.
 
-**Création** : si une racine Grand livre est trouvée, on tente d’abord les expressions
-``aggregation`` + ``positive`` (correct pour initiaux/finaux). Si Odoo refuse (ex. v19
-``groupby`` + ``aggregation`` sur la même ligne), repli : ``root_report_id`` effacé et
-moteur **domain** (moins fiable pour le découpage solde ; à éviter si possible).
+**Stratégie toolbox** : rapport **autonome** (``root_report_id`` = faux), recopie **uniquement**
+des options (filtres, solde initial…) depuis le Grand livre si trouvé, lignes en **domain** +
+``sum_if_pos`` / ``-sum_if_neg`` sur les quatre colonnes extérieures, puis **réécriture**
+XML-RPC des expressions pour garantir les sous-formules en base.
 
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
@@ -82,7 +84,7 @@ def _report_create_vals(
     *,
     root_report_id: int | None = None,
 ) -> dict[str, Any]:
-    """Rapport variante (``root_report_id``) ou autonome si aucune racine résolue."""
+    """``root_report_id`` explicite ; pour Balance OHADA on passe ``None`` (rapport autonome)."""
     vals: dict[str, Any] = {}
     if "root_report_id" in field_names:
         vals["root_report_id"] = int(root_report_id) if root_report_id else False
@@ -168,13 +170,10 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
 
 def _expressions_aggregation_ohada_line() -> list[dict[str, Any]]:
     """
-    Gabarit « procédure manuelle » / XML : ``aggregation`` + ``subformula`` ``positive`` pour
-    les **soldes** (initiaux + finaux uniquement). Les expressions **debit** / **credit** de
-    période restent les variables brutes ``debit`` et ``credit`` (pas de ``positive``).
-
-    Nécessite un ``root_report_id`` valide (Grand livre) : sans cela, les variables
-    ``initial_*`` ne sont pas disponibles. Préféré à la création tant qu’Odoo accepte
-    ``aggregation`` avec ``groupby``.
+    Référence **Studio / import XML** (ligne **sans** ``groupby`` ou hors v19). Avec
+    ``groupby = account_id``, Odoo 19 **refuse** l’engine ``aggregation`` sur la même ligne :
+    la toolbox n’utilise pas ce bloc pour la création API ; voir le domaine +
+    ``_force_ohada_outer_domain_expressions``.
     """
     return [
         {
@@ -219,6 +218,131 @@ def _expressions_aggregation_ohada_line() -> list[dict[str, Any]]:
             "date_scope": "strict_range",
         },
     ]
+
+
+def _strip_variant_root_and_handlers(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    rep_field_names: set[str],
+) -> None:
+    """Rapport 100 % autonome : pas de racine ni handler métier (évite soldes signés type variante)."""
+    vals: dict[str, Any] = {}
+    if "root_report_id" in rep_field_names:
+        vals["root_report_id"] = False
+    if "section_main_report_ids" in rep_field_names:
+        vals["section_main_report_ids"] = [(5, 0, 0)]
+    if "custom_handler_model_name" in rep_field_names:
+        vals["custom_handler_model_name"] = False
+    if vals:
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "write",
+                [[int(report_id)], vals],
+            )
+        except Exception:
+            pass
+
+
+def _force_ohada_outer_domain_expressions(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    line_code: str,
+) -> None:
+    """
+    Réécrit les expressions des colonnes extérieures (initiaux / finaux) pour forcer le
+    découpage solde : ``sum_if_pos`` / ``-sum_if_neg`` sur ``[]``, quoi qu’ait stocké la création.
+    """
+    line_ids = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        "search",
+        [[("report_id", "=", int(report_id)), ("code", "=", line_code)]],
+        {"limit": 2},
+    )
+    if not line_ids:
+        return
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        "read",
+        [line_ids[:1]],
+        {"fields": ["expression_ids"]},
+    )
+    expr_ids = (rows[0] or {}).get("expression_ids") or []
+    if not expr_ids:
+        return
+    expr_rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.expression",
+        "read",
+        [expr_ids],
+        {"fields": ["id", "label"]},
+    )
+    targets: dict[str, dict[str, Any]] = {
+        "debit_initial": {
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "sum_if_pos",
+            "date_scope": "to_beginning_of_period",
+        },
+        "credit_initial": {
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "-sum_if_neg",
+            "date_scope": "to_beginning_of_period",
+        },
+        "debit_final": {
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "sum_if_pos",
+            "date_scope": "from_beginning",
+        },
+        "credit_final": {
+            "engine": "domain",
+            "formula": "[]",
+            "subformula": "-sum_if_neg",
+            "date_scope": "from_beginning",
+        },
+    }
+    for er in expr_rows:
+        lbl = er.get("label")
+        if lbl not in targets:
+            continue
+        eid = er.get("id")
+        if not eid:
+            continue
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.expression",
+                "write",
+                [[int(eid)], dict(targets[str(lbl)])],
+            )
+        except Exception:
+            continue
 
 
 def _create_report_line_with_expressions(
@@ -297,8 +421,8 @@ def create_balance_six_columns_rpc(
         (60, "Crédit final", "Closing credit", "credit_final"),
     ]
 
-    root_id = find_general_ledger_account_report_id(models, db, uid, password)
-    rep_vals = _report_create_vals(rep_fields, root_report_id=root_id)
+    gl_id = find_general_ledger_account_report_id(models, db, uid, password)
+    rep_vals = _report_create_vals(rep_fields, root_report_id=None)
     rep_vals["name"] = name_fr
 
     report_id = int(
@@ -314,6 +438,10 @@ def create_balance_six_columns_rpc(
         )
     )
 
+    _strip_variant_root_and_handlers(
+        models, db, uid, password, report_id, rep_fields
+    )
+
     apply_report_name_translations(
         models,
         db,
@@ -324,8 +452,11 @@ def create_balance_six_columns_rpc(
         name_en,
     )
 
+    col_fields = _fields(models, db, uid, password, "account.report.column")
     for seq, fr_lbl, en_lbl, expr_lbl in cols_spec:
         cv = _column_vals(seq, fr_lbl, expr_lbl)
+        if "blank_if_zero" in col_fields:
+            cv["blank_if_zero"] = True
         cv["report_id"] = report_id
         col_id = int(
             execute_kw(
@@ -395,62 +526,25 @@ def create_balance_six_columns_rpc(
     if "foldable" in line_field_names:
         child_vals_base["foldable"] = True
 
-    ctx_fr = {"context": {"lang": "fr_FR"}}
-
-    if root_id:
+    if gl_id:
         try:
             copy_account_report_options_from_source(
-                models, db, uid, password, root_id, report_id
+                models, db, uid, password, gl_id, report_id
             )
         except Exception:
             pass
-        agg_vals = dict(child_vals_base)
-        agg_vals["expression_ids"] = [
-            (0, 0, dict(e)) for e in _expressions_aggregation_ohada_line()
-        ]
-        try:
-            child_id = int(
-                execute_kw(
-                    models,
-                    db,
-                    uid,
-                    password,
-                    "account.report.line",
-                    "create",
-                    [agg_vals],
-                    ctx_fr,
-                )
-            )
-        except Exception:
-            try:
-                execute_kw(
-                    models,
-                    db,
-                    uid,
-                    password,
-                    "account.report",
-                    "write",
-                    [[report_id], {"root_report_id": False}],
-                )
-            except Exception:
-                pass
-            child_id = _create_report_line_with_expressions(
-                models,
-                db,
-                uid,
-                password,
-                child_vals_base,
-                _expressions_domain_grouped_line(),
-            )
-    else:
-        child_id = _create_report_line_with_expressions(
-            models,
-            db,
-            uid,
-            password,
-            child_vals_base,
-            _expressions_domain_grouped_line(),
-        )
+
+    child_id = _create_report_line_with_expressions(
+        models,
+        db,
+        uid,
+        password,
+        child_vals_base,
+        _expressions_domain_grouped_line(),
+    )
+    _force_ohada_outer_domain_expressions(
+        models, db, uid, password, report_id, line_code
+    )
 
     apply_record_field_translations(
         models,
