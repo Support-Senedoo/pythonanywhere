@@ -435,6 +435,169 @@ def _menu_m2o_id(val: Any) -> int | None:
         return None
 
 
+def _next_menu_sequence_under_parent(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    parent_menu_id: int,
+) -> int:
+    """Prochaine séquence libre sous un menu parent (ajout en fin de sous-menu)."""
+    try:
+        mids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "search",
+            [[("parent_id", "=", int(parent_menu_id))]],
+            {"limit": 500},
+        )
+    except Exception:
+        return 500
+    if not mids:
+        return 10
+    try:
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "read",
+            [mids],
+            {"fields": ["sequence"]},
+        )
+    except Exception:
+        return 500
+    mx = 0
+    for r in rows or []:
+        try:
+            mx = max(mx, int(r.get("sequence") or 0))
+        except (TypeError, ValueError):
+            continue
+    return mx + 1
+
+
+# Grand livre général : son ``parent_id`` est le sous-menu **Grands livres** (Analyse › …).
+_GENERAL_LEDGER_MENU_XMLIDS: tuple[str, ...] = (
+    "account_reports.menu_action_account_report_general_ledger",
+    "account_reports.menu_action_account_report_gl",
+    "account_accountant.menu_action_account_report_general_ledger",
+    "account.menu_action_account_report_general_ledger",
+)
+_GENERAL_LEDGER_DATA_NAME_EXACT = "menu_action_account_report_general_ledger"
+_GENERAL_LEDGER_MODULE_PREF: tuple[str, ...] = (
+    "account_reports",
+    "account_accountant",
+    "account",
+)
+
+
+def _find_general_ledger_menu_id(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> int | None:
+    for xmlid in _GENERAL_LEDGER_MENU_XMLIDS:
+        mod, _, name = xmlid.partition(".")
+        if not name:
+            continue
+        mid = _ir_ui_menu_id_from_xmlid(models, db, uid, password, mod, name)
+        if mid:
+            return mid
+    try:
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.model.data",
+            "search_read",
+            [
+                [
+                    ("model", "=", "ir.ui.menu"),
+                    ("name", "=", _GENERAL_LEDGER_DATA_NAME_EXACT),
+                ]
+            ],
+            {"fields": ["module", "res_id"], "limit": 20},
+        )
+    except Exception:
+        rows = []
+    if not rows:
+        try:
+            rows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.model.data",
+                "search_read",
+                [
+                    [
+                        ("model", "=", "ir.ui.menu"),
+                        ("name", "ilike", "%general_ledger%"),
+                    ]
+                ],
+                {"fields": ["module", "res_id"], "limit": 20},
+            )
+        except Exception:
+            rows = []
+    if not rows:
+        return None
+
+    def _pref_key(mod: str) -> int:
+        try:
+            return _GENERAL_LEDGER_MODULE_PREF.index(mod)
+        except ValueError:
+            return len(_GENERAL_LEDGER_MODULE_PREF)
+
+    rows.sort(
+        key=lambda r: (_pref_key(str(r.get("module") or "")), str(r.get("name") or ""))
+    )
+    rid = rows[0].get("res_id")
+    return int(rid) if rid else None
+
+
+def resolve_parent_menu_in_grands_livres_group(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+) -> tuple[int, int] | None:
+    """
+    Place le menu sous le groupe **Grands livres** (même parent que le Grand livre général).
+
+    Résolution : menu d’action du rapport Grand livre → ``parent_id`` = dossier Grands livres ;
+    séquence = fin de liste des enfants. Repli : ancienne logique « après balance comptable ».
+    """
+    gl_mid = _find_general_ledger_menu_id(models, db, uid, password)
+    if gl_mid:
+        try:
+            gl_rows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.ui.menu",
+                "read",
+                [[gl_mid]],
+                {"fields": ["parent_id"]},
+            )
+        except Exception:
+            gl_rows = []
+        if gl_rows:
+            parent_id = _menu_m2o_id(gl_rows[0].get("parent_id"))
+            if parent_id:
+                seq = _next_menu_sequence_under_parent(
+                    models, db, uid, password, parent_id
+                )
+                return (parent_id, seq)
+    return resolve_parent_menu_below_trial_balance(models, db, uid, password)
+
+
 def _find_trial_balance_menu_id(
     models: Any,
     db: str,
@@ -679,8 +842,8 @@ def ensure_account_report_reporting_menu(
     Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu``.
 
     Par défaut : sous **Reporting** (Statement Reports / Reporting). Avec ``under_trial_balance=True``
-    (balance 6 col.) : sous le **même parent** que le menu **Balance comptable** / trial balance,
-    séquence juste après (Analyse › Grands livres › … selon la langue).
+    (balance 6 col.) : sous le sous-menu **Grands livres** (parent du **Grand livre général** si
+    trouvé ; séquence en fin de groupe), sinon repli après **Balance comptable**.
 
     Retourne ``(client_action_id, menu_id)``. Si aucun parent menu n’est résolu, retourne
     ``(action_id, None)`` — l’URL ``web#action=`` peut rester insuffisante selon la version Odoo.
@@ -703,7 +866,7 @@ def ensure_account_report_reporting_menu(
     existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
 
     if under_trial_balance:
-        placement = resolve_parent_menu_below_trial_balance(models, db, uid, password)
+        placement = resolve_parent_menu_in_grands_livres_group(models, db, uid, password)
         if placement:
             parent_id, menu_sequence = placement[0], placement[1]
         else:

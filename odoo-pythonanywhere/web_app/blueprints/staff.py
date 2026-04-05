@@ -420,18 +420,6 @@ def _accounting_reports_page(accounting_mode: str):
                 rid = int(request.form.get("report_id") or "0")
             except ValueError:
                 rid = 0
-            if (request.form.get("confirm") or "").strip() != "OUI":
-                flash("Tapez OUI en majuscules pour confirmer la personnalisation.", "warning")
-                return redirect(
-                    ru(
-                        **_rapports_url_params(
-                            client_id=cid,
-                            q=filter_q,
-                            report_id=rid if rid > 0 else None,
-                            filter_host=fl_save,
-                        ),
-                    )
-                )
             if rid <= 0:
                 flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
                 return redirect(
@@ -476,21 +464,6 @@ def _accounting_reports_page(accounting_mode: str):
                 rid = int(request.form.get("report_id") or "0")
             except ValueError:
                 rid = 0
-            if (request.form.get("confirm") or "").strip() != "OUI":
-                flash(
-                    "Tapez OUI en majuscules pour confirmer la personnalisation P&L analytique / budget.",
-                    "warning",
-                )
-                return redirect(
-                    ru(
-                        **_rapports_url_params(
-                            client_id=cid,
-                            q=filter_q,
-                            report_id=rid if rid > 0 else None,
-                            filter_host=fl_save,
-                        ),
-                    )
-                )
             if rid <= 0:
                 flash("Indiquez un identifiant de rapport (account.report) valide.", "danger")
                 return redirect(
@@ -550,18 +523,6 @@ def _accounting_reports_page(accounting_mode: str):
                 rid = int(request.form.get("report_id") or "0")
             except ValueError:
                 rid = 0
-            if (request.form.get("confirm") or "").strip() != "OUI":
-                flash("Tapez OUI en majuscules pour confirmer la personnalisation de la balance.", "warning")
-                return redirect(
-                    ru(
-                        **_rapports_url_params(
-                            client_id=cid,
-                            q=filter_q,
-                            report_id=rid if rid > 0 else None,
-                            filter_host=fl_save,
-                        ),
-                    )
-                )
             if rid <= 0:
                 flash("Indiquez un identifiant de rapport balance (account.report) valide.", "danger")
                 return redirect(
@@ -608,8 +569,8 @@ def _accounting_reports_page(accounting_mode: str):
                     )
                     if menu_mid:
                         msg += (
-                            " Une entrée de menu a été créée sous Analyse › Grands livres, "
-                            "juste après Balance comptable (libellés selon la langue Odoo) — ouvrez-la pour lancer l’analyse."
+                            " Une entrée de menu a été créée dans le sous-menu Grands livres "
+                            "(Analyse › …, libellés selon la langue Odoo) — ouvrez-la pour lancer l’analyse."
                         )
                 except Exception:
                     pass

@@ -80,7 +80,7 @@
     Les bases sont identifiées par le <strong>nom technique Odoo (db)</strong> ; le filtre <strong>hôte d’URL</strong> regroupe les bases d’un même serveur.
   </p>
   <ul>
-    <li><strong>Personnaliser</strong> : id du rapport source + <strong>OUI</strong> — copie + script <code>personalize_syscohada_detail</code>.</li>
+    <li><strong>Personnaliser</strong> : id du rapport source, puis bouton — copie + script <code>personalize_syscohada_detail</code>.</li>
     <li><strong>Liste</strong> : filtre texte sur le nom ; renommer / supprimer depuis chaque ligne.</li>
     <li>Pour le <strong>budget analytique</strong> sur P&amp;L, utilisez l’utilitaire dédié « P&amp;L analytique / budget ».</li>
   </ul>
@@ -101,7 +101,7 @@
     La <strong>sonde budget / analytique</strong> (lecture seule) indique si des lignes de budget portent un analytique — prérequis pour qu’un budget « par axe » ait du sens dans le rapport.
   </p>
   <ul>
-    <li>Lancez d’abord la <strong>sonde</strong> si besoin, puis <strong>Créer la copie (détail + analytique / budget)</strong> avec <strong>OUI</strong>.</li>
+    <li>Lancez d’abord la <strong>sonde</strong> si besoin, puis <strong>Créer la copie (détail + analytique / budget)</strong>.</li>
     <li>Détails et contournements : <code>DEPLOY_PYTHONANYWHERE.md</code>.</li>
   </ul>
   <p class="sn-meta-line">
@@ -121,7 +121,7 @@
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le rapport peut combiner un <strong>handler</strong> et des lignes moteur « custom » (<code>_report_custom_engine_trial_balance</code>). Il ne faut <strong>pas</strong> vider le handler sur la copie : sinon erreur « Méthode invalide » à l’ouverture.
-    La copie est <strong>autonome</strong> (sans <code>root_report_id</code>) pour éviter les erreurs sur les colonnes <code>sn_*</code> (sinon Odoo peut lever <strong>RPC_ERROR / KeyError: sn_open_deb</strong> dans le post-processeur trial balance). La toolbox détache la racine <strong>avant</strong> de recréer les colonnes. Pour une copie déjà cassée : mode développeur → <strong>Rapports comptables</strong> → ouvrir le rapport → vider le champ <strong>Racine du rapport</strong> (<code>root_report_id</code>) puis enregistrer (les options ont été recopiées si la personnalisation toolbox a réussi partiellement ; sinon recopier les filtres depuis la balance standard ou refaire une nouvelle copie avec la toolbox à jour). La toolbox crée une <strong>entrée de menu</strong> sous <strong>Analyse › Grands livres</strong>, juste après <strong>Balance comptable</strong> (même parent technique que le menu trial balance ; libellés selon la langue Odoo), et un lien liste « rapports comptables » en configuration. Vous pouvez <strong>définir le nom du rapport et du menu</strong> (champ optionnel) <strong>avant</strong> la création du menu ; à la suppression du rapport dans la toolbox, menu et action client sont retirés ensemble. Les options de filtre du modèle source sont recopiées sur la copie.
+    La copie est <strong>autonome</strong> (sans <code>root_report_id</code>) pour éviter les erreurs sur les colonnes <code>sn_*</code> (sinon Odoo peut lever <strong>RPC_ERROR / KeyError: sn_open_deb</strong> dans le post-processeur trial balance). La toolbox détache la racine <strong>avant</strong> de recréer les colonnes. Pour une copie déjà cassée : mode développeur → <strong>Rapports comptables</strong> → ouvrir le rapport → vider le champ <strong>Racine du rapport</strong> (<code>root_report_id</code>) puis enregistrer (les options ont été recopiées si la personnalisation toolbox a réussi partiellement ; sinon recopier les filtres depuis la balance standard ou refaire une nouvelle copie avec la toolbox à jour). La toolbox crée une <strong>entrée de menu</strong> dans le sous-menu <strong>Grands livres</strong> (même parent que le Grand livre général si trouvé ; repli après balance comptable ; libellés selon la langue Odoo), et un lien liste « rapports comptables » en configuration. Vous pouvez <strong>définir le nom du rapport et du menu</strong> (champ optionnel) <strong>avant</strong> la création du menu ; à la suppression du rapport dans la toolbox, menu et action client sont retirés ensemble. Les options de filtre du modèle source sont recopiées sur la copie.
   </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -451,8 +451,6 @@
     <p class="sn-muted" style="margin:0.35rem 0 0.65rem;font-size:0.85rem;line-height:1.45;">
       Saisissez le libellé <strong>avant</strong> la création du menu : rapport, entrée de menu et action client d’exécution restent ainsi <strong>identiques</strong> (limite affichage menu ~120 caractères côté Odoo).
     </p>
-    <label for="confirm_b">Confirmation</label>
-    <input type="text" id="confirm_b" name="confirm" placeholder="Tapez OUI en majuscules" {% if not prefill_report_id %}disabled{% endif %}>
     <button type="submit" {% if not prefill_report_id %}disabled{% endif %}>Créer la copie et appliquer les 6 colonnes</button>
   </form>
   {% elif accounting_mode == 'pl_budget' %}
@@ -482,8 +480,6 @@
     <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;">Aucun rapport sélectionné — cliquez sur <strong>Préparer (budget)</strong> sur une ligne du tableau.</p>
     {% endif %}
     <p class="sn-muted" style="font-size:0.85rem;margin:0 0 0.5rem;">Libellé de la copie : source + « — copie Senedoo (analytique budget) ».</p>
-    <label for="confirm_ab">Confirmation</label>
-    <input type="text" id="confirm_ab" name="confirm" placeholder="Tapez OUI en majuscules" {% if not prefill_report_id %}disabled{% endif %}>
     <button type="submit" {% if not prefill_report_id %}disabled{% endif %}>Créer la copie (détail + analytique / budget)</button>
   </form>
   {% else %}
@@ -508,8 +504,6 @@
     <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;">Aucun rapport sélectionné — cliquez sur <strong>Personnaliser</strong> sur une ligne du tableau.</p>
     {% endif %}
     <p class="sn-muted" style="font-size:0.85rem;margin:0 0 0.5rem;">Le libellé de la copie sera celui du source + « — copie Senedoo » (traductions préservées quand c’est possible).</p>
-    <label for="confirm_p">Confirmation</label>
-    <input type="text" id="confirm_p" name="confirm" placeholder="Tapez OUI en majuscules" {% if not prefill_report_id %}disabled{% endif %}>
     <button type="submit" {% if not prefill_report_id %}disabled{% endif %}>Créer la copie et personnaliser</button>
   </form>
   {% endif %}
