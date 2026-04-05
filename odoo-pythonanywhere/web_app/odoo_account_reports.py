@@ -1435,6 +1435,11 @@ def duplicate_account_report(
         )
         if _account_report_has_field(models, db, uid, password, "root_report_id"):
             try:
+                sa_vals: dict[str, Any] = {"root_report_id": False}
+                if _account_report_has_field(
+                    models, db, uid, password, "section_main_report_ids"
+                ):
+                    sa_vals["section_main_report_ids"] = [(5, 0, 0)]
                 execute_kw(
                     models,
                     db,
@@ -1442,7 +1447,7 @@ def duplicate_account_report(
                     password,
                     "account.report",
                     "write",
-                    [[new_id], {"root_report_id": False}],
+                    [[new_id], sa_vals],
                 )
             except Exception:
                 pass

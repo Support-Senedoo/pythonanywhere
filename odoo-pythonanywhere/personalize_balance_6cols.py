@@ -17,7 +17,10 @@ reste une **variante** (``root_report_id``) : le post-processeur s’aligne sur 
 la toolbox le **vide sans condition sur le handler** (sur Odoo 19 SaaS le modèle technique peut ne pas
 contenir « trial_balance »), **avant** les colonnes `sn_*`. Après ``copy``, ``duplicate_account_report``
 avec ``attach_to_root=False`` force aussi ``root_report_id`` à vide une fois les options recopiées.
-Les filtres sont resynchronisés depuis la racine au détachement.
+Les filtres sont resynchronisés depuis la racine au détachement. Sur Odoo 17+, le champ
+``section_main_report_ids`` (« Section de ») peut aussi faire hériter le comportement d’un rapport
+composite : il est **vidé** en même temps que ``root_report_id``, sinon le post-processeur trial balance
+peut continuer à indexer les totaux sur le schéma d’origine → ``KeyError: sn_open_deb``.
 
 **Ne pas** retirer ``custom_handler_model_name`` sur la copie : les lignes au moteur « custom »
 ``_report_custom_engine_trial_balance`` exigent ce handler ; sans lui, Odoo affiche « Méthode invalide ».
@@ -63,6 +66,14 @@ def _account_report_field_names(models: Any, db: str, uid: int, password: str) -
     return set(fg.keys())
 
 
+def _standalone_account_report_write_vals(names: set[str]) -> dict[str, Any]:
+    """Coupe variante + lien « Section de » (Many2many) pour un rapport autonome."""
+    vals: dict[str, Any] = {"root_report_id": False}
+    if "section_main_report_ids" in names:
+        vals["section_main_report_ids"] = [(5, 0, 0)]
+    return vals
+
+
 def _detach_trial_balance_variant_after_six_columns(
     models: Any,
     db: str,
@@ -71,10 +82,9 @@ def _detach_trial_balance_variant_after_six_columns(
     report_id: int,
 ) -> dict[str, Any]:
     """
-    Vide ``root_report_id`` dès qu’il est renseigné, puis réécrit les options depuis la racine
-    (sinon elles retombent sur les défauts du cœur). Sans condition sur le handler : sur Odoo 19
-    Enterprise le nom du modèle handler peut ne pas contenir « trial_balance » alors que le
-    post-processeur reste celui de la balance d’essai — sans détachement, ``KeyError: sn_open_deb``.
+    Vide ``root_report_id`` et ``section_main_report_ids`` (si présents), puis réécrit les options
+    depuis la racine lorsqu’il y avait une variante. Sans condition sur le handler. Si la racine est
+    déjà vide mais le rapport est encore « section de » un composite, supprime ce lien seul.
     Appelé en **début** de ``personalize_balance_six_columns`` (avant les colonnes ``sn_*``).
     """
     names = _account_report_field_names(models, db, uid, password)
@@ -88,7 +98,7 @@ def _detach_trial_balance_variant_after_six_columns(
         "account.report",
         "read",
         [[report_id]],
-        {"fields": ["root_report_id"]},
+        {"fields": ["root_report_id", "section_main_report_ids"]},
     )[0]
     root = row.get("root_report_id")
     root_id: int | None = None
@@ -97,7 +107,25 @@ def _detach_trial_balance_variant_after_six_columns(
             root_id = int(root[0])
         except (TypeError, ValueError):
             root_id = None
+    section_ids = row.get("section_main_report_ids") or []
     if root_id is None:
+        if section_ids and "section_main_report_ids" in names:
+            try:
+                execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.report",
+                    "write",
+                    [[report_id], _standalone_account_report_write_vals(names)],
+                )
+                return {
+                    "detached_from_root": False,
+                    "detach_note": "lien « Section de » supprimé (root déjà vide)",
+                }
+            except Exception as e:
+                return {"detached_from_root": False, "detach_error": str(e)}
         return {"detached_from_root": False, "detach_note": "déjà autonome (sans root_report_id)"}
     option_fields = [f for f in _ROOT_MIRROR_OPTION_FIELDS if f in names]
     snap_fields = list(option_fields)
@@ -115,6 +143,8 @@ def _detach_trial_balance_variant_after_six_columns(
         {"fields": snap_fields},
     )[0]
     vals = {k: root_snap[k] for k in snap_fields if k in root_snap}
+    standalone = _standalone_account_report_write_vals(names)
+    merged = {**standalone, **vals}
     try:
         execute_kw(
             models,
@@ -123,18 +153,8 @@ def _detach_trial_balance_variant_after_six_columns(
             password,
             "account.report",
             "write",
-            [[report_id], {"root_report_id": False}],
+            [[report_id], merged],
         )
-        if vals:
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report",
-                "write",
-                [[report_id], vals],
-            )
     except Exception as e:
         return {"detached_from_root": False, "detach_error": str(e)}
     return {"detached_from_root": True}
@@ -540,4 +560,17 @@ def personalize_balance_six_columns(
     ]
     for cv in to_create:
         execute_kw(models, db, uid, password, "account.report.column", "create", [cv])
+    try:
+        names_end = _account_report_field_names(models, db, uid, password)
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[report_id], _standalone_account_report_write_vals(names_end)],
+        )
+    except Exception:
+        pass
     return detach_meta
