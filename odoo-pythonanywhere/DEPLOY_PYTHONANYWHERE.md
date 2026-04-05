@@ -212,6 +212,7 @@ Host pythonanywhere
 ### Utilitaires personnalisation rapports (`account.report`)
 
 - **Suppression depuis la toolbox** : avant `account.report.unlink`, le code retire les **`ir.ui.menu`** pointant sur l’action **`ir.actions.client`** (tag `account_report`, contexte avec ce `report_id`), puis supprime ces actions — évite les entrées de menu orphelines (`web_app/odoo_account_reports.py` : `unlink_account_report`).
+- **Balance 6 col. — nom menu = nom rapport** : champ optionnel **`copy_display_name`** sur le formulaire ; renommage de la copie **avant** `ensure_account_report_reporting_menu`. Les actions client existantes sont resynchronisées (`ensure_account_report_client_action` + `sync_menu_labels_for_client_action`).
 
 - Fichier principal : **`web_app/odoo_account_reports.py`**. Métadonnées **version** / **date** / **auteur** : **`web_app/app_version.py`** (et env `TOOLBOX_APP_*`, voir **`toolbox-env-exemple.txt`**).
 - **Compte de résultat personnalisé (SYSCOHADA / détail comptes)** : `/staff/utilities/rapports-comptables` (alias `/staff/utilities/personalize-report`) — copie + [`personalize_syscohada_detail.py`](personalize_syscohada_detail.py).

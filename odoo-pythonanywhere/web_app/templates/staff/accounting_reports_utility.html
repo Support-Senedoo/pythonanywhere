@@ -121,7 +121,7 @@
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     <strong>Odoo Enterprise / SaaS (ex. v19) — balance d’essai</strong> : le rapport peut combiner un <strong>handler</strong> et des lignes moteur « custom » (<code>_report_custom_engine_trial_balance</code>). Il ne faut <strong>pas</strong> vider le handler sur la copie : sinon erreur « Méthode invalide » à l’ouverture.
-    La copie est <strong>autonome</strong> (sans <code>root_report_id</code>) pour éviter les erreurs sur les colonnes <code>sn_*</code> (sinon Odoo peut lever <strong>RPC_ERROR / KeyError: sn_open_deb</strong> dans le post-processeur trial balance). La toolbox détache la racine <strong>avant</strong> de recréer les colonnes. Pour une copie déjà cassée : mode développeur → <strong>Rapports comptables</strong> → ouvrir le rapport → vider le champ <strong>Racine du rapport</strong> (<code>root_report_id</code>) puis enregistrer (les options ont été recopiées si la personnalisation toolbox a réussi partiellement ; sinon recopier les filtres depuis la balance standard ou refaire une nouvelle copie avec la toolbox à jour). La toolbox crée une <strong>entrée de menu</strong> sous <strong>Analyse › Grands livres</strong>, juste après <strong>Balance comptable</strong> (même parent technique que le menu trial balance ; libellés selon la langue Odoo), et un lien liste « rapports comptables » en configuration. Les options de filtre du modèle source sont recopiées sur la copie.
+    La copie est <strong>autonome</strong> (sans <code>root_report_id</code>) pour éviter les erreurs sur les colonnes <code>sn_*</code> (sinon Odoo peut lever <strong>RPC_ERROR / KeyError: sn_open_deb</strong> dans le post-processeur trial balance). La toolbox détache la racine <strong>avant</strong> de recréer les colonnes. Pour une copie déjà cassée : mode développeur → <strong>Rapports comptables</strong> → ouvrir le rapport → vider le champ <strong>Racine du rapport</strong> (<code>root_report_id</code>) puis enregistrer (les options ont été recopiées si la personnalisation toolbox a réussi partiellement ; sinon recopier les filtres depuis la balance standard ou refaire une nouvelle copie avec la toolbox à jour). La toolbox crée une <strong>entrée de menu</strong> sous <strong>Analyse › Grands livres</strong>, juste après <strong>Balance comptable</strong> (même parent technique que le menu trial balance ; libellés selon la langue Odoo), et un lien liste « rapports comptables » en configuration. Vous pouvez <strong>définir le nom du rapport et du menu</strong> (champ optionnel) <strong>avant</strong> la création du menu ; à la suppression du rapport dans la toolbox, menu et action client sont retirés ensemble. Les options de filtre du modèle source sont recopiées sur la copie.
   </p>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -443,6 +443,14 @@
     {% else %}
     <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;">Aucun rapport sélectionné — cliquez sur <strong>Préparer</strong> sur une ligne du tableau.</p>
     {% endif %}
+    <label for="copy_display_name_b">Nom du rapport <em>et</em> du menu Odoo (optionnel)</label>
+    <input type="text" id="copy_display_name_b" name="copy_display_name" maxlength="240"
+      placeholder="Ex. Balance 6 col. — Ripaille (vide = nom auto avec suffixe Senedoo)"
+      {% if not prefill_report_id %}disabled{% endif %}
+      style="max-width:42rem;width:100%;box-sizing:border-box;">
+    <p class="sn-muted" style="margin:0.35rem 0 0.65rem;font-size:0.85rem;line-height:1.45;">
+      Saisissez le libellé <strong>avant</strong> la création du menu : rapport, entrée de menu et action client d’exécution restent ainsi <strong>identiques</strong> (limite affichage menu ~120 caractères côté Odoo).
+    </p>
     <label for="confirm_b">Confirmation</label>
     <input type="text" id="confirm_b" name="confirm" placeholder="Tapez OUI en majuscules" {% if not prefill_report_id %}disabled{% endif %}>
     <button type="submit" {% if not prefill_report_id %}disabled{% endif %}>Créer la copie et appliquer les 6 colonnes</button>

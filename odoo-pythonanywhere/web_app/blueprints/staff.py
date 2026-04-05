@@ -580,6 +580,11 @@ def _accounting_reports_page(accounting_mode: str):
                     attach_to_root=False,
                 )
                 bal_meta = personalize_balance_six_columns(models, db, uid, pwd, new_rid)
+                copy_display_name = (request.form.get("copy_display_name") or "").strip()
+                if copy_display_name:
+                    write_account_report_name(
+                        models, db, uid, pwd, new_rid, copy_display_name
+                    )
                 src_label = read_account_report_label(models, db, uid, pwd, rid)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
                 msg = (

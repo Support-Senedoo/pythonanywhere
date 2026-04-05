@@ -315,13 +315,26 @@ def ensure_account_report_client_action(
     """
     Garantit une action client ``account_report`` pour ce rapport (création si aucune trouvée).
 
-    Les droits d’écriture sur ``ir.actions.client`` sont requis pour la création.
+    Si l’action existe déjà, met à jour son **nom** pour rester aligné avec le rapport / le menu.
+    Les droits d’écriture sur ``ir.actions.client`` sont requis pour la création et la mise à jour.
     """
     found = find_account_report_client_action_id(models, db, uid, password, report_id)
+    name = (action_name or f"Rapport comptable {report_id}").strip()[:255] or f"Rapport {report_id}"
     if found:
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.actions.client",
+                "write",
+                [[int(found)], {"name": name}],
+            )
+        except Exception:
+            pass
         return found
     ctx = repr({"report_id": int(report_id)})
-    name = (action_name or f"Rapport comptable {report_id}").strip()[:255] or f"Rapport {report_id}"
     vals: dict[str, Any] = {
         "name": name,
         "tag": "account_report",
@@ -561,6 +574,52 @@ def find_menu_id_for_client_action(
     return int(mids[0]) if mids else None
 
 
+def sync_menu_labels_for_client_action(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    client_action_id: int,
+    menu_title: str,
+) -> None:
+    """
+    Aligne le libellé de **toutes** les entrées ``ir.ui.menu`` pointant sur cette action client
+    (évite un menu obsolète si le rapport a été renommé ou pour doublons).
+    """
+    label = (menu_title or "").strip()
+    if not label:
+        return
+    if len(label) > 120:
+        label = label[:117] + "…"
+    ref = f"ir.actions.client,{int(client_action_id)}"
+    try:
+        mids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.ui.menu",
+            "search",
+            [[("action", "=", ref)]],
+            {"limit": 500},
+        )
+    except Exception:
+        return
+    for mid in mids or []:
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.ui.menu",
+                "write",
+                [[int(mid)], {"name": label}],
+            )
+        except Exception:
+            pass
+
+
 def find_account_report_backend_list_action_id(
     models: Any,
     db: str,
@@ -639,6 +698,7 @@ def ensure_account_report_reporting_menu(
     )
     if not aid:
         return None, None
+    sync_menu_labels_for_client_action(models, db, uid, password, aid, title)
     ref = f"ir.actions.client,{int(aid)}"
     existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
 
