@@ -46,6 +46,7 @@ from create_balance_6cols_via_api import (
     create_toolbox_balance_ohada,
     find_balance_ohada_report_id,
     purge_balance_ohada_instances,
+    rewrite_toolbox_balance_ohada_aggregation_all_rpc,
     rewrite_toolbox_balance_ohada_outer_gross_all_rpc,
 )
 from personalize_pl_analytic_budget import (
@@ -615,6 +616,49 @@ def _accounting_reports_page(accounting_mode: str):
                 if bad:
                     msg += f" Échec partiel sur id : {', '.join(bad)}."
                 flash(msg, "success" if not bad else "warning")
+            return redirect(
+                ru(
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        filter_host=fl_save,
+                    ),
+                )
+            )
+        if action == "rewrite_balance_ohada_aggregation" and accounting_mode == "balance":
+            try:
+                triples = rewrite_toolbox_balance_ohada_aggregation_all_rpc(
+                    models, db, uid, pwd
+                )
+            except Exception as e:
+                flash(f"Échec mode net (aggregation) : {e!s}", "danger")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            if not triples:
+                flash(
+                    "Aucun rapport Balance OHADA toolbox sur cette base (ligne bal_ohada).",
+                    "warning",
+                )
+            else:
+                lines: list[str] = []
+                for rid, ok, reason in triples:
+                    st = "OK" if ok else "échec"
+                    lines.append(f"id {rid} : {st} ({reason})")
+                any_ok = any(t[1] for t in triples)
+                any_bad = any(not t[1] for t in triples)
+                flash(
+                    "Mode net (aggregation) — résultat par rapport : "
+                    + " ; ".join(lines)
+                    + ". Rouvrez la balance dans Odoo. Si l’affichage est faux, recliquez « Colonnes extérieures → brut ».",
+                    "success" if any_ok and not any_bad else ("warning" if any_ok else "danger"),
+                )
             return redirect(
                 ru(
                     **_rapports_url_params(

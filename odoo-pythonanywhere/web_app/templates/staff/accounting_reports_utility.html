@@ -568,6 +568,16 @@
     </p>
     <button type="submit" class="sn-btn sn-btn--ghost" {% if conn_status != 'ok' %}disabled{% endif %}>Colonnes extérieures → brut (API)</button>
   </form>
+  <form id="form-rewrite-balance-ohada-aggregation" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin-top:0.65rem;">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="action" value="rewrite_balance_ohada_aggregation">
+    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;font-size:0.88rem;">
+      <strong>Solde net sur les colonnes extérieures (expérimental) :</strong> remplace les six expressions par le moteur <code>aggregation</code> + <code>positive</code> (une seule face non nulle pour l’ouverture / la clôture si Odoo calcule correctement). Refusé sur certaines bases ; si l’écran redevient incohérent, repassez au bouton <strong>brut</strong> ci-dessus.
+    </p>
+    <button type="submit" class="sn-btn sn-btn--ghost" {% if conn_status != 'ok' %}disabled{% endif %}>Mode net OHADA — aggregation (API)</button>
+  </form>
   {% endif %}
   {% if balance_ohada_report_id %}
   <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--sn-border);">

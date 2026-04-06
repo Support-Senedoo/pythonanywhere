@@ -51,6 +51,7 @@ Variables : ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASSWORD (ou .env à côté du sc
 Usage :
   python create_balance_6cols_via_api.py
   python create_balance_6cols_via_api.py --rewrite-outer-gross
+  python create_balance_6cols_via_api.py --rewrite-aggregation
   python create_balance_6cols_via_api.py --name-fr "Autre libellé"
   python create_balance_6cols_via_api.py --line-code bal6_client_x
 
@@ -463,6 +464,117 @@ def _force_ohada_outer_domain_expressions(
             )
         except Exception:
             continue
+
+
+_SN_AGG_GROUPBY_PROBE = "_sn_agg_groupby_probe"
+
+
+def _unlink_all_expressions_on_line(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    line_id: int,
+) -> None:
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        "read",
+        [[int(line_id)]],
+        {"fields": ["expression_ids"]},
+    )
+    if not rows:
+        return
+    eids = (rows[0] or {}).get("expression_ids") or []
+    if not eids:
+        return
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "unlink",
+            [eids],
+        )
+    except Exception:
+        pass
+
+
+def _line_accepts_aggregation_with_groupby(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    line_id: int,
+) -> bool:
+    """True si le serveur accepte une expression ``aggregation`` sur une ligne déjà ``groupby``."""
+    ctx_fr = {"context": {"lang": "fr_FR"}}
+    try:
+        eid = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "create",
+            [
+                {
+                    "report_line_id": int(line_id),
+                    "label": _SN_AGG_GROUPBY_PROBE,
+                    "engine": "aggregation",
+                    "formula": "0",
+                    "date_scope": "strict_range",
+                }
+            ],
+            ctx_fr,
+        )
+    except Exception:
+        return False
+    try:
+        probe_id = int(eid)
+    except (TypeError, ValueError):
+        return False
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "unlink",
+            [[probe_id]],
+        )
+    except Exception:
+        pass
+    return True
+
+
+def _leaf_line_id_for_report_code(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    line_code: str,
+) -> int | None:
+    line_ids = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        "search",
+        [[("report_id", "=", int(report_id)), ("code", "=", line_code)]],
+        {"limit": 1},
+    )
+    if not line_ids:
+        return None
+    return int(line_ids[0])
 
 
 def _populate_line_expressions(
@@ -881,6 +993,52 @@ def rewrite_toolbox_balance_ohada_outer_gross_all_rpc(
     return out
 
 
+def rewrite_toolbox_balance_ohada_aggregation_all_rpc(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    *,
+    line_code: str = BALANCE_OHADA_LINE_CODE,
+) -> list[tuple[int, bool, str]]:
+    """
+    Remplace **toutes** les expressions de la ligne feuille par le schéma **aggregation** +
+    ``positive`` (découpage **net** visé OHADA sur les colonnes extérieures).
+
+    Échoue avec raison ``aggregation_interdit_avec_groupby`` si l’ORM refuse ``aggregation`` sur
+    une ligne ``groupby`` (schéma communautaire strict). Sinon, en cas de succès, rouvrir le rapport
+    dans Odoo : si l’affichage est incohérent, repasser au mode **brut** (bouton staff ou
+    ``--rewrite-outer-gross``).
+    """
+    lc = (line_code or "").strip() or BALANCE_OHADA_LINE_CODE
+    rids = find_all_balance_ohada_report_ids(
+        models, db, uid, password, line_code=lc
+    )
+    out: list[tuple[int, bool, str]] = []
+    agg = _expressions_aggregation_ohada_line(line_code=lc)
+    for rid in rids:
+        lid = _leaf_line_id_for_report_code(
+            models, db, uid, password, int(rid), lc
+        )
+        if lid is None:
+            out.append((int(rid), False, "ligne_introuvable"))
+            continue
+        if not _line_accepts_aggregation_with_groupby(
+            models, db, uid, password, lid
+        ):
+            out.append((int(rid), False, "aggregation_interdit_avec_groupby"))
+            continue
+        try:
+            _unlink_all_expressions_on_line(models, db, uid, password, lid)
+            _populate_line_expressions(
+                models, db, uid, password, lid, agg
+            )
+            out.append((int(rid), True, "ok"))
+        except Exception as e:
+            out.append((int(rid), False, f"erreur:{e!s}"))
+    return out
+
+
 def create_toolbox_balance_ohada(
     models: Any,
     db: str,
@@ -936,6 +1094,11 @@ def main() -> int:
         action="store_true",
         help="Ne pas créer : réécrit les 4 colonnes extérieures en « brut » pour chaque rapport bal_ohada.",
     )
+    p.add_argument(
+        "--rewrite-aggregation",
+        action="store_true",
+        help="Ne pas créer : remplace les 6 expressions par aggregation+positive (net OHADA si Odoo l’affiche).",
+    )
 
     args = p.parse_args()
     missing = [
@@ -950,6 +1113,12 @@ def main() -> int:
     ]
     if missing:
         print("Paramètres manquants :", ", ".join(missing), file=sys.stderr)
+        return 1
+    if args.rewrite_outer_gross and args.rewrite_aggregation:
+        print(
+            "Utilisez soit --rewrite-outer-gross soit --rewrite-aggregation, pas les deux.",
+            file=sys.stderr,
+        )
         return 1
 
     name_en = (args.name_en or "").strip() or args.name_fr
@@ -978,6 +1147,32 @@ def main() -> int:
         for rid, ok in pairs:
             print(f"account.report id={rid} : {'OK' if ok else 'ÉCHEC'}")
         return 0 if all(p[1] for p in pairs) else 1
+
+    if args.rewrite_aggregation:
+        try:
+            uid = client.authenticate()
+            triples = rewrite_toolbox_balance_ohada_aggregation_all_rpc(
+                client._object,
+                client.db,
+                uid,
+                client.password,
+                line_code=line_code,
+            )
+        except Exception as e:
+            print("Échec :", e, file=sys.stderr)
+            return 1
+        if not triples:
+            print(
+                f"Aucun account.report avec une ligne code={line_code!r}.",
+                file=sys.stderr,
+            )
+            return 2
+        for rid, ok, reason in triples:
+            print(
+                f"account.report id={rid} : "
+                f"{'OK' if ok else 'ÉCHEC'} ({reason})"
+            )
+        return 0 if all(t[1] for t in triples) else 1
 
     try:
         rid = create_balance_six_columns(
