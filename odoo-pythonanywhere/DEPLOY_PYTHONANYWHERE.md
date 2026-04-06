@@ -223,6 +223,12 @@ Host pythonanywhere
 - Fichier : **`web_app/odoo_instance_info.py`** — fonction **`collect_authenticated_instance_metadata`** (appelée depuis les écrans rapports staff quand la connexion XML-RPC est OK).
 - **Version « officielle » installée en base** : module **`base`** (`ir.module.module`, état installé), champ **`latest_version`** — affichée comme *« Version Odoo (module base, installée en base) »*. Compléments : **`common.version()`** (`server_version`, `server_version_info` formaté), **`web_enterprise`** si présent, **`ir.config_parameter`** (UUID, expiration, etc.).
 
+### Documentation Odoo 19 et validation « comptable »
+
+- **Ce n’est pas un audit** : la toolbox applique des **réglages techniques** (XML-RPC sur `account.report`, lignes, expressions). La **conformité** au référentiel (OHADA, PCG, règles internes) et l’exactitude des montants dépendent du **moteur Odoo**, de la **saisie**, de la **période** et d’une **relecture métier** sur la base cible — pas d’attestation comptable dans le dépôt.
+- **Références officielles v19** (à croiser avec le code source si besoin) : modèle **`account.report`** — [doc développeur](https://www.odoo.com/documentation/19.0/developer/reference/standard_modules/account/account_report.html) ; rapports personnalisés — [guide utilisateur](https://www.odoo.com/documentation/19.0/applications/finance/accounting/reporting/customize.html) (moteurs *domain* / *aggregation*, sous-formules). Les champs optionnels (ex. **filtre budgets**) peuvent être dans le module **account_reports** (Enterprise) : la toolbox utilise **`fields_get`** pour n’activer que des champs **réellement présents** sur l’instance.
+- **Balance OHADA (6 colonnes)** : les `date_scope` utilisés (`to_beginning_of_period`, `strict_range`, …) sont les valeurs **standard du moteur** ; le basculement **domain d’abord** si la série majeure est **inférieure à 19** est une **règle toolbox** (détection via module `base`), pour la stabilité à l’écran — à valider sur votre version exacte (SaaS / .0+e).
+
 ### Utilitaires personnalisation rapports (`account.report`)
 
 - **Suppression depuis la toolbox** : avant `account.report.unlink`, le code retire les **`ir.ui.menu`** pointant sur l’action **`ir.actions.client`** (tag `account_report`, contexte avec ce `report_id`), puis supprime ces actions — évite les entrées de menu orphelines (`web_app/odoo_account_reports.py` : `unlink_account_report`).
