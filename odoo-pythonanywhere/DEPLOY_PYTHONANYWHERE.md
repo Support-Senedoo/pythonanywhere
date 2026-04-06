@@ -68,6 +68,18 @@ Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le di
 
 **Sur la machine du développeur** (PC avec Git + clé SSH PA sans passphrase, ex. `%USERPROFILE%\.ssh\id_ed25519_pa_cursor`) : l’assistant Cursor peut lancer **`.\deploy_pa.ps1 -SkipGitPush`** depuis `odoo-pythonanywhere/` après un **`git push`** — cela exécute sur PA **`deploy_pa.sh`** : **`git pull`**, **`pip`**, **reload API** si `~/.pythonanywhere_api_token` existe. **Sans** cette machine / cette clé, seul **vous** (PowerShell local, Bash PA, ou bouton Reload) déclenchez la mise à jour effective du worker WSGI.
 
+### Plusieurs agents Cursor (ou plusieurs sessions) en parallèle
+
+Git **ne verrouille pas** le dépôt entre agents : chacun peut **commit** localement, mais au **`git push`** le **deuxième** peut être **refusé** (`! [rejected] … non-fast-forward`) si le premier a déjà poussé sur `master`.
+
+**À faire pour éviter les blocages :**
+
+1. Avant chaque push : **`git fetch origin`** puis **`git pull --rebase origin master`** (ou `git pull --ff-only`), résoudre les conflits éventuels, puis **`git push`**.
+2. **Enchaînement** : idéalement un seul agent à la fois pour le couple **push + deploy_pa** ; si deux agents livrent en même temps, que le second **rebase** sur `origin/master` après le premier push.
+3. **Sur PA** : deux **`deploy_pa.ps1`** lancés à la suite exécutent chacun un **`git pull`** — le second récupère bien l’état après le premier ; le risque est surtout **côté Git local** (push refusé), pas un « écrasement » mystérieux sur le serveur tant que personne ne force (`--force` interdit en usage normal).
+
+**Ce n’est pas pris en charge automatiquement** par Cursor : c’est la **discipline Git** (pull avant push, pas de travail sur les mêmes lignes sans coordination) qui évite les problèmes.
+
 ### Si `deploy_pa.ps1` plante au démarrage (ParserError, accents « cassés »)
 
 Le script **`deploy_pa.ps1` du dépôt** utilise des **messages ASCII** dans le code exécutable (depuis avril 2026) pour éviter ce cas sur **Google Drive / Mon Drive** avec **PowerShell 5.1**. Si vous avez encore une **ancienne copie** ou un fichier ré-enregistré avec accents dans les `Write-Host` / `Write-Error`, le parseur peut mal lire le fichier (erreurs *Argument manquant*). **Le serveur PA n’est pas en cause** : blocage local au `.ps1`.
