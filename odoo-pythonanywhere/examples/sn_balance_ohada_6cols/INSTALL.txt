@@ -1,0 +1,29 @@
+Balance OHADA 6 colonnes — module sn_balance_ohada_6cols
+========================================================
+
+Prérequis
+---------
+- Odoo avec rapports comptables configurables (account.report), en général via le module
+  « account_reports » (souvent Enterprise ou Odoo.sh).
+- Si l’installation échoue sur « module account_reports introuvable », votre édition n’expose
+  pas ce module : utilisez plutôt l’import XML via Studio (fichier balance_generale_6_col_studio.example.xml
+  téléchargeable depuis la toolbox PythonAnywhere).
+
+Installation (fichier ZIP téléchargé depuis la toolbox)
+-------------------------------------------------------
+1. Décompresser l’archive : le dossier « sn_balance_ohada_6cols » doit apparaître.
+2. Copier ce dossier dans un répertoire addons accessible par votre serveur Odoo
+   (ou liaison symbolique / dépôt Git dédié addons tiers).
+3. Redémarrer Odoo si nécessaire, puis : Applications → Mettre à jour la liste des applications.
+4. Rechercher « Balance OHADA » ou « sn_balance_ohada » et installer le module.
+
+Après installation
+------------------
+- Activer sur le rapport l’option « Inclure le solde initial » si les colonnes d’ouverture restent à zéro.
+- Le rapport porte le nom défini dans data/balance_ohada_6cols.xml ; la ligne feuille a le code
+  bal_ohada_import (pas bal_ohada de la toolbox API).
+
+Alternative Studio (sans module)
+------------------------------
+Télécharger le fichier XML « balance_generale_6_col_studio.example.xml » depuis la même page
+toolbox, puis Studio → Import XML (ou mode développeur selon la version).

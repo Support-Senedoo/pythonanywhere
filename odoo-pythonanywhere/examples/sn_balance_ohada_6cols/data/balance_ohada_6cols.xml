@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Aligné sur examples/balance_generale_6_col_studio.example.xml (aggregation OHADA). -->
+    <record id="report_balance_ohada" model="account.report">
+        <field name="name">Balance OHADA 6 colonnes (module Senedoo)</field>
+    </record>
+
+    <record id="col_debit_initial" model="account.report.column">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="sequence" eval="10"/>
+        <field name="name">Débit initial</field>
+        <field name="expression_label">ohada6_open_deb</field>
+        <field name="figure_type">monetary</field>
+    </record>
+
+    <record id="col_credit_initial" model="account.report.column">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="sequence" eval="20"/>
+        <field name="name">Crédit initial</field>
+        <field name="expression_label">ohada6_open_cre</field>
+        <field name="figure_type">monetary</field>
+    </record>
+
+    <record id="col_debit" model="account.report.column">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="sequence" eval="30"/>
+        <field name="name">Débit</field>
+        <field name="expression_label">ohada6_mov_deb</field>
+        <field name="figure_type">monetary</field>
+    </record>
+
+    <record id="col_credit" model="account.report.column">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="sequence" eval="40"/>
+        <field name="name">Crédit</field>
+        <field name="expression_label">ohada6_mov_cre</field>
+        <field name="figure_type">monetary</field>
+    </record>
+
+    <record id="col_debit_final" model="account.report.column">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="sequence" eval="50"/>
+        <field name="name">Débit final</field>
+        <field name="expression_label">ohada6_close_deb</field>
+        <field name="figure_type">monetary</field>
+    </record>
+
+    <record id="col_credit_final" model="account.report.column">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="sequence" eval="60"/>
+        <field name="name">Crédit final</field>
+        <field name="expression_label">ohada6_close_cre</field>
+        <field name="figure_type">monetary</field>
+    </record>
+
+    <record id="line_section_balance" model="account.report.line">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="name">Balance</field>
+        <field name="code">bal_ohada_import_section</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+    <record id="line_accounts_leaf" model="account.report.line">
+        <field name="report_id" ref="report_balance_ohada"/>
+        <field name="parent_id" ref="line_section_balance"/>
+        <field name="name">Comptes</field>
+        <field name="code">bal_ohada_import</field>
+        <field name="groupby">account_id</field>
+        <field name="sequence" eval="20"/>
+        <field name="expression_ids" eval="[
+            (0, 0, {
+                'label': 'ohada6_open_deb',
+                'engine': 'aggregation',
+                'formula': 'initial_debit - initial_credit',
+                'subformula': 'positive',
+                'date_scope': 'to_beginning_of_period',
+            }),
+            (0, 0, {
+                'label': 'ohada6_open_cre',
+                'engine': 'aggregation',
+                'formula': 'initial_credit - initial_debit',
+                'subformula': 'positive',
+                'date_scope': 'to_beginning_of_period',
+            }),
+            (0, 0, {
+                'label': 'ohada6_mov_deb',
+                'engine': 'aggregation',
+                'formula': 'debit',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'ohada6_mov_cre',
+                'engine': 'aggregation',
+                'formula': 'credit',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'ohada6_close_deb',
+                'engine': 'aggregation',
+                'formula': '(initial_debit + debit) - (initial_credit + credit)',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
+            }),
+            (0, 0, {
+                'label': 'ohada6_close_cre',
+                'engine': 'aggregation',
+                'formula': '(initial_credit + credit) - (initial_debit + debit)',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
+            }),
+        ]"/>
+    </record>
+</odoo>

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import zipfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -35,6 +36,13 @@ from web_app.odoo_registry import (
     upsert_client,
 )
 from web_app.odoo_account_probe import MAX_DATABASES_TO_PROBE, probe_account_databases
+from web_app.odoo_instance_info import (
+    build_balance_ohada_import_guide,
+    format_server_version_info,
+    is_enterprise_from_instance_rows,
+    parse_odoo_major_version,
+    read_public_server_version,
+)
 from web_app.pointage_import_util import (
     ALLOWED_SUFFIX,
     parse_pointage_csv,
@@ -1607,6 +1615,7 @@ def _accounting_reports_page(accounting_mode: str):
     conn_detail = ""
     reports: list = []
     balance_ohada_report_id: int | None = None
+    balance_import_guide: dict[str, Any] | None = None
     instance_meta_rows: list[tuple[str, str]] = []
     label_picker_rows: list[dict[str, Any]] = []
     sibling_rows: list[dict[str, Any]] = []
@@ -1797,6 +1806,27 @@ def _accounting_reports_page(accounting_mode: str):
         except Exception:
             pass
 
+    if (
+        accounting_mode == "balance"
+        and selected
+        and conn_status == "ok"
+        and selected in reg
+    ):
+        try:
+            pub = read_public_server_version(reg[selected].url)
+            major_ui = parse_odoo_major_version(pub)
+            vl_ui = format_server_version_info(pub.get("server_version_info")) or (
+                str(pub.get("server_version") or "").strip() or "—"
+            )
+            ent_ui = is_enterprise_from_instance_rows(instance_meta_rows)
+            balance_import_guide = build_balance_ohada_import_guide(
+                major=major_ui,
+                version_label=vl_ui,
+                is_enterprise=ent_ui,
+            )
+        except Exception:
+            balance_import_guide = None
+
     return render_template(
         "staff/accounting_reports_utility.html",
         clients=reg,
@@ -1829,6 +1859,7 @@ def _accounting_reports_page(accounting_mode: str):
         utility_version=UTILITY_VERSION,
         utility_date=UTILITY_DATE,
         utility_author=UTILITY_AUTHOR,
+        balance_import_guide=balance_import_guide,
     )
 
 
@@ -1854,6 +1885,9 @@ def rapports_balance():
 _BALANCE_6COL_EXAMPLE_XML = (
     Path(__file__).resolve().parents[2] / "examples" / "balance_generale_6_col_studio.example.xml"
 )
+_BALANCE_OHADA_MODULE_DIR = (
+    Path(__file__).resolve().parents[2] / "examples" / "sn_balance_ohada_6cols"
+)
 
 
 @bp.route("/utilities/balance-6col-example.xml", methods=["GET"])
@@ -1867,5 +1901,28 @@ def download_balance_6col_example_xml():
         as_attachment=True,
         download_name="balance_generale_6_col_studio.example.xml",
         mimetype="application/xml",
+        max_age=0,
+    )
+
+
+@bp.route("/utilities/balance-ohada-module.zip", methods=["GET"])
+@login_required_staff
+def download_balance_ohada_module_zip():
+    """Module Odoo minimal sn_balance_ohada_6cols (ZIP) pour import Apps / addons."""
+    if not _BALANCE_OHADA_MODULE_DIR.is_dir():
+        abort(404)
+    buf = io.BytesIO()
+    root = "sn_balance_ohada_6cols"
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(_BALANCE_OHADA_MODULE_DIR.rglob("*")):
+            if path.is_file():
+                arcname = f"{root}/{path.relative_to(_BALANCE_OHADA_MODULE_DIR).as_posix()}"
+                zf.write(path, arcname)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name="sn_balance_ohada_6cols.zip",
+        mimetype="application/zip",
         max_age=0,
     )

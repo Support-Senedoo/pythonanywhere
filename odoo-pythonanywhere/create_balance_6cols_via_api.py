@@ -11,20 +11,20 @@ mouvement sur la période ; ne pas les remplacer par un solde net.
 Un ``root_report_id`` vers le Grand livre faisait par le passé se comporter le rapport comme une
 **variante** (solde signé) : la création toolbox reste **sans** racine ni handler métier.
 
-**Odoo v19 (recommandé)** : sur la ligne feuille ``groupby = account_id``, le moteur
-**``aggregation``** avec ``initial_debit`` / ``initial_credit`` / ``debit`` / ``credit`` et
-``subformula: positive`` pour les colonnes « débit/crédit décomposés » **sépare correctement**
-les montants — contrairement au moteur **``domain``** avec ``[('debit','>',0)]``, qui filtre des
-écritures mais **n’empêche pas** l’agrégat de mélanger débit et crédit sur la même ligne de rapport.
+**Odoo v19+** : sur la ligne feuille ``groupby = account_id``, le moteur **``aggregation``**
+avec ``initial_debit`` / ``debit`` / ``subformula: positive``, etc. est **essayé en premier**
+(sonde RPC). En repli : moteur ``domain`` (cumuls bruts sur les colonnes extérieures).
 
-**Comportement toolbox** : à la création, on tente **d’abord** ``aggregation`` (sonde RPC : le
-serveur accepte-t-il ``aggregation`` sur une ligne ``groupby`` ?). Si **refus** (schéma
-communautaire strict), **repli** sur le moteur ``domain`` (cumuls bruts sur les colonnes
-extérieures, comme avant).
+**Odoo 18 et séries strictement inférieures à 19** (détection via ``ir.module.module`` module ``base``, champ ``latest_version``) :
+la toolbox **ne tente pas** ``aggregation`` à la création et applique **directement** l’ancienne
+voie API **``domain``** (même logique qu’avant le basculement v19) — **sans intervention**
+utilisateur (pas d’import XML requis pour le bouton « Créer Balance OHADA »). C’est en général
+plus stable sur ces versions que ``aggregation`` + ``groupby``.
 
-**Option** : ``TOOLBOX_OHADA6_FORCE_DOMAIN=1`` pour forcer le repli ``domain`` sans tenter
-``aggregation``. ``TOOLBOX_OHADA6_OUTER_NET=1`` : en mode domain uniquement, colonnes extérieures
-en ``sum_if_pos`` / ``-sum_if_neg`` (souvent capricieux à l’affichage).
+**Option** : ``TOOLBOX_OHADA6_AGGREGATION_FIRST=1`` pour forcer la tentative ``aggregation``
+même sur une série inférieure à 19 (tests / alignement v19). ``TOOLBOX_OHADA6_FORCE_DOMAIN=1`` force
+``domain`` sur **toutes** les séries. ``TOOLBOX_OHADA6_OUTER_NET=1`` : en mode domain uniquement,
+colonnes extérieures en ``sum_if_pos`` / ``-sum_if_neg``.
 
 **Stratégie** : rapport **autonome**, recopie **uniquement** des options depuis le Grand livre
 si trouvé ; en repli ``domain`` uniquement, réécriture XML-RPC des quatre expressions extérieures.
@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from typing import Any
 
@@ -105,6 +106,51 @@ OHADA6_CLOSE_CRE = "ohada6_close_cre"
 def _fields(models: Any, db: str, uid: int, password: str, model: str) -> set[str]:
     fg = execute_kw(models, db, uid, password, model, "fields_get", [], {})
     return set(fg.keys())
+
+
+def _detect_odoo_major_from_db(models: Any, db: str, uid: int, password: str) -> int | None:
+    """
+    Série majeure Odoo (16, 17, 18, 19…) à partir du module ``base`` installé.
+
+    Utilisé pour choisir la stratégie d’expressions (domain d’abord si série inférieure à 19).
+    """
+    try:
+        bids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.module.module",
+            "search",
+            [[("name", "=", "base"), ("state", "=", "installed")]],
+            {"limit": 1},
+        )
+        if not bids:
+            return None
+        br = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.module.module",
+            "read",
+            [bids],
+            {"fields": ["latest_version", "published_version"]},
+        )
+        if not br:
+            return None
+        lv = (br[0].get("latest_version") or br[0].get("published_version") or "").strip()
+        if not lv:
+            return None
+        m = re.search(r"(?:^|~)(\d{1,2})\.", lv)
+        if m:
+            return int(m.group(1))
+        m2 = re.match(r"^(\d{1,2})", lv)
+        if m2:
+            return int(m2.group(1))
+    except Exception:
+        pass
+    return None
 
 
 def _report_create_vals(
@@ -750,13 +796,24 @@ def create_balance_six_columns_rpc(
         except Exception:
             pass
 
-    # v19 : aggregation par défaut si le serveur l’accepte sur une ligne groupby ; sinon domain.
+    # Séries avant 19 (ex. 18) : ancienne voie API « domain » uniquement — sans import XML utilisateur.
+    # Série 19+ : tentative aggregation si le serveur l’accepte ; sinon domain.
     force_domain = (
         os.environ.get("TOOLBOX_OHADA6_FORCE_DOMAIN") or ""
+    ).strip().lower() in ("1", "true", "yes", "on")
+    aggregation_first_env = (
+        os.environ.get("TOOLBOX_OHADA6_AGGREGATION_FIRST") or ""
     ).strip().lower() in ("1", "true", "yes", "on")
     use_net_outer_domain = (
         os.environ.get("TOOLBOX_OHADA6_OUTER_NET") or ""
     ).strip().lower() in ("1", "true", "yes", "on")
+
+    odoo_major = _detect_odoo_major_from_db(models, db, uid, password)
+    prefer_domain_api = (
+        odoo_major is not None
+        and odoo_major < 19
+        and not aggregation_first_env
+    )
 
     ctx_fr_line = {"context": {"lang": "fr_FR"}}
     child_id = int(
@@ -774,6 +831,7 @@ def create_balance_six_columns_rpc(
 
     use_aggregation = (
         not force_domain
+        and not prefer_domain_api
         and _line_accepts_aggregation_with_groupby(
             models, db, uid, password, child_id
         )

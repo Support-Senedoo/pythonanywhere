@@ -217,3 +217,153 @@ def collect_authenticated_instance_metadata(
     rows.append(("Nom technique PostgreSQL (db)", db))
     rows.append(("URL instance", normalize_odoo_base_url(base_url)))
     return rows
+
+
+def parse_odoo_major_version(pub: dict[str, Any] | None) -> int | None:
+    """
+    Extrait la série majeure (16, 17, 18, 19…) depuis le dict renvoyé par ``common.version()``
+    (champs ``server_version_info`` ou ``server_version``).
+    """
+    if not pub or not isinstance(pub, dict):
+        return None
+    svi = pub.get("server_version_info")
+    if isinstance(svi, (list, tuple)) and len(svi) > 0:
+        m = svi[0]
+        if isinstance(m, int):
+            return m
+        try:
+            return int(m)
+        except (TypeError, ValueError):
+            pass
+    sv = pub.get("server_version")
+    if isinstance(sv, str):
+        s = sv.strip()
+        if s and s[0].isdigit():
+            i = 0
+            while i < len(s) and s[i].isdigit():
+                i += 1
+            try:
+                return int(s[:i])
+            except ValueError:
+                pass
+    return None
+
+
+def is_enterprise_from_instance_rows(rows: list[tuple[str, str]]) -> bool | None:
+    """Déduit Enterprise vs Community à partir des lignes ``collect_authenticated_instance_metadata``."""
+    for label, val in rows:
+        if "édition" in label.lower():
+            v = val.lower()
+            if "enterprise" in v:
+                return True
+            if "community" in v:
+                return False
+    return None
+
+
+def build_balance_ohada_import_guide(
+    *,
+    major: int | None,
+    version_label: str,
+    is_enterprise: bool | None,
+) -> dict[str, Any]:
+    """
+    Textes pour l’écran Balance OHADA — import manuel XML / module ZIP, selon version et édition.
+
+    Retour : clés utilisées par le template Jinja (alert, points, hints).
+    """
+    vl = (version_label or "").strip() or "—"
+    points: list[str] = []
+    alert = "neutral"
+    if major is None:
+        alert = "warning"
+        points.append(
+            "Version Odoo non détectée : dans Odoo, ouvrez le menu du compte / À propos "
+            "ou Paramètres → À propos, et vérifiez que vous êtes en série 17 ou plus pour le "
+            "moteur d’expressions utilisé par le gabarit (aggregation + colonnes ohada6_*)."
+        )
+    elif major < 16:
+        alert = "warning"
+        points.append(
+            f"Série majeure détectée : {major}. Les rapports configurables et les champs "
+            f"`account.report.expression` peuvent différer : testez sur une copie de base ou "
+            "montez de version avant de compter sur l’import tel quel."
+        )
+    elif major < 19:
+        alert = "success"
+        points.append(
+            f"Série {major} (Odoo 16–18) : le bouton « Créer Balance OHADA » suffit — la toolbox "
+            "crée le rapport uniquement par API, avec l’ancienne voie « domain » (stable sur ces "
+            "versions). Aucun import XML n’est nécessaire pour une création standard."
+        )
+    else:
+        alert = "success"
+        points.append(
+            f"Série {major} (Odoo 19+) : création par API avec priorité au moteur « aggregation » "
+            "(repli « domain » automatique si besoin). Les fichiers XML / ZIP ci-dessous restent des "
+            "secours (Studio, module, autre base)."
+        )
+
+    if is_enterprise is True:
+        points.append(
+            "Enterprise : le module dépend de « account_reports » (rapports comptables). "
+            "Vous pouvez installer le ZIP sur un serveur avec accès aux addons, ou importer "
+            "le fichier XML via Studio (Import XML) si vous avez les droits."
+        )
+        studio_hint = (
+            "Activer le mode développeur, puis Studio → import XML (libellé exact selon la langue), "
+            "ou ouvrir un formulaire Comptabilité et utiliser l’entrée Studio associée."
+        )
+        zip_hint = (
+            "Applications → mode développeur → Importer un module : déposer sn_balance_ohada_6cols.zip "
+            "(dossier décompressé = nom technique sn_balance_ohada_6cols dans le chemin addons)."
+        )
+    elif is_enterprise is False:
+        alert = "warning" if alert != "warning" else alert
+        points.append(
+            "Community : le module « account_reports » est souvent absent — l’installation du ZIP "
+            "peut échouer. Privilégiez la création du rapport via le bouton API ci-dessus, ou un "
+            "hébergement Odoo avec rapports financiers complets."
+        )
+        studio_hint = (
+            "Si le module Studio est installé, l’import XML peut quand même créer des enregistrements "
+            "partiels ; en cas d’erreur sur account.report, l’API reste l’option la plus fiable."
+        )
+        zip_hint = (
+            "ZIP réservé aux serveurs où « account_reports » est disponible et installable "
+            "(souvent Enterprise ou build équivalent)."
+        )
+    else:
+        studio_hint = (
+            "Mode développeur → Studio → Import XML du fichier .example.xml, ou import du ZIP "
+            "via Applications si votre serveur expose les modules comptables."
+        )
+        zip_hint = (
+            "Si vous ne savez pas si vous êtes en Enterprise : dans Odoo, cherchez "
+            "« Rapports comptables » / balance générale configurable ; sans cela, utilisez surtout l’API."
+        )
+
+    xml_hint = (
+        "Fichier balance_generale_6_col_studio.example.xml : même contenu fonctionnel que le module "
+        "(préfixe ohada6_*). En cas d’échec d’import monolithique, importer en deux temps : colonnes puis ligne."
+    )
+
+    summary = f"Odoo {vl}"
+    if major is not None:
+        summary += f" · série {major}"
+    if is_enterprise is True:
+        summary += " · Enterprise"
+    elif is_enterprise is False:
+        summary += " · Community"
+
+    return {
+        "major": major,
+        "version_label": vl,
+        "is_enterprise": is_enterprise,
+        "alert": alert,
+        "summary_line": summary,
+        "points": points,
+        "studio_hint": studio_hint,
+        "zip_hint": zip_hint,
+        "xml_hint": xml_hint,
+    }

@@ -538,6 +538,25 @@
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
     Crée un <code>account.report</code> « Balance OHADA » (six colonnes, ligne <code>bal_ohada</code>). Si une <strong>instance toolbox</strong> existe déjà (même repère technique), elle est <strong>d’abord supprimée</strong> (menus / actions liés à ce rapport uniquement), puis recréée. Autres rapports comptables inchangés.
   </p>
+  {% if balance_import_guide %}
+  <div class="sn-card" style="margin:0 0 1rem;padding:0.85rem;background:rgba(0,80,120,0.06);border:1px solid var(--sn-border);border-radius:8px;">
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Création par API (sans import XML) — selon votre version</h3>
+    <p style="margin:0 0 0.5rem;line-height:1.45;font-size:0.92rem;">{{ balance_import_guide.summary_line }}</p>
+    <ul style="margin:0.35rem 0 0;padding-left:1.2rem;line-height:1.5;font-size:0.88rem;">
+      {% for p in balance_import_guide.points %}
+      <li style="margin:0.25rem 0;">{{ p }}</li>
+      {% endfor %}
+    </ul>
+    <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.85rem;">
+      <strong>Secours</strong> (Studio / autre base) :
+      <a href="{{ url_for('staff.download_balance_6col_example_xml') }}">télécharger le gabarit XML</a>
+      ·
+      <a href="{{ url_for('staff.download_balance_ohada_module_zip') }}">télécharger le module ZIP</a>
+      (souvent Enterprise, dépendance <code>account_reports</code>).
+    </p>
+    <p class="sn-muted" style="margin:0.45rem 0 0;line-height:1.45;font-size:0.82rem;">{{ balance_import_guide.xml_hint }}</p>
+  </div>
+  {% endif %}
   {% if conn_status == 'ok' %}
     {% if balance_ohada_report_id %}
     <p style="margin:0 0 0.75rem;line-height:1.45;">État : <strong>présent</strong> sur la base — <code>account.report</code> id <code>{{ balance_ohada_report_id }}</code>.</p>
