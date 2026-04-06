@@ -1,23 +1,48 @@
 #!/usr/bin/env python3
 """
-Rapport financier projet : réalisé (écritures) / budget / pourcentage, via API Odoo (XML-RPC).
+Rapport financier projet (P&L par axe analytique) : réalisé / budget / %, via API Odoo (XML-RPC).
 
-Sans module personnalisé : lecture de account.move.line (analytic_distribution) et
-crossovered.budget.lines. Odoo SaaS / v17–v19 : adapter les droits utilisateur et les champs
-si fields_get diffère.
+Conçu pour Odoo SaaS (v17–v19) **sans module custom** : XML-RPC / JSON-RPC uniquement.
 
-Variables d'environnement (ou .env à côté du script si python-dotenv est installé) :
-  ODOO_URL       URL de base, ex. https://xxx.odoo.com
-  ODOO_DB        nom de la base
-  ODOO_USER      login
-  ODOO_PASSWORD  mot de passe ou clé API
+Cahier des charges (fonctions réutilisables) — correspondance :
+  connect()              → ``connect(url, db, user, password)``
+  get_move_lines(...)    → ``get_move_lines(models, db, uid, password, analytic_account_id, date_from, date_to)``
+  get_budget_lines(...)  → ``get_budget_lines(...)`` idem
+  compute_realized(...)  → ``compute_realized(move_lines, analytic_account_id, ...)``
+                           (l’id analytique est **obligatoire** pour proratiser selon ``analytic_distribution``)
+  compute_budget(...)    → ``compute_budget(budget_lines, spec)`` avec ``spec = resolve_budget_line_spec(...)``
+                           ou raccourci : ``compute_budget_aggregate(models, db, uid, password, budget_lines)``
+  merge_results(...)     → ``merge_results(models, db, uid, password, realized, budget)``
+  compute_percentage(...)→ ``compute_percentage(rows)``
+  Pipeline complet       → ``build_report(...)`` ; export JSON minimal → ``rows_for_api_export(report["lines"])``
 
-Exemples :
+Filtrage critique (réalisé) :
+  - Domaine ``account.move.line`` : période + postées ; pré-filtre ``analytic_distribution`` si l’ORM l’accepte.
+  - Puis **exclusion** des lignes où la clé du JSON ``analytic_distribution`` ne contient pas le compte
+    analytique demandé ; montant = balance (ou prorata du % de distribution).
+
+Budget : ``crossovered.budget.lines`` + chevauchement de période (champs selon ``fields_get``).
+
+Pourcentage : ``realized / budget`` si ``budget != 0``, sinon ``None`` (division par zéro) ; signes conservés.
+
+Totaux OHADA (classes 6 / 7) : ``report["totals"]`` après ``build_report``.
+
+Variables d'environnement (ou fichier ``.env`` à côté du script si ``python-dotenv`` est installé) :
+  ODOO_URL         URL de base, ex. https://xxx.odoo.com
+  ODOO_DB          nom de la base
+  ODOO_USER        login
+  ODOO_PASSWORD    mot de passe ou **clé API** Odoo
+
+Exemple CLI :
   python project_pl_analytic_report.py --analytic-id 12 --date-from 2025-01-01 --date-to 2025-12-31
   python project_pl_analytic_report.py --analytic-id 12 --date-from 2025-01-01 --date-to 2025-12-31 --json out.json
   python project_pl_analytic_report.py ... --excel rapport.xlsx
   python project_pl_analytic_report.py ... --full-line-balance
   python project_pl_analytic_report.py ... --currency transaction
+
+Exemple Python : importer ``connect``, ``build_report``, ``rows_for_api_export`` ; appeler
+``connect`` avec ODOO_URL / ODOO_DB / ODOO_USER / ODOO_PASSWORD ; puis ``build_report(...)``
+et ``rows_for_api_export(report["lines"])`` pour la liste JSON minimale.
 """
 from __future__ import annotations
 
@@ -617,6 +642,21 @@ def compute_budget(budget_lines: list[dict[str, Any]], spec: BudgetLineSpec) -> 
     return acc
 
 
+def compute_budget_aggregate(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    budget_lines: list[dict[str, Any]],
+) -> dict[int, float]:
+    """
+    Raccourci « cahier des charges » : introspection des champs puis ``compute_budget``,
+    sans passer ``BudgetLineSpec`` explicitement.
+    """
+    spec = _resolve_budget_spec(models, db, uid, password)
+    return compute_budget(budget_lines, spec)
+
+
 def merge_results(
     models: Any,
     db: str,
@@ -677,6 +717,25 @@ def compute_percentage(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             d["percentage"] = rf / bf
         out.append(d)
+    return out
+
+
+def rows_for_api_export(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Format de sortie minimal (livrable type) : une liste par compte général, sans ``account_id`` ::
+        [{"account_code": "...", "account_name": "...", "realized": float, "budget": float, "percentage": float|None}, ...]
+    """
+    out: list[dict[str, Any]] = []
+    for r in lines:
+        out.append(
+            {
+                "account_code": r.get("account_code"),
+                "account_name": r.get("account_name"),
+                "realized": r.get("realized"),
+                "budget": r.get("budget"),
+                "percentage": r.get("percentage"),
+            }
+        )
     return out
 
 
