@@ -1250,21 +1250,109 @@ def search_account_reports(
     *,
     limit: int = 400,
 ) -> list[dict[str, Any]]:
+    """Liste les rapports ; si ``filter_text`` est non vide, filtre sur le libellé affiché (traductions JSON comprises)."""
     q = (filter_text or "").strip()
-    domain: list = []
-    if q:
-        domain = [("name", "ilike", q)]
-    ids = execute_kw(
+
+    def _row_dict(r: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": r["id"],
+            "name": format_report_name(r.get("name")),
+            "name_raw": r.get("name"),
+        }
+
+    if not q:
+        ids = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "search",
+            [[]],
+            {"limit": limit, "order": "id desc"},
+        )
+        if not ids:
+            return []
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "read",
+            [ids],
+            {"fields": ["id", "name"]},
+        )
+        return [_row_dict(r) for r in rows]
+
+    if q.isdigit():
+        exact = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "search",
+            [[("id", "=", int(q))]],
+            {"limit": 1},
+        )
+        if exact:
+            rows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "read",
+                [exact],
+                {"fields": ["id", "name"]},
+            )
+            return [_row_dict(r) for r in rows]
+
+    ql = q.lower()
+    domain_ilike = [("name", "ilike", q)]
+    ids_ilike = execute_kw(
         models,
         db,
         uid,
         password,
         "account.report",
         "search",
-        [domain],
-        {"limit": limit, "order": "id desc"},
+        [domain_ilike],
+        {"limit": max(limit * 4, 200), "order": "id desc"},
     )
-    if not ids:
+    if ids_ilike:
+        rows_ilike = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "read",
+            [ids_ilike],
+            {"fields": ["id", "name"]},
+        )
+        picked: list[dict[str, Any]] = []
+        for r in rows_ilike:
+            if ql in format_report_name(r.get("name")).lower():
+                picked.append(_row_dict(r))
+            if len(picked) >= limit:
+                break
+        if picked:
+            return picked
+
+    scan_cap = min(5000, max(limit * 12, 2000))
+    all_ids = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "search",
+        [[]],
+        {"limit": scan_cap, "order": "id desc"},
+    )
+    if not all_ids:
         return []
     rows = execute_kw(
         models,
@@ -1273,18 +1361,16 @@ def search_account_reports(
         password,
         "account.report",
         "read",
-        [ids],
+        [all_ids],
         {"fields": ["id", "name"]},
     )
-    out = []
+    out: list[dict[str, Any]] = []
     for r in rows:
-        out.append(
-            {
-                "id": r["id"],
-                "name": format_report_name(r.get("name")),
-                "name_raw": r.get("name"),
-            }
-        )
+        label = format_report_name(r.get("name")).lower()
+        if ql in label:
+            out.append(_row_dict(r))
+        if len(out) >= limit:
+            break
     return out
 
 

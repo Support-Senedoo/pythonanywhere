@@ -265,6 +265,48 @@ def _pl_analytic_url_params(
     return d
 
 
+_SESSION_PL_ANALYTIC = "staff_pl_analytic_prefs"
+
+
+def _pl_analytic_prefs() -> dict[str, Any]:
+    raw = session.get(_SESSION_PL_ANALYTIC)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _pl_analytic_prefs_merge_save(**kwargs: Any) -> None:
+    d = _pl_analytic_prefs()
+    for k, v in kwargs.items():
+        if v is None and k in (
+            "last_created_report_id",
+            "last_created_client_id",
+        ):
+            d.pop(k, None)
+        else:
+            d[k] = v
+    session[_SESSION_PL_ANALYTIC] = d
+    session.modified = True
+
+
+def _pl_analytic_highlight_info(
+    prefs: dict[str, Any],
+    selected: str,
+    reports: list[dict[str, Any]],
+) -> tuple[int | None, bool]:
+    """Dernière copie toolbox pour cette base : id + indique si absent du filtre courant."""
+    cid = (prefs.get("last_created_client_id") or "").strip().lower()
+    rid = prefs.get("last_created_report_id")
+    try:
+        rid_i = int(rid) if rid is not None else 0
+    except (TypeError, ValueError):
+        rid_i = 0
+    if not selected or not cid or cid != selected or rid_i <= 0:
+        return None, False
+    ids_in = {int(r["id"]) for r in reports}
+    if rid_i in ids_in:
+        return rid_i, False
+    return rid_i, True
+
+
 @bp.route("/utilities/pl-analytique-projet", methods=["GET", "POST"])
 @login_required_staff
 def pl_analytic_project_report():
@@ -365,6 +407,12 @@ def pl_analytic_project_report():
                 rid_int = int(rid) if rid else 0
             except ValueError:
                 rid_int = 0
+            _pl_analytic_prefs_merge_save(
+                client_id=cid,
+                filter_host=registry_netloc(reg[cid]),
+                filter_q=filter_q_post,
+                analytic_q=analytic_q_post,
+            )
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
@@ -393,6 +441,12 @@ def pl_analytic_project_report():
             )
 
         fl_save = registry_netloc(reg[cid])
+        _pl_analytic_prefs_merge_save(
+            client_id=cid,
+            filter_host=fl_save,
+            filter_q=filter_q_post,
+            analytic_q=analytic_q_post,
+        )
 
         if action == "personalize_pl_budget":
             try:
@@ -445,6 +499,14 @@ def pl_analytic_project_report():
                         ),
                     ),
                 )
+            _pl_analytic_prefs_merge_save(
+                client_id=cid,
+                filter_host=fl_save,
+                filter_q=filter_q_post,
+                analytic_q=analytic_q_post,
+                last_created_report_id=new_rid,
+                last_created_client_id=cid,
+            )
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
@@ -541,6 +603,14 @@ def pl_analytic_project_report():
                         f"actions client : {meta.get('client_actions_unlinked', 0)}."
                     )
                 flash(f"Rapport « {rlabel} » (id={rid}) supprimé.{extra}", "success")
+                pr = _pl_analytic_prefs()
+                if int(pr.get("last_created_report_id") or 0) == int(rid) and (
+                    (pr.get("last_created_client_id") or "").strip().lower() == cid
+                ):
+                    _pl_analytic_prefs_merge_save(
+                        last_created_report_id=None,
+                        last_created_client_id=None,
+                    )
             except Exception as e:
                 flash(f"Suppression impossible : {e!s}", "danger")
             return redirect(
@@ -658,6 +728,21 @@ def pl_analytic_project_report():
                         report_open_urls[int(r["id"])] = account_report_odoo_form_url(
                             bu, int(r["id"])
                         )
+            prefs_now = _pl_analytic_prefs()
+            abc = prefs_now.get("analytic_account_by_client")
+            if not isinstance(abc, dict):
+                abc = {}
+            abc[cid] = aid
+            _pl_analytic_prefs_merge_save(
+                client_id=cid,
+                filter_host=fh,
+                filter_q=filter_q_post,
+                analytic_q=analytic_q_post,
+                analytic_account_by_client=abc,
+            )
+            hp_id, hp_miss = _pl_analytic_highlight_info(
+                _pl_analytic_prefs(), cid, reports
+            )
             return render_template(
                 "staff/pl_analytic_report.html",
                 clients=reg,
@@ -673,6 +758,8 @@ def pl_analytic_project_report():
                 report_open_urls=report_open_urls,
                 prefill_report_id=None,
                 prefill_report_name="",
+                highlight_report_id=hp_id,
+                highlight_report_missing=hp_miss,
                 conn_status=conn_status,
                 conn_detail=conn_detail,
                 utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -772,10 +859,20 @@ def pl_analytic_project_report():
             ),
         )
 
-    selected = (request.args.get("client_id") or "").strip().lower()
+    prefs = _pl_analytic_prefs()
+
+    if "client_id" in request.args:
+        selected = (request.args.get("client_id") or "").strip().lower()
+    else:
+        selected = (prefs.get("client_id") or "").strip().lower()
     if selected not in reg:
         selected = ""
-    filter_host = (request.args.get("filter_host") or "").strip()
+
+    if "filter_host" in request.args:
+        filter_host = (request.args.get("filter_host") or "").strip()
+    else:
+        filter_host = (prefs.get("filter_host") or "").strip()
+
     valid_hosts = set(distinct_odoo_hosts(reg))
     if filter_host and filter_host not in valid_hosts:
         filter_host = ""
@@ -796,8 +893,16 @@ def pl_analytic_project_report():
     if add_base_only:
         selected = ""
 
-    analytic_q = (request.args.get("aq") or "").strip()
-    filter_q = (request.args.get("q") or "").strip()
+    if "q" in request.args:
+        filter_q = (request.args.get("q") or "").strip()
+    else:
+        filter_q = (prefs.get("filter_q") or "").strip()
+
+    if "aq" in request.args:
+        analytic_q = (request.args.get("aq") or "").strip()
+    else:
+        analytic_q = (prefs.get("analytic_q") or "").strip()
+
     prefill_rid = request.args.get("report_id", type=int)
 
     conn_status = "idle"
@@ -845,11 +950,34 @@ def pl_analytic_project_report():
             conn_status = "error"
             conn_detail = str(e)
 
+    highlight_report_id, highlight_report_missing = _pl_analytic_highlight_info(
+        prefs, selected, reports
+    )
+
+    default_analytic_id = None
+    abc_get = prefs.get("analytic_account_by_client")
+    if isinstance(abc_get, dict) and selected:
+        raw_aid = abc_get.get(selected)
+        try:
+            da = int(raw_aid) if raw_aid is not None else 0
+        except (TypeError, ValueError):
+            da = 0
+        if da > 0:
+            default_analytic_id = da
+
     clients_for_select = (
         configs_for_same_host(reg, filter_host)
         if filter_host
         else clients_sorted_for_select(reg)
     )
+
+    if not add_base_only:
+        _pl_analytic_prefs_merge_save(
+            client_id=selected,
+            filter_host=filter_host,
+            filter_q=filter_q,
+            analytic_q=analytic_q,
+        )
 
     return render_template(
         "staff/pl_analytic_report.html",
@@ -866,6 +994,8 @@ def pl_analytic_project_report():
         report_open_urls=report_open_urls,
         prefill_report_id=prefill_rid,
         prefill_report_name=prefill_report_name,
+        highlight_report_id=highlight_report_id,
+        highlight_report_missing=highlight_report_missing,
         conn_status=conn_status,
         conn_detail=conn_detail,
         utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -873,7 +1003,7 @@ def pl_analytic_project_report():
         utility_date=UTILITY_DATE,
         utility_author=UTILITY_AUTHOR,
         report_result=None,
-        form_analytic_id=None,
+        form_analytic_id=default_analytic_id,
         form_full_line=False,
         form_currency_mode="company",
         add_base_only=add_base_only,

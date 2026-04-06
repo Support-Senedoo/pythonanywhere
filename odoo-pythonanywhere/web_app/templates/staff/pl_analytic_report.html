@@ -100,6 +100,9 @@
       <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.pl_analytic_project_report', add_base_only='1', filter_host=filter_host) }}">Ajouter une base</a>
       <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
     </div>
+    <p class="sn-muted" style="margin:0.65rem 0 0;font-size:0.82rem;line-height:1.4;">
+      Base, filtres et dernier axe analytique (tableau API) sont <strong>mémorisés pour votre session</strong> : vous retrouvez les dernières valeurs en rouvrant la page (sans tout resaisir).
+    </p>
   </form>
 </div>
 
@@ -119,6 +122,11 @@
       {% endif %}
     </summary>
     <div style="margin-top:0.75rem;">
+  {% if highlight_report_id is not none and highlight_report_id and highlight_report_missing %}
+  <p style="margin:0 0 0.65rem;padding:0.5rem 0.65rem;border:1px solid var(--sn-border);border-radius:6px;background:rgba(59,130,246,0.06);line-height:1.45;font-size:0.88rem;">
+    <strong>Dernière copie créée</strong> (id <code>{{ highlight_report_id }}</code>) : elle n’apparaît pas avec le filtre actuel sur le nom. Videz le champ « Filtrer les rapports », élargissez la recherche, ou saisissez l’<strong>id</strong> seul pour retrouver la ligne.
+  </p>
+  {% endif %}
   {% if not reports %}
   <p class="sn-muted">Aucun rapport ne correspond au filtre « rapports comptables ».</p>
   {% else %}
@@ -134,8 +142,13 @@
     </thead>
     <tbody>
       {% for r in reports %}
-      <tr>
-        <td><code>{{ r.id }}</code></td>
+      <tr{% if highlight_report_id is not none and highlight_report_id and r.id == highlight_report_id %} style="background:rgba(59,130,246,0.09);box-shadow:inset 3px 0 0 0 #3b82f6;"{% endif %}>
+        <td>
+          <code>{{ r.id }}</code>
+          {% if highlight_report_id is not none and highlight_report_id and r.id == highlight_report_id %}
+          <span style="display:inline-block;margin-left:0.35rem;padding:0.12rem 0.45rem;font-size:0.72rem;font-weight:600;border-radius:4px;background:#3b82f6;color:#fff;">Dernière copie</span>
+          {% endif %}
+        </td>
         <td>{{ r.name }}</td>
         <td>
           {% if report_open_urls.get(r.id) %}
