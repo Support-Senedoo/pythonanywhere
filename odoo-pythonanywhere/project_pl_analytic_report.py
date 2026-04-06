@@ -690,8 +690,8 @@ def build_report(
     }
 
 
-def export_excel(path: str, report: dict[str, Any]) -> None:
-    """Export Excel (pandas + openpyxl)."""
+def _dataframes_for_excel(report: dict[str, Any]) -> tuple[Any, Any]:
+    """Construit les DataFrames pandas pour l’export Excel."""
     try:
         import pandas as pd
     except ImportError as e:
@@ -715,10 +715,29 @@ def export_excel(path: str, report: dict[str, Any]) -> None:
             }
         )
     df_sum = pd.DataFrame(rows_summary)
+    return df, df_sum
 
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+
+def report_to_excel_bytes(report: dict[str, Any]) -> bytes:
+    """Retourne un classeur .xlsx en mémoire (pandas + openpyxl)."""
+    import io
+
+    df, df_sum = _dataframes_for_excel(report)
+    import pandas as pd
+
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="Lignes", index=False)
         df_sum.to_excel(writer, sheet_name="Totaux", index=False)
+    bio.seek(0)
+    return bio.read()
+
+
+def export_excel(path: str, report: dict[str, Any]) -> None:
+    """Export Excel (pandas + openpyxl)."""
+    data = report_to_excel_bytes(report)
+    with open(path, "wb") as f:
+        f.write(data)
 
 
 def main() -> None:

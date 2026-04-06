@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}{% if add_base_only %}Ajouter une base Odoo{% else %}{{ utility_title }} — Senedoo{% endif %}{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+{% if add_base_only %}
+<h1>Ajouter une base Odoo</h1>
+<p class="sn-muted" style="margin:-0.35rem 0 0.85rem;">
+  <a href="{{ url_for('staff_admin.clients_list') }}">← Clients Odoo (administration)</a>
+  · <a href="{{ url_for('staff.utilities_home') }}">Utilitaires</a>
+  · <a href="{{ url_for('staff.pl_analytic_project_report') }}">Compte de résultat analytique (API)</a>
+</p>
+<div class="sn-card sn-card--accent">
+  <h2 style="margin-top:0;font-size:1.05rem;">Nouvelle base</h2>
+  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" autocomplete="off" novalidate>
+    <input type="hidden" name="action" value="add_client">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="add_base_only" value="1">
+    <label for="new_environment">Environnement</label>
+    <select id="new_environment" name="new_environment">
+      <option value="production" selected>Production</option>
+      <option value="test">Test / recette</option>
+    </select>
+    <label for="new_url">URL Odoo (https://…)</label>
+    <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
+    <label for="new_db">Nom de la base (db)</label>
+    <input type="text" id="new_db" name="new_db" required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
+    <label for="new_user">Utilisateur / e-mail API</label>
+    <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
+    <label for="new_password">Mot de passe ou clé API</label>
+    <input type="password" id="new_password" name="new_password" autocomplete="new-password" required placeholder="Obligatoire pour une nouvelle base">
+    <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
+  </form>
+</div>
+{% else %}
+<h1>{{ utility_title }}</h1>
+<p class="sn-muted" style="margin:-0.35rem 0 0.85rem;display:flex;flex-wrap:wrap;gap:0.35rem 0.75rem;align-items:center;">
+  <span>Autres utilitaires :</span>
+  <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L personnalisé</a>
+  <span class="sn-muted">·</span>
+  <a href="{{ url_for('staff.rapports_pl_budget') }}">P&amp;L analytique / budget (copie Odoo)</a>
+  <span class="sn-muted">·</span>
+  <a href="{{ url_for('staff.rapports_balance') }}">Balance OHADA</a>
+  <span class="sn-muted">·</span>
+  <a href="{{ url_for('staff.utilities_home') }}">← Tous les utilitaires</a>
+</p>
+
+<details class="sn-doc">
+  <summary>Descriptif — compte de résultat analytique (API)</summary>
+  <p style="margin:0.65rem 0 0;line-height:1.5;">
+    <strong>But.</strong> Calculer un tableau <strong>réalisé / budget / %</strong> par <strong>compte général</strong> pour un
+    <strong>compte analytique</strong> (projet) et une période, via l’API Odoo (<code>account.move.line</code>,
+    <code>analytic_distribution</code>, <code>crossovered.budget.lines</code>). <strong>Aucun rapport
+    <code>account.report</code> n’est créé dans la base</strong> — contrairement à l’utilitaire « P&amp;L analytique / budget »
+    qui duplique un rapport Odoo.
+  </p>
+  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
+    Saisissez l’<strong>identifiant numérique</strong> du compte analytique (menu Comptabilité › Analytique, ou liste technique).
+    Les montants réalisés suivent la répartition <code>analytic_distribution</code> (prorata des pourcentages).
+  </p>
+  <p class="sn-meta-line">
+    <strong>Auteur :</strong> {{ utility_author }} ·
+    <strong>Version :</strong> {{ utility_version }} ·
+    <strong>Date :</strong> {{ utility_date }}
+    · <strong>Révision dépôt :</strong> <code>{{ toolbox_git_revision }}</code>
+  </p>
+</details>
+
+<div class="sn-card sn-card--accent">
+  <h2 style="margin-top:0;font-size:1.05rem;">Base Odoo</h2>
+  <form method="get" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
+    <label for="filter_host">Serveur Odoo (hôte de l’URL)</label>
+    <select id="filter_host" name="filter_host">
+      <option value="">— Tous les serveurs —</option>
+      {% for h in distinct_odoo_hosts %}
+      <option value="{{ h }}" {% if filter_host == h %}selected{% endif %}>{{ h }}</option>
+      {% endfor %}
+    </select>
+    <label for="client_id">Base à utiliser</label>
+    <select id="client_id" name="client_id">
+      <option value="">— Choisir —</option>
+      {% for cid, c in clients_for_select %}
+      <option value="{{ cid }}" {% if selected_client == cid %}selected{% endif %}>
+        {{ c.db }} — {% if c.environment == 'test' %}Test{% else %}Prod{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <div class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;">
+      <button type="submit">Actualiser</button>
+      <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.pl_analytic_project_report', add_base_only='1', filter_host=filter_host) }}">Ajouter une base</a>
+      <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+    </div>
+  </form>
+</div>
+
+{% if selected_client and conn_status == 'ok' %}
+<div class="sn-card">
+  <h2 style="margin-top:0;font-size:1.05rem;">Paramètres du rapport</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
+    Connexion : {{ conn_detail or 'OK' }}
+  </p>
+  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <label for="analytic_account_id">Id du compte analytique (<code>account.analytic.account</code>)</label>
+    <input type="number" id="analytic_account_id" name="analytic_account_id" required min="1" step="1"
+           value="{{ form_analytic_id if form_analytic_id is not none else '' }}"
+           placeholder="ex. 42">
+    <label for="date_from">Date début</label>
+    <input type="date" id="date_from" name="date_from" required value="{{ form_date_from }}">
+    <label for="date_to">Date fin</label>
+    <input type="date" id="date_to" name="date_to" required value="{{ form_date_to }}">
+    <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+      <input type="checkbox" name="full_line_balance" value="1" {% if form_full_line %}checked{% endif %}>
+      Balance entière (sans prorata % sur la distribution)
+    </label>
+    <label for="currency_mode">Montants</label>
+    <select id="currency_mode" name="currency_mode">
+      <option value="company" {% if form_currency_mode == 'company' %}selected{% endif %}>Devise société (balance)</option>
+      <option value="transaction" {% if form_currency_mode == 'transaction' %}selected{% endif %}>Devise transaction (amount_currency)</option>
+    </select>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.85rem;">
+      <button type="submit" name="action" value="run_report">Calculer le rapport</button>
+      <button type="submit" name="action" value="budget_probe" class="sn-btn sn-btn--ghost" formnovalidate>Sonde budget / analytique</button>
+    </div>
+  </form>
+</div>
+{% elif selected_client and conn_status == 'error' %}
+<p class="sn-muted">Connexion impossible : {{ conn_detail }}</p>
+{% endif %}
+
+{% if report_result %}
+<div class="sn-card sn-card--accent" style="margin-top:1rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">Résultat — projet id {{ report_result.analytic_account_id }}
+    ({{ report_result.date_from }} → {{ report_result.date_to }})</h2>
+  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0 0 1rem;">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="analytic_account_id" value="{{ form_analytic_id }}">
+    <input type="hidden" name="date_from" value="{{ form_date_from }}">
+    <input type="hidden" name="date_to" value="{{ form_date_to }}">
+    <input type="hidden" name="currency_mode" value="{{ form_currency_mode }}">
+    {% if form_full_line %}<input type="hidden" name="full_line_balance" value="1">{% endif %}
+    <button type="submit" name="action" value="export_excel">Télécharger Excel</button>
+  </form>
+
+  {% set tot = report_result.totals %}
+  <table class="sn-table" style="width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:0.92rem;">
+    <thead>
+      <tr style="text-align:left;border-bottom:1px solid var(--sn-border);">
+        <th style="padding:0.35rem 0.5rem;">Classe / total</th>
+        <th style="padding:0.35rem 0.5rem;">Réalisé</th>
+        <th style="padding:0.35rem 0.5rem;">Budget</th>
+        <th style="padding:0.35rem 0.5rem;">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for key, label in [('class_6', 'Classe 6 (charges)'), ('class_7', 'Classe 7 (produits)'), ('global', 'Total global')] %}
+      {% set b = tot.get(key) or {} %}
+      <tr>
+        <td style="padding:0.35rem 0.5rem;">{{ label }}</td>
+        <td style="padding:0.35rem 0.5rem;">{{ '%.2f'|format(b.get('realized') or 0) }}</td>
+        <td style="padding:0.35rem 0.5rem;">{{ '%.2f'|format(b.get('budget') or 0) }}</td>
+        <td style="padding:0.35rem 0.5rem;">{% if b.get('percentage') is not none %}{{ '%.2f'|format(b.get('percentage')) }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="overflow:auto;max-height:70vh;">
+  <table class="sn-table" style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+    <thead>
+      <tr style="text-align:left;border-bottom:1px solid var(--sn-border);position:sticky;top:0;background:var(--sn-card-bg, #fff);">
+        <th style="padding:0.35rem 0.45rem;">Compte</th>
+        <th style="padding:0.35rem 0.45rem;">Libellé</th>
+        <th style="padding:0.35rem 0.45rem;">Réalisé</th>
+        <th style="padding:0.35rem 0.45rem;">Budget</th>
+        <th style="padding:0.35rem 0.45rem;">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in report_result.lines %}
+      <tr>
+        <td style="padding:0.3rem 0.45rem;"><code>{{ row.account_code }}</code></td>
+        <td style="padding:0.3rem 0.45rem;">{{ row.account_name }}</td>
+        <td style="padding:0.3rem 0.45rem;">{{ '%.2f'|format(row.realized or 0) }}</td>
+        <td style="padding:0.3rem 0.45rem;">{{ '%.2f'|format(row.budget or 0) }}</td>
+        <td style="padding:0.3rem 0.45rem;">{% if row.percentage is not none %}{{ '%.2f'|format(row.percentage) }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="sn-page-bottom-flash" role="region" aria-label="Messages">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="sn-flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+</div>
+{% endif %}
+{% endblock %}

@@ -20,8 +20,12 @@
       <a href="{{ url_for('staff.rapports_pl_budget') }}"><strong>Compte de résultat avec budget analytique</strong></a>
       — copie + même détail comptes, avec <code>filter_analytic</code> et <code>filter_budget</code> si le modèle Odoo les expose ; <strong>sonde</strong> lecture seule sur les lignes de budget / analytique.
     </li>
+    <li style="margin-bottom:0.65rem;">
+      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique (réalisé / budget / %)</strong></a>
+      — tableau par compte général pour un axe analytique et une période, via API (<code>analytic_distribution</code>, budgets) ; <strong>ne crée pas</strong> de rapport Odoo dans la base ; export Excel possible.
+    </li>
   </ul>
-  <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/personalize-pl-budget</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé).</p>
+  <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/personalize-pl-budget</code>, <code>…/pl-analytique-projet</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé).</p>
 </div>
 
 <div class="sn-card">

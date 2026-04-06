@@ -1,6 +1,7 @@
 """Espace Senedoo : choix client / apps + utilitaires (personnalisation rapport)."""
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -54,12 +55,14 @@ from personalize_pl_analytic_budget import (
     probe_financial_budget_analytic_summary,
 )
 from personalize_syscohada_detail import personalize_fix_detail_complete
+from project_pl_analytic_report import build_report, report_to_excel_bytes
 
 from web_app.odoo_account_reports import (
     UTILITY_AUTHOR,
     UTILITY_DATE,
     UTILITY_TITLE,
     UTILITY_TITLE_BALANCE,
+    UTILITY_TITLE_PL_ANALYTIC_API,
     UTILITY_TITLE_PL_BUDGET,
     UTILITY_VERSION,
     account_report_backend_list_url,
@@ -227,6 +230,325 @@ def staff_apps_pointage_import():
 def utilities_home():
     reg = _registry()
     return render_template("staff/utilities.html", clients=reg)
+
+
+def _pl_analytic_url_params(
+    *,
+    client_id: str | None = None,
+    filter_host: str | None = None,
+    add_base_only: bool = False,
+) -> dict[str, Any]:
+    d: dict[str, Any] = {}
+    if client_id:
+        d["client_id"] = client_id
+    fh = (filter_host or "").strip()
+    if fh:
+        d["filter_host"] = fh
+    if add_base_only:
+        d["add_base_only"] = "1"
+    return d
+
+
+@bp.route("/utilities/pl-analytique-projet", methods=["GET", "POST"])
+@login_required_staff
+def pl_analytic_project_report():
+    """
+    Compte de résultat analytique (réalisé / budget / %) via API Odoo — lecture seule,
+    sans créer de rapport dans la base (contrairement aux utilitaires account.report).
+    """
+    reg = _registry()
+
+    def ru(**kwargs: Any) -> str:
+        return url_for("staff.pl_analytic_project_report", **kwargs)
+
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+        filter_host_post = (request.form.get("filter_host") or "").strip()
+        add_base_only_post = (request.form.get("add_base_only") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
+        def _ru_err(
+            client_id: str | None = None,
+            filter_host_override: str | None = None,
+        ):
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=client_id,
+                        filter_host=filter_host_override
+                        if filter_host_override is not None
+                        else filter_host_post,
+                        add_base_only=add_base_only_post,
+                    ),
+                ),
+            )
+
+        if action == "add_client":
+            clients_path = current_app.config["TOOLBOX_CLIENTS_PATH"]
+            url = (request.form.get("new_url") or "").strip()
+            db = (request.form.get("new_db") or "").strip()
+            user = (request.form.get("new_user") or "").strip()
+            password = (request.form.get("new_password") or "").strip() or None
+            try:
+                new_cid = normalize_registry_db_key(db)
+            except ValueError as e:
+                flash(str(e), "danger")
+                return _ru_err()
+            if not url or not user:
+                flash("URL et utilisateur Odoo sont requis.", "danger")
+                return _ru_err()
+            env_raw = (request.form.get("new_environment") or "").strip().lower()
+            env_kw = env_raw if env_raw in ("production", "test") else None
+            try:
+                upsert_client(
+                    clients_path,
+                    new_cid,
+                    new_cid,
+                    normalize_odoo_base_url(url),
+                    db,
+                    user,
+                    password,
+                    [],
+                    environment=env_kw,
+                )
+                flash(f"Base enregistrée : {new_cid}.", "success")
+            except ValueError as e:
+                flash(str(e), "danger")
+                return _ru_err()
+            net = urlparse(normalize_odoo_base_url(url)).netloc
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=new_cid,
+                        filter_host=filter_host_post or net,
+                    ),
+                ),
+            )
+
+        cid = (request.form.get("client_id") or "").strip().lower()
+        if cid not in reg:
+            flash("Base / client inconnu.", "danger")
+            return _ru_err()
+
+        try:
+            models, db, uid, pwd = get_xmlrpc_for_staff_client_id(cid)
+        except Exception as e:
+            flash(f"Connexion impossible : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=registry_netloc(reg[cid]),
+                    ),
+                ),
+            )
+
+        fl_save = registry_netloc(reg[cid])
+
+        if action == "budget_probe":
+            try:
+                msg = probe_financial_budget_analytic_summary(models, db, uid, pwd)
+                if len(msg) > 900:
+                    msg = msg[:897] + "…"
+                flash(f"Sonde budget / analytique : {msg}", "info")
+            except Exception as e:
+                flash(f"Sonde : {e!s}", "danger")
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+
+        if action == "run_report":
+            try:
+                aid = int(request.form.get("analytic_account_id") or "0")
+            except ValueError:
+                aid = 0
+            date_from = (request.form.get("date_from") or "").strip()
+            date_to = (request.form.get("date_to") or "").strip()
+            full_line = (request.form.get("full_line_balance") or "").strip().lower() in (
+                "1",
+                "on",
+                "yes",
+                "true",
+            )
+            currency_mode = (request.form.get("currency_mode") or "company").strip()
+            if currency_mode not in ("company", "transaction"):
+                currency_mode = "company"
+            if aid <= 0 or not date_from or not date_to:
+                flash(
+                    "Indiquez l’id du compte analytique (nombre entier > 0) et les deux dates.",
+                    "warning",
+                )
+                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            try:
+                report = build_report(
+                    models,
+                    db,
+                    uid,
+                    pwd,
+                    aid,
+                    date_from,
+                    date_to,
+                    full_line_balance=full_line,
+                    currency_mode=currency_mode,
+                )
+            except Exception as e:
+                flash(f"Échec du calcul : {e!s}", "danger")
+                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+
+            valid_hosts = set(distinct_odoo_hosts(reg))
+            fh = fl_save
+            if fh and fh not in valid_hosts:
+                fh = ""
+            clients_for_select = (
+                configs_for_same_host(reg, fh) if fh else clients_sorted_for_select(reg)
+            )
+            conn_status = "ok"
+            conn_detail = ""
+            try:
+                ok, msg = probe_odoo_reports_access(models, db, uid, pwd)
+                conn_detail = msg
+                if not ok:
+                    conn_status = "error"
+            except Exception:
+                pass
+            return render_template(
+                "staff/pl_analytic_report.html",
+                clients=reg,
+                clients_sorted=clients_sorted_for_select(reg),
+                clients_for_select=clients_for_select,
+                distinct_odoo_hosts=distinct_odoo_hosts(reg),
+                selected_client=cid,
+                filter_host=fh,
+                conn_status=conn_status,
+                conn_detail=conn_detail,
+                utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
+                utility_version=UTILITY_VERSION,
+                utility_date=UTILITY_DATE,
+                utility_author=UTILITY_AUTHOR,
+                report_result=report,
+                form_analytic_id=aid,
+                form_date_from=date_from,
+                form_date_to=date_to,
+                form_full_line=full_line,
+                form_currency_mode=currency_mode,
+                add_base_only=False,
+            )
+
+        if action == "export_excel":
+            try:
+                aid = int(request.form.get("analytic_account_id") or "0")
+            except ValueError:
+                aid = 0
+            date_from = (request.form.get("date_from") or "").strip()
+            date_to = (request.form.get("date_to") or "").strip()
+            full_line = (request.form.get("full_line_balance") or "").strip().lower() in (
+                "1",
+                "on",
+                "yes",
+                "true",
+            )
+            currency_mode = (request.form.get("currency_mode") or "company").strip()
+            if currency_mode not in ("company", "transaction"):
+                currency_mode = "company"
+            if aid <= 0 or not date_from or not date_to:
+                flash("Paramètres Excel incomplets.", "warning")
+                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            try:
+                report = build_report(
+                    models,
+                    db,
+                    uid,
+                    pwd,
+                    aid,
+                    date_from,
+                    date_to,
+                    full_line_balance=full_line,
+                    currency_mode=currency_mode,
+                )
+                raw = report_to_excel_bytes(report)
+            except RuntimeError as e:
+                flash(str(e), "danger")
+                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            except Exception as e:
+                flash(f"Export Excel : {e!s}", "danger")
+                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            safe_db = "".join(c for c in reg[cid].db if c.isalnum() or c in "-_")[:40]
+            fname = f"pl_analytique_{safe_db}_{aid}.xlsx"
+            return send_file(
+                io.BytesIO(raw),
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                as_attachment=True,
+                download_name=fname,
+            )
+
+        flash("Action non reconnue.", "warning")
+        return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+
+    selected = (request.args.get("client_id") or "").strip().lower()
+    if selected not in reg:
+        selected = ""
+    filter_host = (request.args.get("filter_host") or "").strip()
+    valid_hosts = set(distinct_odoo_hosts(reg))
+    if filter_host and filter_host not in valid_hosts:
+        filter_host = ""
+    if (
+        selected
+        and filter_host
+        and registry_netloc(reg[selected]).lower() != filter_host.lower()
+    ):
+        selected = ""
+    if selected and not filter_host:
+        filter_host = registry_netloc(reg[selected])
+
+    add_base_only = (request.args.get("add_base_only") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if add_base_only:
+        selected = ""
+
+    conn_status = "idle"
+    conn_detail = ""
+    if selected:
+        try:
+            models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
+            ok, msg = probe_odoo_reports_access(models, db, uid, pwd)
+            conn_detail = msg
+            conn_status = "ok" if ok else "error"
+        except Exception as e:
+            conn_status = "error"
+            conn_detail = str(e)
+
+    clients_for_select = (
+        configs_for_same_host(reg, filter_host)
+        if filter_host
+        else clients_sorted_for_select(reg)
+    )
+
+    return render_template(
+        "staff/pl_analytic_report.html",
+        clients=reg,
+        clients_sorted=clients_sorted_for_select(reg),
+        clients_for_select=clients_for_select,
+        distinct_odoo_hosts=distinct_odoo_hosts(reg),
+        selected_client=selected,
+        filter_host=filter_host,
+        conn_status=conn_status,
+        conn_detail=conn_detail,
+        utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
+        utility_version=UTILITY_VERSION,
+        utility_date=UTILITY_DATE,
+        utility_author=UTILITY_AUTHOR,
+        report_result=None,
+        form_analytic_id=None,
+        form_date_from="",
+        form_date_to="",
+        form_full_line=False,
+        form_currency_mode="company",
+        add_base_only=add_base_only,
+    )
 
 
 @bp.route("/utilities/odoo-compte-bases", methods=["GET", "POST"])

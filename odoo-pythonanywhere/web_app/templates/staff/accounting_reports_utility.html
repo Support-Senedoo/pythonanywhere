@@ -12,6 +12,7 @@
   <a href="{% if filter_host %}{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.rapports_comptables', add_base_only='1') }}{% endif %}">P&amp;L personnalisé</a>
   · <a href="{% if filter_host %}{{ url_for('staff.rapports_balance', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.rapports_balance', add_base_only='1') }}{% endif %}">Balance OHADA</a>
   · <a href="{% if filter_host %}{{ url_for('staff.rapports_pl_budget', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.rapports_pl_budget', add_base_only='1') }}{% endif %}">P&amp;L budget</a>
+  · <a href="{% if filter_host %}{{ url_for('staff.pl_analytic_project_report', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.pl_analytic_project_report', add_base_only='1') }}{% endif %}">P&amp;L analytique (API)</a>
 </p>
 <div class="sn-card sn-card--accent">
   <h2 style="margin-top:0;font-size:1.05rem;">Nouvelle base</h2>
@@ -66,6 +67,8 @@
   <a href="{{ url_for('staff.rapports_balance') }}">Balance OHADA</a>
   <span class="sn-muted">·</span>
   <a href="{{ url_for('staff.rapports_pl_budget') }}">P&amp;L analytique / budget</a>
+  <span class="sn-muted">·</span>
+  <a href="{{ url_for('staff.pl_analytic_project_report') }}">P&amp;L analytique (API)</a>
   <span class="sn-muted">·</span>
   <a href="{{ url_for('staff.utilities_home') }}">← Tous les utilitaires</a>
 </p>

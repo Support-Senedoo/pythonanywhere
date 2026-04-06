@@ -12,6 +12,7 @@ from web_app import app_version
 UTILITY_TITLE = "Compte de résultat — personnalisation (détail / SYSCOHADA)"
 UTILITY_TITLE_BALANCE = "Balance OHADA — 6 colonnes (Senedoo)"
 UTILITY_TITLE_PL_BUDGET = "Compte de résultat — analytique et budget"
+UTILITY_TITLE_PL_ANALYTIC_API = "Compte de résultat analytique (réalisé / budget / %)"
 UTILITY_VERSION = app_version.TOOLBOX_APP_VERSION
 UTILITY_DATE = app_version.TOOLBOX_APP_DATE
 UTILITY_AUTHOR = app_version.TOOLBOX_APP_AUTHOR
