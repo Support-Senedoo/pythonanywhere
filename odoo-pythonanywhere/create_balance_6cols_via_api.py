@@ -20,6 +20,10 @@ des options (filtres, solde initial…) depuis le Grand livre si trouvé, lignes
 ``sum_if_pos`` / ``-sum_if_neg`` sur les quatre colonnes extérieures, puis **réécriture**
 XML-RPC des expressions pour garantir les sous-formules en base.
 
+**Libellés d’expressions** : préfixe ``ohada6_`` (ex. ``ohada6_open_deb``) pour les colonnes,
+au lieu de ``debit`` / ``debit_initial``, afin d’éviter les collisions avec le moteur standard
+des rapports comptables Odoo qui peut réinjecter un solde signé dans une colonne « débit ».
+
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
 
@@ -73,6 +77,15 @@ BALANCE_OHADA_NAME_FR = "Balance OHADA"
 BALANCE_OHADA_NAME_EN = "Balance OHADA"
 BALANCE_OHADA_LINE_CODE = "bal_ohada"
 
+# Colonnes : ``expression_label`` = ``label`` des expressions (identiques). Préfixe ohada6_
+# pour ne pas utiliser debit / credit / debit_initial, souvent traités à part par Odoo.
+OHADA6_OPEN_DEB = "ohada6_open_deb"
+OHADA6_OPEN_CRE = "ohada6_open_cre"
+OHADA6_MOV_DEB = "ohada6_mov_deb"
+OHADA6_MOV_CRE = "ohada6_mov_cre"
+OHADA6_CLOSE_DEB = "ohada6_close_deb"
+OHADA6_CLOSE_CRE = "ohada6_close_cre"
+
 
 def _fields(models: Any, db: str, uid: int, password: str, model: str) -> set[str]:
     fg = execute_kw(models, db, uid, password, model, "fields_get", [], {})
@@ -122,14 +135,14 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     """
     return [
         {
-            "label": "debit_initial",
+            "label": OHADA6_OPEN_DEB,
             "engine": "domain",
             "formula": "[]",
             "subformula": "sum_if_pos",
             "date_scope": "to_beginning_of_period",
         },
         {
-            "label": "credit_initial",
+            "label": OHADA6_OPEN_CRE,
             "engine": "domain",
             "formula": "[]",
             "subformula": "-sum_if_neg",
@@ -137,14 +150,14 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
         },
         # Période : mouvements bruts (ne pas remplacer par un solde net débit − crédit).
         {
-            "label": "debit",
+            "label": OHADA6_MOV_DEB,
             "engine": "domain",
             "formula": "[('debit', '>', 0)]",
             "subformula": "sum",
             "date_scope": "strict_range",
         },
         {
-            "label": "credit",
+            "label": OHADA6_MOV_CRE,
             "engine": "domain",
             "formula": "[('credit', '>', 0)]",
             "subformula": "-sum",
@@ -152,14 +165,14 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
         },
         # Finaux : solde net décomposé (comme les initiaux).
         {
-            "label": "debit_final",
+            "label": OHADA6_CLOSE_DEB,
             "engine": "domain",
             "formula": "[]",
             "subformula": "sum_if_pos",
             "date_scope": "from_beginning",
         },
         {
-            "label": "credit_final",
+            "label": OHADA6_CLOSE_CRE,
             "engine": "domain",
             "formula": "[]",
             "subformula": "-sum_if_neg",
@@ -175,45 +188,51 @@ def _expressions_aggregation_ohada_line() -> list[dict[str, Any]]:
     la toolbox n’utilise pas ce bloc pour la création API ; voir le domaine +
     ``_force_ohada_outer_domain_expressions``.
     """
+    lc = BALANCE_OHADA_LINE_CODE
     return [
         {
-            "label": "debit_initial",
+            "label": OHADA6_OPEN_DEB,
             "engine": "aggregation",
             "formula": "initial_debit - initial_credit",
             "subformula": "positive",
             "date_scope": "strict_range",
         },
         {
-            "label": "credit_initial",
+            "label": OHADA6_OPEN_CRE,
             "engine": "aggregation",
             "formula": "initial_credit - initial_debit",
             "subformula": "positive",
             "date_scope": "strict_range",
         },
-        # Période : uniquement mouvements bruts (ne pas mettre debit - credit ici).
         {
-            "label": "debit",
+            "label": OHADA6_MOV_DEB,
             "engine": "aggregation",
             "formula": "debit",
             "date_scope": "strict_range",
         },
         {
-            "label": "credit",
+            "label": OHADA6_MOV_CRE,
             "engine": "aggregation",
             "formula": "credit",
             "date_scope": "strict_range",
         },
         {
-            "label": "debit_final",
+            "label": OHADA6_CLOSE_DEB,
             "engine": "aggregation",
-            "formula": "(initial_debit + debit) - (initial_credit + credit)",
+            "formula": (
+                f"(initial_debit + {lc}.{OHADA6_MOV_DEB}) "
+                f"- (initial_credit + {lc}.{OHADA6_MOV_CRE})"
+            ),
             "subformula": "positive",
             "date_scope": "strict_range",
         },
         {
-            "label": "credit_final",
+            "label": OHADA6_CLOSE_CRE,
             "engine": "aggregation",
-            "formula": "(initial_credit + credit) - (initial_debit + debit)",
+            "formula": (
+                f"(initial_credit + {lc}.{OHADA6_MOV_CRE}) "
+                f"- (initial_debit + {lc}.{OHADA6_MOV_DEB})"
+            ),
             "subformula": "positive",
             "date_scope": "strict_range",
         },
@@ -299,25 +318,25 @@ def _force_ohada_outer_domain_expressions(
         {"fields": ["id", "label"]},
     )
     targets: dict[str, dict[str, Any]] = {
-        "debit_initial": {
+        OHADA6_OPEN_DEB: {
             "engine": "domain",
             "formula": "[]",
             "subformula": "sum_if_pos",
             "date_scope": "to_beginning_of_period",
         },
-        "credit_initial": {
+        OHADA6_OPEN_CRE: {
             "engine": "domain",
             "formula": "[]",
             "subformula": "-sum_if_neg",
             "date_scope": "to_beginning_of_period",
         },
-        "debit_final": {
+        OHADA6_CLOSE_DEB: {
             "engine": "domain",
             "formula": "[]",
             "subformula": "sum_if_pos",
             "date_scope": "from_beginning",
         },
-        "credit_final": {
+        OHADA6_CLOSE_CRE: {
             "engine": "domain",
             "formula": "[]",
             "subformula": "-sum_if_neg",
@@ -413,12 +432,12 @@ def create_balance_six_columns_rpc(
     rep_fields = _fields(models, db, uid, password, "account.report")
 
     cols_spec = [
-        (10, "Débit initial", "Opening debit", "debit_initial"),
-        (20, "Crédit initial", "Opening credit", "credit_initial"),
-        (30, "Débit", "Debit", "debit"),
-        (40, "Crédit", "Credit", "credit"),
-        (50, "Débit final", "Closing debit", "debit_final"),
-        (60, "Crédit final", "Closing credit", "credit_final"),
+        (10, "Débit initial", "Opening debit", OHADA6_OPEN_DEB),
+        (20, "Crédit initial", "Opening credit", OHADA6_OPEN_CRE),
+        (30, "Débit", "Debit", OHADA6_MOV_DEB),
+        (40, "Crédit", "Credit", OHADA6_MOV_CRE),
+        (50, "Débit final", "Closing debit", OHADA6_CLOSE_DEB),
+        (60, "Crédit final", "Closing credit", OHADA6_CLOSE_CRE),
     ]
 
     gl_id = find_general_ledger_account_report_id(models, db, uid, password)

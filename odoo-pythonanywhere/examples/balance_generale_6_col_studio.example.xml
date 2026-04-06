@@ -3,34 +3,15 @@
     <!--
       Balance générale 6 colonnes (visée OHADA) — gabarit Studio / module custom, Odoo v19+.
 
-      Attention Odoo 19 : sur une ligne avec groupby (ex. account_id), le moteur
-      « aggregation » est refusé par le serveur. Utiliser le moteur « domain » et une
-      hiérarchie ligne parente + ligne groupée, ou créer via la toolbox
-      (create_balance_6cols_via_api.py) qui applique ce schéma.
+      Odoo 19 : sur une ligne avec groupby (ex. account_id), le moteur « aggregation » est
+      refusé. Ce gabarit utilise le moteur « domain » (comme create_balance_6cols_via_api.py).
 
-      Points clés (gabarit historique aggregation + XML Studio) :
-      - engine = aggregation (pas de formule « python » pour ce schéma).
-      - subformula = positive : garde uniquement la partie > 0 (équivalent pratique à max(x, 0)).
-      - subformula = negative : garde uniquement la partie < 0 (côté crédit si besoin).
-      - Formules : initial_debit, initial_credit, debit, credit (variables autorisées dans ce contexte).
-      - Option rapport : « Inclure le solde initial » (ou libellé équivalent) activée, sinon colonnes initiales à 0.
-      - groupby = account_id sur la ligne feuille.
-      - Chaque expression : date_scope obligatoire (ex. strict_range).
+      Libellés d’expressions / expression_label des colonnes : préfixe ohada6_ pour éviter les
+      collisions avec debit / credit / debit_initial traités à part par le moteur standard.
 
-      Import Studio (SaaS) : en cas d’erreur, importer en deux temps (colonnes puis ligne + rapport).
+      Option rapport : « Inclure le solde initial » activée si besoin pour les colonnes d’ouverture.
 
-      Si votre build refuse « positive » à la validation, repli possible : subformula if_above(EUR(0))
-      en adaptant le code devise (EUR → XOF, etc.).
-
-      Mode d’emploi interface (sans XML) : page toolbox staff « personalize-balance », aide repliée
-      « Procédure manuelle d’ajout des colonnes ».
-
-      Téléchargement depuis la toolbox (staff) : GET …/utilities/balance-6col-example.xml
-      (connexion staff requise). L’import dans Odoo reste manuel (Studio ou module).
-
-      Ce fichier n’est pas injecté automatiquement dans une base Odoo par la toolbox.
-      Équivalent automatisé : API odoo-pythonanywhere/create_balance_6cols_via_api.py
-      (CLI ou page staff « Balance OHADA » — rapport nommé Balance OHADA, ligne bal_ohada).
+      Import Studio : en cas d’erreur, importer en deux temps (colonnes puis ligne + rapport).
     -->
 
     <record id="report_balance_6_col_example" model="account.report">
@@ -41,7 +22,7 @@
         <field name="report_id" ref="report_balance_6_col_example"/>
         <field name="sequence" eval="10"/>
         <field name="name">Débit initial</field>
-        <field name="expression_label">debit_initial</field>
+        <field name="expression_label">ohada6_open_deb</field>
         <field name="figure_type">monetary</field>
     </record>
 
@@ -49,7 +30,7 @@
         <field name="report_id" ref="report_balance_6_col_example"/>
         <field name="sequence" eval="20"/>
         <field name="name">Crédit initial</field>
-        <field name="expression_label">credit_initial</field>
+        <field name="expression_label">ohada6_open_cre</field>
         <field name="figure_type">monetary</field>
     </record>
 
@@ -57,7 +38,7 @@
         <field name="report_id" ref="report_balance_6_col_example"/>
         <field name="sequence" eval="30"/>
         <field name="name">Débit</field>
-        <field name="expression_label">debit</field>
+        <field name="expression_label">ohada6_mov_deb</field>
         <field name="figure_type">monetary</field>
     </record>
 
@@ -65,7 +46,7 @@
         <field name="report_id" ref="report_balance_6_col_example"/>
         <field name="sequence" eval="40"/>
         <field name="name">Crédit</field>
-        <field name="expression_label">credit</field>
+        <field name="expression_label">ohada6_mov_cre</field>
         <field name="figure_type">monetary</field>
     </record>
 
@@ -73,7 +54,7 @@
         <field name="report_id" ref="report_balance_6_col_example"/>
         <field name="sequence" eval="50"/>
         <field name="name">Débit final</field>
-        <field name="expression_label">debit_final</field>
+        <field name="expression_label">ohada6_close_deb</field>
         <field name="figure_type">monetary</field>
     </record>
 
@@ -81,7 +62,7 @@
         <field name="report_id" ref="report_balance_6_col_example"/>
         <field name="sequence" eval="60"/>
         <field name="name">Crédit final</field>
-        <field name="expression_label">credit_final</field>
+        <field name="expression_label">ohada6_close_cre</field>
         <field name="figure_type">monetary</field>
     </record>
 
@@ -92,44 +73,46 @@
         <field name="groupby">account_id</field>
         <field name="expression_ids" eval="[
             (0, 0, {
-                'label': 'debit_initial',
-                'engine': 'aggregation',
-                'formula': 'initial_debit - initial_credit',
-                'subformula': 'positive',
+                'label': 'ohada6_open_deb',
+                'engine': 'domain',
+                'formula': '[]',
+                'subformula': 'sum_if_pos',
+                'date_scope': 'to_beginning_of_period',
+            }),
+            (0, 0, {
+                'label': 'ohada6_open_cre',
+                'engine': 'domain',
+                'formula': '[]',
+                'subformula': '-sum_if_neg',
+                'date_scope': 'to_beginning_of_period',
+            }),
+            (0, 0, {
+                'label': 'ohada6_mov_deb',
+                'engine': 'domain',
+                'formula': &quot;[('debit', '&gt;', 0)]&quot;,
+                'subformula': 'sum',
                 'date_scope': 'strict_range',
             }),
             (0, 0, {
-                'label': 'credit_initial',
-                'engine': 'aggregation',
-                'formula': 'initial_credit - initial_debit',
-                'subformula': 'positive',
+                'label': 'ohada6_mov_cre',
+                'engine': 'domain',
+                'formula': &quot;[('credit', '&gt;', 0)]&quot;,
+                'subformula': '-sum',
                 'date_scope': 'strict_range',
             }),
             (0, 0, {
-                'label': 'debit',
-                'engine': 'aggregation',
-                'formula': 'debit',
-                'date_scope': 'strict_range',
+                'label': 'ohada6_close_deb',
+                'engine': 'domain',
+                'formula': '[]',
+                'subformula': 'sum_if_pos',
+                'date_scope': 'from_beginning',
             }),
             (0, 0, {
-                'label': 'credit',
-                'engine': 'aggregation',
-                'formula': 'credit',
-                'date_scope': 'strict_range',
-            }),
-            (0, 0, {
-                'label': 'debit_final',
-                'engine': 'aggregation',
-                'formula': '(initial_debit + debit) - (initial_credit + credit)',
-                'subformula': 'positive',
-                'date_scope': 'strict_range',
-            }),
-            (0, 0, {
-                'label': 'credit_final',
-                'engine': 'aggregation',
-                'formula': '(initial_credit + credit) - (initial_debit + debit)',
-                'subformula': 'positive',
-                'date_scope': 'strict_range',
+                'label': 'ohada6_close_cre',
+                'engine': 'domain',
+                'formula': '[]',
+                'subformula': '-sum_if_neg',
+                'date_scope': 'from_beginning',
             }),
         ]"/>
     </record>

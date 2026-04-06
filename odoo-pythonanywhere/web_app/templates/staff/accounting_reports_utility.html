@@ -144,6 +144,10 @@
           </ul>
           Conserver les colonnes période <strong>Débit</strong> / <strong>Crédit</strong> (<code>debit</code> / <code>credit</code>) — ordre conseillé : initiaux à gauche, débit/crédit période au centre, finaux à droite (glisser-déposer si l’UI le permet).
         </li>
+        <li style="margin:0.35rem 0;" class="sn-muted">
+          <strong>Balance OHADA (toolbox)</strong> : la création automatique utilise des <code>expression_label</code> préfixés <code>ohada6_</code>
+          (<code>ohada6_open_deb</code>, <code>ohada6_open_cre</code>, <code>ohada6_mov_deb</code>, <code>ohada6_mov_cre</code>, <code>ohada6_close_deb</code>, <code>ohada6_close_cre</code>) pour éviter les collisions avec le moteur standard Odoo. La liste ci-dessus reste valable pour une configuration manuelle sur une balance générale, si vous renommez partout de façon cohérente (colonnes = expressions).
+        </li>
         <li style="margin:0.35rem 0;">
           <strong>Onglet Lignes</strong> — ligne principale (souvent « Accounts », « Balance », etc.) avec <strong><code>groupby = account_id</code></strong>. Sous <strong>Expressions</strong>, créer ou vérifier <strong>une expression par colonne</strong> (label = expression_label de la colonne) :
           <table style="width:100%;border-collapse:collapse;margin:0.4rem 0 0;font-size:0.86rem;">
