@@ -26,6 +26,7 @@ import json
 import os
 import re
 import sys
+from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,106 @@ from odoo_client import normalize_odoo_base_url
 
 # Pagination search_read (évite la mémoire / timeouts sur grosses bases)
 _DEFAULT_PAGE_SIZE = 2000
+
+
+def default_period_ytd() -> tuple[str, str]:
+    """Période par défaut : 1er janvier de l’année en cours → aujourd’hui (date locale)."""
+    t = date.today()
+    start = t.replace(month=1, day=1)
+    return start.isoformat(), t.isoformat()
+
+
+def search_analytic_accounts_for_select(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    filter_text: str,
+    *,
+    limit: int = 400,
+) -> list[dict[str, Any]]:
+    """Liste pour liste déroulante : id, name, code, label (libellé affiché)."""
+    fg = _fields_get(models, db, uid, password, "account.analytic.account")
+    q = (filter_text or "").strip()
+    domain: list[Any] = []
+    if q:
+        if "code" in fg:
+            domain = ["|", ("name", "ilike", q), ("code", "ilike", q)]
+        else:
+            domain = [("name", "ilike", q)]
+    fields = ["id", "name"]
+    if "code" in fg:
+        fields.append("code")
+    ids = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.analytic.account",
+        "search",
+        [domain],
+        {"limit": limit, "order": "name asc"},
+    )
+    if not ids:
+        return []
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.analytic.account",
+        "read",
+        [ids],
+        {"fields": fields},
+    )
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        raw_name = r.get("name")
+        if isinstance(raw_name, dict):
+            name = str(next(iter(raw_name.values()), "") or "")
+        else:
+            name = (str(raw_name) if raw_name is not None else "").strip()
+        code = (r.get("code") or "").strip() if "code" in fields else ""
+        label = f"{code} — {name}" if code else name
+        out.append({"id": int(r["id"]), "name": name, "code": code, "label": label})
+    return out
+
+
+def read_analytic_account_label(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    analytic_account_id: int,
+) -> str:
+    """Libellé lisible pour un compte analytique (nom + code si présent)."""
+    fg = _fields_get(models, db, uid, password, "account.analytic.account")
+    fields = ["name"]
+    if "code" in fg:
+        fields.append("code")
+    try:
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.analytic.account",
+            "read",
+            [[int(analytic_account_id)]],
+            {"fields": fields},
+        )
+    except Exception:
+        return ""
+    if not rows:
+        return ""
+    r = rows[0]
+    raw_name = r.get("name")
+    if isinstance(raw_name, dict):
+        name = str(next(iter(raw_name.values()), "") or "")
+    else:
+        name = (str(raw_name) if raw_name is not None else "").strip()
+    code = (r.get("code") or "").strip() if "code" in fields else ""
+    return f"{code} — {name}" if code else name
 
 
 def execute_kw(
@@ -808,6 +909,9 @@ def build_report(
     totals = add_ohada_totals(with_pct)
     return {
         "analytic_account_id": analytic_account_id,
+        "analytic_account_label": read_analytic_account_label(
+            models, db, uid, password, analytic_account_id
+        ),
         "date_from": date_from,
         "date_to": date_to,
         "options": {
