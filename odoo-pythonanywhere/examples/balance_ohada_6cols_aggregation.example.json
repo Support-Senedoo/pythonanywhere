@@ -1,0 +1,64 @@
+{
+  "description": "Balance OHADA 6 colonnes — schéma aggregation (Odoo v19). Les libellés ChatGPT initial/normal ne sont PAS des date_scope Odoo ; utiliser les valeurs ci-dessous. Voir create_balance_6cols_via_api.py (_expressions_aggregation_ohada_line).",
+  "mapping_chatgpt_vers_odoo": {
+    "initial": "to_beginning_of_period",
+    "normal": "strict_range"
+  },
+  "name": "Balance OHADA 6 colonnes",
+  "lines": [
+    {
+      "name": "Comptes",
+      "groupby": "account_id",
+      "expressions": [
+        {
+          "label": "ohada6_open_deb",
+          "engine": "aggregation",
+          "formula": "initial_debit - initial_credit",
+          "subformula": "positive",
+          "date_scope": "to_beginning_of_period"
+        },
+        {
+          "label": "ohada6_open_cre",
+          "engine": "aggregation",
+          "formula": "initial_credit - initial_debit",
+          "subformula": "positive",
+          "date_scope": "to_beginning_of_period"
+        },
+        {
+          "label": "ohada6_mov_deb",
+          "engine": "aggregation",
+          "formula": "debit",
+          "date_scope": "strict_range"
+        },
+        {
+          "label": "ohada6_mov_cre",
+          "engine": "aggregation",
+          "formula": "credit",
+          "date_scope": "strict_range"
+        },
+        {
+          "label": "ohada6_close_deb",
+          "engine": "aggregation",
+          "formula": "(initial_debit + debit) - (initial_credit + credit)",
+          "subformula": "positive",
+          "date_scope": "strict_range"
+        },
+        {
+          "label": "ohada6_close_cre",
+          "engine": "aggregation",
+          "formula": "(initial_credit + credit) - (initial_debit + debit)",
+          "subformula": "positive",
+          "date_scope": "strict_range"
+        }
+      ]
+    }
+  ],
+  "columns": [
+    { "name": "Débit initial", "expression_label": "ohada6_open_deb" },
+    { "name": "Crédit initial", "expression_label": "ohada6_open_cre" },
+    { "name": "Débit", "expression_label": "ohada6_mov_deb" },
+    { "name": "Crédit", "expression_label": "ohada6_mov_cre" },
+    { "name": "Débit final", "expression_label": "ohada6_close_deb" },
+    { "name": "Crédit final", "expression_label": "ohada6_close_cre" }
+  ]
+}
