@@ -11,8 +11,7 @@
   · <span class="sn-muted">Autre utilitaire (même formulaire) :</span>
   <a href="{% if filter_host %}{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.rapports_comptables', add_base_only='1') }}{% endif %}">P&amp;L personnalisé</a>
   · <a href="{% if filter_host %}{{ url_for('staff.rapports_balance', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.rapports_balance', add_base_only='1') }}{% endif %}">Balance OHADA</a>
-  · <a href="{% if filter_host %}{{ url_for('staff.rapports_pl_budget', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.rapports_pl_budget', add_base_only='1') }}{% endif %}">P&amp;L budget</a>
-  · <a href="{% if filter_host %}{{ url_for('staff.pl_analytic_project_report', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.pl_analytic_project_report', add_base_only='1') }}{% endif %}">P&amp;L analytique (API)</a>
+  · <a href="{% if filter_host %}{{ url_for('staff.pl_analytic_project_report', add_base_only='1', filter_host=filter_host) }}{% else %}{{ url_for('staff.pl_analytic_project_report', add_base_only='1') }}{% endif %}">P&amp;L analytique (réalisé / budget / %)</a>
 </p>
 <div class="sn-card sn-card--accent">
   <h2 style="margin-top:0;font-size:1.05rem;">Nouvelle base</h2>
@@ -66,9 +65,7 @@
   <span class="sn-muted">·</span>
   <a href="{{ url_for('staff.rapports_balance') }}">Balance OHADA</a>
   <span class="sn-muted">·</span>
-  <a href="{{ url_for('staff.rapports_pl_budget') }}">P&amp;L analytique / budget</a>
-  <span class="sn-muted">·</span>
-  <a href="{{ url_for('staff.pl_analytic_project_report') }}">P&amp;L analytique (API)</a>
+  <a href="{{ url_for('staff.pl_analytic_project_report') }}">P&amp;L analytique (réalisé / budget / %)</a>
   <span class="sn-muted">·</span>
   <a href="{{ url_for('staff.utilities_home') }}">← Tous les utilitaires</a>
 </p>
@@ -85,7 +82,7 @@
   <ul>
     <li><strong>Personnaliser</strong> : id du rapport source, puis bouton — copie + script <code>personalize_syscohada_detail</code>.</li>
     <li><strong>Liste</strong> : filtre texte sur le nom ; renommer / supprimer depuis chaque ligne.</li>
-    <li>Pour le <strong>budget analytique</strong> sur P&amp;L, utilisez l’utilitaire dédié « P&amp;L analytique / budget ».</li>
+    <li>Pour le <strong>budget analytique</strong> et le tableau réalisé / budget / %, utilisez l’utilitaire <a href="{{ url_for('staff.pl_analytic_project_report') }}">Compte de résultat analytique</a> (liste des bases).</li>
   </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·

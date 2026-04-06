@@ -6,7 +6,7 @@
 
 <div class="sn-card sn-card--accent" style="margin-bottom:1rem;">
   <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation des rapports comptables</h2>
-  <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.45;">Trois parcours distincts selon l’objectif. Chacun liste les <code>account.report</code> de la base choisie.</p>
+  <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.45;">Trois parcours distincts selon l’objectif. Les écrans qui listent des rapports affichent les <code>account.report</code> de la base choisie.</p>
   <ul style="margin:0;padding-left:1.2rem;line-height:1.55;">
     <li style="margin-bottom:0.65rem;">
       <a href="{{ url_for('staff.rapports_comptables') }}"><strong>Compte de résultat personnalisé</strong></a>
@@ -17,15 +17,11 @@
       — crée sur la base un rapport <strong>Balance OHADA</strong> (six colonnes débit/crédit initiaux et finaux) ou le supprime ; pas de liste de rapports sur cette page.
     </li>
     <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.rapports_pl_budget') }}"><strong>Compte de résultat avec budget analytique</strong></a>
-      — copie + même détail comptes, avec <code>filter_analytic</code> et <code>filter_budgets</code> (ou <code>filter_budget</code>) si le modèle Odoo les expose ; <strong>sonde</strong> lecture seule sur les lignes de budget / analytique.
-    </li>
-    <li style="margin-bottom:0.65rem;">
       <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique (réalisé / budget / %)</strong></a>
-      — tableau par compte général pour un axe analytique et une période, via API (<code>analytic_distribution</code>, budgets) ; <strong>ne crée pas</strong> de rapport Odoo dans la base ; export Excel possible.
+      — <strong>tableau API</strong> par compte pour un axe analytique (réalisé / budget / %, export Excel) ; sur la même page : <strong>copie Odoo</strong> du P&amp;L avec <code>filter_analytic</code> / <code>filter_budgets</code>, liste des <code>account.report</code>, sonde budget / analytique, renommage / suppression des copies.
     </li>
   </ul>
-  <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/personalize-pl-budget</code>, <code>…/pl-analytique-projet</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé).</p>
+  <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/pl-analytique-projet</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé). L’ancienne entrée <code>…/personalize-pl-budget</code> reste accessible pour les favoris mais n’est plus listée ici (fonctions regroupées sous « compte de résultat analytique »).</p>
 </div>
 
 <div class="sn-card">
