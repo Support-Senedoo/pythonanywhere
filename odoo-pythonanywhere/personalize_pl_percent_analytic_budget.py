@@ -212,6 +212,249 @@ def rewrite_percent_expressions(
     return candidates, n_ok, messages + [f"OK — {n_ok} expression(s) mise(s) à jour."]
 
 
+def _column_name_lower(c: dict[str, Any]) -> str:
+    n = c.get("name")
+    if isinstance(n, dict):
+        return " ".join(str(v) for v in n.values() if v).lower()
+    return str(n or "").lower()
+
+
+def _pick_percent_expression_label(cols: list[dict[str, Any]]) -> str | None:
+    """Libellé d’expression de la colonne % (figure_type percentage ou libellé type pct_*)."""
+    for c in cols:
+        if (c.get("figure_type") or "").lower() == "percentage":
+            el = (c.get("expression_label") or "").strip()
+            if el:
+                return el
+    for c in cols:
+        el = (c.get("expression_label") or "").strip()
+        if el and "pct" in el.lower():
+            return el
+    return None
+
+
+def _monetary_columns_except_budget(
+    cols: list[dict[str, Any]],
+    percent_label: str,
+) -> list[dict[str, Any]]:
+    """Colonnes montants (hors % et hors budget), triées par séquence."""
+    sorted_cols = sorted(cols, key=lambda c: (c.get("sequence") or 0, c.get("id") or 0))
+    out: list[dict[str, Any]] = []
+    for c in sorted_cols:
+        el = (c.get("expression_label") or "").strip()
+        if not el or el == percent_label:
+            continue
+        if "budget" in el.lower():
+            continue
+        ft = (c.get("figure_type") or "").lower()
+        if ft == "percentage":
+            continue
+        if ft and ft not in ("float", "monetary", "integer", "none", ""):
+            continue
+        out.append(c)
+    return out
+
+
+def infer_numerator_labels_from_columns(
+    cols: list[dict[str, Any]],
+    percent_label: str,
+) -> tuple[str, str] | None:
+    """
+    Devine (numerator_from, numerator_to) : total période → colonne analytique.
+    Retourne None si impossible.
+    """
+    monetary = _monetary_columns_except_budget(cols, percent_label)
+    if len(monetary) < 2:
+        return None
+
+    def el(c: dict[str, Any]) -> str:
+        return (c.get("expression_label") or "").strip()
+
+    analytic_c = None
+    total_c = None
+    for c in monetary:
+        e = el(c).lower()
+        n = _column_name_lower(c)
+        if "analytic" in e or "analytique" in n:
+            analytic_c = c
+        if total_c is None and (
+            "total" in n
+            or "période" in n
+            or "periode" in n
+            or e in ("balance_total", "total")
+        ):
+            if "analytic" not in e:
+                total_c = c
+
+    if analytic_c and total_c and el(analytic_c) != el(total_c):
+        return (el(total_c), el(analytic_c))
+
+    if analytic_c:
+        for c in monetary:
+            if el(c) != el(analytic_c):
+                return (el(c), el(analytic_c))
+
+    # Dernier recours : les deux premières colonnes montant (souvent total puis analytique)
+    return (el(monetary[0]), el(monetary[1]))
+
+
+# Libellés fréquents dans les formules Odoo « aggregation » (réalisé total → réalisé analytique)
+_COMMON_NUMERATOR_PAIRS: tuple[tuple[str, str], ...] = (
+    ("balance_total", "balance_analytic"),
+    ("balance_total", "analytic_balance"),
+    ("total", "analytic"),
+    ("balance", "balance_analytic"),
+    ("balance", "analytic"),
+)
+
+
+def apply_percent_analytic_numerator(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> dict[str, Any]:
+    """
+    Après copie du P&L : réécrit les expressions % (moteur aggregation) pour que le numérateur
+    soit la colonne analytique, pas le total de période.
+
+    Retourne un dict avec ok, writes, labels, messages, reason (si échec).
+    """
+    cols = list_columns(models, db, uid, password, report_id)
+    pct = _pick_percent_expression_label(cols)
+    if not pct:
+        return {
+            "ok": False,
+            "writes": 0,
+            "percent_label": None,
+            "numerator_from": None,
+            "numerator_to": None,
+            "messages": [],
+            "reason": "no_percent_column",
+        }
+
+    for from_l, to_l in _COMMON_NUMERATOR_PAIRS:
+        if from_l == to_l:
+            continue
+        cand, nwr, msgs = rewrite_percent_expressions(
+            models,
+            db,
+            uid,
+            password,
+            report_id,
+            percent_label=pct,
+            numerator_from=from_l,
+            numerator_to=to_l,
+            dry_run=True,
+        )
+        if nwr > 0:
+            _cand2, nwr2, msgs2 = rewrite_percent_expressions(
+                models,
+                db,
+                uid,
+                password,
+                report_id,
+                percent_label=pct,
+                numerator_from=from_l,
+                numerator_to=to_l,
+                dry_run=False,
+            )
+            return {
+                "ok": True,
+                "writes": nwr2,
+                "percent_label": pct,
+                "numerator_from": from_l,
+                "numerator_to": to_l,
+                "messages": msgs2,
+                "reason": None,
+            }
+
+    inferred = infer_numerator_labels_from_columns(cols, pct)
+    if not inferred:
+        return {
+            "ok": False,
+            "writes": 0,
+            "percent_label": pct,
+            "numerator_from": None,
+            "numerator_to": None,
+            "messages": [],
+            "reason": "could_not_infer_columns",
+        }
+
+    from_l, to_l = inferred
+    if from_l == to_l:
+        return {
+            "ok": False,
+            "writes": 0,
+            "percent_label": pct,
+            "numerator_from": from_l,
+            "numerator_to": to_l,
+            "messages": [],
+            "reason": "same_inferred_labels",
+        }
+
+    cand, nwr, msgs = rewrite_percent_expressions(
+        models,
+        db,
+        uid,
+        password,
+        report_id,
+        percent_label=pct,
+        numerator_from=from_l,
+        numerator_to=to_l,
+        dry_run=True,
+    )
+    if nwr == 0:
+        # Essai inverse (ordre colonnes atypique)
+        cand2, nwr2, msgs2 = rewrite_percent_expressions(
+            models,
+            db,
+            uid,
+            password,
+            report_id,
+            percent_label=pct,
+            numerator_from=to_l,
+            numerator_to=from_l,
+            dry_run=True,
+        )
+        if nwr2 > 0:
+            from_l, to_l = to_l, from_l
+            nwr, msgs = nwr2, msgs2
+        else:
+            return {
+                "ok": False,
+                "writes": 0,
+                "percent_label": pct,
+                "numerator_from": from_l,
+                "numerator_to": to_l,
+                "messages": msgs,
+                "reason": "no_aggregation_formulas_to_change",
+                "candidates_seen": cand,
+            }
+
+    _cand3, nwr3, msgs3 = rewrite_percent_expressions(
+        models,
+        db,
+        uid,
+        password,
+        report_id,
+        percent_label=pct,
+        numerator_from=from_l,
+        numerator_to=to_l,
+        dry_run=False,
+    )
+    return {
+        "ok": True,
+        "writes": nwr3,
+        "percent_label": pct,
+        "numerator_from": from_l,
+        "numerator_to": to_l,
+        "messages": msgs3,
+        "reason": None,
+    }
+
+
 def main() -> None:
     p = argparse.ArgumentParser(
         description="P&L : % budget calculé sur la colonne analytique (formules aggregation, ex. Odoo 19)."

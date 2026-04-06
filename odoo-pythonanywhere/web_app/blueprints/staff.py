@@ -62,6 +62,7 @@ from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
     probe_financial_budget_analytic_summary,
 )
+from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import personalize_fix_detail_complete
 from project_pl_analytic_report import (
     build_report,
@@ -484,12 +485,29 @@ def pl_analytic_project_report():
                 )
                 personalize_fix_detail_complete(models, db, uid, pwd, new_rid)
                 opt = personalize_pl_analytic_budget_options(models, db, uid, pwd, new_rid)
+                try:
+                    pct_fix = apply_percent_analytic_numerator(models, db, uid, pwd, new_rid)
+                except Exception as pct_e:
+                    current_app.logger.exception("apply_percent_analytic_numerator")
+                    pct_fix = {"ok": False, "reason": str(pct_e)}
                 src_label = read_account_report_label(models, db, uid, pwd, rid)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
                 written = ", ".join(f"{k}={v}" for k, v in opt["written"].items())
+                pct_msg = ""
+                if pct_fix.get("ok"):
+                    pct_msg = (
+                        f" Colonne % : {pct_fix.get('writes', 0)} expression(s) recalée(s) sur l’analytique "
+                        f"({pct_fix.get('numerator_from')} → {pct_fix.get('numerator_to')})."
+                    )
+                else:
+                    pct_msg = (
+                        " Colonne % : correction automatique non appliquée (formules Odoo différentes ou moteur hors "
+                        "« aggregation ») — en cas de % encore basé sur le total, voir "
+                        "`personalize_pl_percent_analytic_budget.py` en CLI."
+                    )
                 flash(
                     f"P&L pilotage : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »). "
-                    f"Options rapport : {written}. "
+                    f"Options rapport : {written}.{pct_msg} "
                     f"Dans Odoo, sélectionnez un compte analytique et un budget puis vérifiez si la colonne budget "
                     f"se restreint (sinon voir DEPLOY_PYTHONANYWHERE.md — Studio / contournement).",
                     "success",
@@ -1285,12 +1303,29 @@ def _accounting_reports_page(accounting_mode: str):
                 )
                 personalize_fix_detail_complete(models, db, uid, pwd, new_rid)
                 opt = personalize_pl_analytic_budget_options(models, db, uid, pwd, new_rid)
+                try:
+                    pct_fix = apply_percent_analytic_numerator(models, db, uid, pwd, new_rid)
+                except Exception as pct_e:
+                    current_app.logger.exception("apply_percent_analytic_numerator")
+                    pct_fix = {"ok": False, "reason": str(pct_e)}
                 src_label = read_account_report_label(models, db, uid, pwd, rid)
                 rlabel = read_account_report_label(models, db, uid, pwd, new_rid)
                 written = ", ".join(f"{k}={v}" for k, v in opt["written"].items())
+                pct_msg = ""
+                if pct_fix.get("ok"):
+                    pct_msg = (
+                        f" Colonne % : {pct_fix.get('writes', 0)} expression(s) recalée(s) sur l’analytique "
+                        f"({pct_fix.get('numerator_from')} → {pct_fix.get('numerator_to')})."
+                    )
+                else:
+                    pct_msg = (
+                        " Colonne % : correction automatique non appliquée (formules Odoo différentes ou moteur hors "
+                        "« aggregation ») — en cas de % encore basé sur le total, voir "
+                        "`personalize_pl_percent_analytic_budget.py` en CLI."
+                    )
                 flash(
                     f"P&L pilotage : copie id={new_rid} (« {rlabel} ») depuis id={rid} (« {src_label} »). "
-                    f"Options rapport : {written}. "
+                    f"Options rapport : {written}.{pct_msg} "
                     f"Dans Odoo, sélectionnez un compte analytique et un budget puis vérifiez si la colonne budget "
                     f"se restreint (sinon voir DEPLOY_PYTHONANYWHERE.md — Studio / contournement).",
                     "success",
