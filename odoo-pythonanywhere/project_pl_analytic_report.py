@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -588,6 +589,101 @@ def _ohada_class(account_code: str) -> str | None:
     return None
 
 
+def _token_looks_like_account_prefix(tok: str) -> bool:
+    """Heuristique : préfixe de compte OHADA / plan numérique."""
+    t = tok.strip()
+    if len(t) < 1 or len(t) > 20:
+        return False
+    if not t[0].isdigit():
+        return False
+    return all(c.isdigit() or c in ".-" for c in t)
+
+
+def collect_account_ids_for_account_report(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> tuple[set[int] | None, str]:
+    """
+    Best-effort : ids ``account.account`` couverts par les expressions « account_codes »
+    sur les lignes feuilles du rapport (même repère que personalize_syscohada_detail).
+
+    Les moteurs « domain » ou formules d’agrégation entre lignes ne sont pas expansés ici.
+    """
+    from personalize_syscohada_detail import leaf_line_ids_with_account_codes
+
+    try:
+        leaves = leaf_line_ids_with_account_codes(models, db, uid, password, report_id)
+    except Exception as e:
+        return None, f"Lecture du rapport : {e!s}"
+
+    if not leaves:
+        return (
+            None,
+            "Aucune ligne feuille avec expression « account_codes » — impossible d’aligner le périmètre "
+            "sur ce rapport (structure différente ou rapport non P&L détail comptes).",
+        )
+
+    account_ids: set[int] = set()
+    for lid in leaves:
+        line = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "read",
+            [[lid]],
+            {"fields": ["expression_ids"]},
+        )[0]
+        eids = line.get("expression_ids") or []
+        if not eids:
+            continue
+        exprs = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "read",
+            [eids],
+            {"fields": ["engine", "formula"]},
+        )
+        for e in exprs:
+            if (e.get("engine") or "") != "account_codes":
+                continue
+            raw = e.get("formula")
+            if raw is None:
+                continue
+            if not isinstance(raw, str):
+                raw = str(raw)
+            for part in re.split(r"[\s,;|]+", raw):
+                tok = part.strip().strip("'\"")
+                if not tok or not _token_looks_like_account_prefix(tok):
+                    continue
+                dom = [("code", "=like", f"{tok}%")]
+                found = execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.account",
+                    "search",
+                    [dom],
+                    {"limit": 8000},
+                )
+                account_ids.update(int(x) for x in found)
+
+    if not account_ids:
+        return (
+            None,
+            "Expressions « account_codes » présentes mais aucun compte général résolu (vérifier les formules / préfixes).",
+        )
+    return account_ids, ""
+
+
 def add_ohada_totals(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Totaux classe 6, classe 7, globaux, pourcentage global."""
     tot6_r = tot6_b = 0.0
@@ -630,6 +726,7 @@ def build_report(
     full_line_balance: bool = False,
     currency_mode: str = "company",
     page_size: int = _DEFAULT_PAGE_SIZE,
+    account_report_id: int | None = None,
 ) -> dict[str, Any]:
     """Pipeline complet : lignes, agrégats, fusion, pourcentages, totaux OHADA."""
     spec = _resolve_budget_spec(models, db, uid, password)
@@ -675,6 +772,38 @@ def build_report(
     )
     budget = compute_budget(budget_lines, spec)
     merged = merge_results(models, db, uid, password, realized, budget)
+
+    scope_meta: dict[str, Any] = {
+        "account_report_id": account_report_id,
+        "account_report_name": None,
+        "scope_filter_applied": False,
+        "scope_note": None,
+    }
+    if account_report_id and account_report_id > 0:
+        ar = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "read",
+            [[int(account_report_id)]],
+            {"fields": ["name"]},
+        )
+        if ar:
+            raw_name = ar[0].get("name")
+            scope_meta["account_report_name"] = (
+                raw_name if isinstance(raw_name, str) else str(raw_name or "")
+            )
+        allowed, note = collect_account_ids_for_account_report(
+            models, db, uid, password, int(account_report_id)
+        )
+        if allowed:
+            merged = [r for r in merged if int(r["account_id"]) in allowed]
+            scope_meta["scope_filter_applied"] = True
+        else:
+            scope_meta["scope_note"] = note
+
     with_pct = compute_percentage(merged)
     totals = add_ohada_totals(with_pct)
     return {
@@ -687,6 +816,7 @@ def build_report(
         },
         "lines": with_pct,
         "totals": totals,
+        "scope": scope_meta,
     }
 
 

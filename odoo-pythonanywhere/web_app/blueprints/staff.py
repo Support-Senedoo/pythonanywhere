@@ -236,6 +236,7 @@ def _pl_analytic_url_params(
     *,
     client_id: str | None = None,
     filter_host: str | None = None,
+    filter_q: str | None = None,
     add_base_only: bool = False,
 ) -> dict[str, Any]:
     d: dict[str, Any] = {}
@@ -244,6 +245,9 @@ def _pl_analytic_url_params(
     fh = (filter_host or "").strip()
     if fh:
         d["filter_host"] = fh
+    qs = (filter_q or "").strip()
+    if qs:
+        d["q"] = qs
     if add_base_only:
         d["add_base_only"] = "1"
     return d
@@ -264,6 +268,7 @@ def pl_analytic_project_report():
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
         filter_host_post = (request.form.get("filter_host") or "").strip()
+        filter_q_post = (request.form.get("filter_q") or "").strip()
         add_base_only_post = (request.form.get("add_base_only") or "").strip().lower() in (
             "1",
             "true",
@@ -282,6 +287,7 @@ def pl_analytic_project_report():
                         if filter_host_override is not None
                         else filter_host_post,
                         add_base_only=add_base_only_post,
+                        filter_q=filter_q_post,
                     ),
                 ),
             )
@@ -324,6 +330,7 @@ def pl_analytic_project_report():
                     **_pl_analytic_url_params(
                         client_id=new_cid,
                         filter_host=filter_host_post or net,
+                        filter_q=filter_q_post,
                     ),
                 ),
             )
@@ -342,6 +349,7 @@ def pl_analytic_project_report():
                     **_pl_analytic_url_params(
                         client_id=cid,
                         filter_host=registry_netloc(reg[cid]),
+                        filter_q=filter_q_post,
                     ),
                 ),
             )
@@ -356,7 +364,15 @@ def pl_analytic_project_report():
                 flash(f"Sonde budget / analytique : {msg}", "info")
             except Exception as e:
                 flash(f"Sonde : {e!s}", "danger")
-            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
 
         if action == "run_report":
             try:
@@ -374,12 +390,25 @@ def pl_analytic_project_report():
             currency_mode = (request.form.get("currency_mode") or "company").strip()
             if currency_mode not in ("company", "transaction"):
                 currency_mode = "company"
+            rid_raw = (request.form.get("report_id") or "").strip()
+            try:
+                account_report_id = int(rid_raw) if rid_raw else 0
+            except ValueError:
+                account_report_id = 0
             if aid <= 0 or not date_from or not date_to:
                 flash(
                     "Indiquez l’id du compte analytique (nombre entier > 0) et les deux dates.",
                     "warning",
                 )
-                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+                return redirect(
+                    ru(
+                        **_pl_analytic_url_params(
+                            client_id=cid,
+                            filter_host=fl_save,
+                            filter_q=filter_q_post,
+                        ),
+                    ),
+                )
             try:
                 report = build_report(
                     models,
@@ -391,10 +420,19 @@ def pl_analytic_project_report():
                     date_to,
                     full_line_balance=full_line,
                     currency_mode=currency_mode,
+                    account_report_id=account_report_id if account_report_id > 0 else None,
                 )
             except Exception as e:
                 flash(f"Échec du calcul : {e!s}", "danger")
-                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+                return redirect(
+                    ru(
+                        **_pl_analytic_url_params(
+                            client_id=cid,
+                            filter_host=fl_save,
+                            filter_q=filter_q_post,
+                        ),
+                    ),
+                )
 
             valid_hosts = set(distinct_odoo_hosts(reg))
             fh = fl_save
@@ -412,6 +450,7 @@ def pl_analytic_project_report():
                     conn_status = "error"
             except Exception:
                 pass
+            reports = search_account_reports(models, db, uid, pwd, filter_q_post)
             return render_template(
                 "staff/pl_analytic_report.html",
                 clients=reg,
@@ -420,6 +459,8 @@ def pl_analytic_project_report():
                 distinct_odoo_hosts=distinct_odoo_hosts(reg),
                 selected_client=cid,
                 filter_host=fh,
+                filter_q=filter_q_post,
+                reports=reports,
                 conn_status=conn_status,
                 conn_detail=conn_detail,
                 utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -432,6 +473,7 @@ def pl_analytic_project_report():
                 form_date_to=date_to,
                 form_full_line=full_line,
                 form_currency_mode=currency_mode,
+                form_report_id=account_report_id if account_report_id > 0 else None,
                 add_base_only=False,
             )
 
@@ -451,9 +493,22 @@ def pl_analytic_project_report():
             currency_mode = (request.form.get("currency_mode") or "company").strip()
             if currency_mode not in ("company", "transaction"):
                 currency_mode = "company"
+            rid_raw = (request.form.get("report_id") or "").strip()
+            try:
+                account_report_id = int(rid_raw) if rid_raw else 0
+            except ValueError:
+                account_report_id = 0
             if aid <= 0 or not date_from or not date_to:
                 flash("Paramètres Excel incomplets.", "warning")
-                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+                return redirect(
+                    ru(
+                        **_pl_analytic_url_params(
+                            client_id=cid,
+                            filter_host=fl_save,
+                            filter_q=filter_q_post,
+                        ),
+                    ),
+                )
             try:
                 report = build_report(
                     models,
@@ -465,14 +520,31 @@ def pl_analytic_project_report():
                     date_to,
                     full_line_balance=full_line,
                     currency_mode=currency_mode,
+                    account_report_id=account_report_id if account_report_id > 0 else None,
                 )
                 raw = report_to_excel_bytes(report)
             except RuntimeError as e:
                 flash(str(e), "danger")
-                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+                return redirect(
+                    ru(
+                        **_pl_analytic_url_params(
+                            client_id=cid,
+                            filter_host=fl_save,
+                            filter_q=filter_q_post,
+                        ),
+                    ),
+                )
             except Exception as e:
                 flash(f"Export Excel : {e!s}", "danger")
-                return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+                return redirect(
+                    ru(
+                        **_pl_analytic_url_params(
+                            client_id=cid,
+                            filter_host=fl_save,
+                            filter_q=filter_q_post,
+                        ),
+                    ),
+                )
             safe_db = "".join(c for c in reg[cid].db if c.isalnum() or c in "-_")[:40]
             fname = f"pl_analytique_{safe_db}_{aid}.xlsx"
             return send_file(
@@ -483,7 +555,15 @@ def pl_analytic_project_report():
             )
 
         flash("Action non reconnue.", "warning")
-        return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+        return redirect(
+            ru(
+                **_pl_analytic_url_params(
+                    client_id=cid,
+                    filter_host=fl_save,
+                    filter_q=filter_q_post,
+                ),
+            ),
+        )
 
     selected = (request.args.get("client_id") or "").strip().lower()
     if selected not in reg:
@@ -509,14 +589,19 @@ def pl_analytic_project_report():
     if add_base_only:
         selected = ""
 
+    filter_q = (request.args.get("q") or "").strip()
+
     conn_status = "idle"
     conn_detail = ""
+    reports: list[dict[str, Any]] = []
     if selected:
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
             ok, msg = probe_odoo_reports_access(models, db, uid, pwd)
             conn_detail = msg
             conn_status = "ok" if ok else "error"
+            if ok:
+                reports = search_account_reports(models, db, uid, pwd, filter_q)
         except Exception as e:
             conn_status = "error"
             conn_detail = str(e)
@@ -535,6 +620,8 @@ def pl_analytic_project_report():
         distinct_odoo_hosts=distinct_odoo_hosts(reg),
         selected_client=selected,
         filter_host=filter_host,
+        filter_q=filter_q,
+        reports=reports,
         conn_status=conn_status,
         conn_detail=conn_detail,
         utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -547,6 +634,7 @@ def pl_analytic_project_report():
         form_date_to="",
         form_full_line=False,
         form_currency_mode="company",
+        form_report_id=None,
         add_base_only=add_base_only,
     )
 

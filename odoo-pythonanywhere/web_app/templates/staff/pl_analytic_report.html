@@ -54,8 +54,15 @@
     qui duplique un rapport Odoo.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    Saisissez l’<strong>identifiant numérique</strong> du compte analytique (menu Comptabilité › Analytique, ou liste technique).
-    Les montants réalisés suivent la répartition <code>analytic_distribution</code> (prorata des pourcentages).
+    <strong>Période :</strong> les dates début / fin délimitent l’intervalle (écritures et budgets selon chevauchement).
+    <strong>Rapport comptable :</strong> liste filtrable comme sur « P&amp;L personnalisé » — si vous en choisissez un,
+    le tableau est restreint aux <strong>comptes généraux</strong> couverts par les expressions « account_codes » des
+    lignes feuilles (même logique que la personnalisation SYSCOHADA). Sinon, tous les comptes avec mouvement analytique
+    pour le projet sont listés.
+  </p>
+  <p class="sn-muted" style="margin:0.55rem 0 0;line-height:1.45;font-size:0.92rem;">
+    <strong>Compte analytique :</strong> id numérique (<code>account.analytic.account</code>). Les montants réalisés
+    suivent <code>analytic_distribution</code> (prorata des %).
   </p>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -84,6 +91,8 @@
       </option>
       {% endfor %}
     </select>
+    <label for="q">Filtrer les rapports (nom / libellé)</label>
+    <input type="text" id="q" name="q" value="{{ filter_q or '' }}" placeholder="ex. résultat, SYSCOHADA, P&amp;L…" autocomplete="off">
     <div class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;">
       <button type="submit">Actualiser</button>
       <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.pl_analytic_project_report', add_base_only='1', filter_host=filter_host) }}">Ajouter une base</a>
@@ -101,6 +110,20 @@
   <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic">
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+    <label for="report_id">Rapport comptable (<code>account.report</code>) — optionnel</label>
+    <select id="report_id" name="report_id">
+      <option value="">— Tous les comptes (sans filtre sur la structure du rapport) —</option>
+      {% for r in reports %}
+      <option value="{{ r.id }}" {% if form_report_id is not none and form_report_id == r.id %}selected{% endif %}>
+        {{ r.name }}
+      </option>
+      {% endfor %}
+    </select>
+    <p class="sn-muted" style="margin:-0.25rem 0 0.65rem;font-size:0.88rem;line-height:1.45;">
+      Même principe que l’utilitaire <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L personnalisé</a> :
+      la liste provient d’<code>account.report</code>. Actualisez la page avec le filtre ci-dessus pour affiner les noms.
+    </p>
     <label for="analytic_account_id">Id du compte analytique (<code>account.analytic.account</code>)</label>
     <input type="number" id="analytic_account_id" name="analytic_account_id" required min="1" step="1"
            value="{{ form_analytic_id if form_analytic_id is not none else '' }}"
@@ -132,9 +155,20 @@
 <div class="sn-card sn-card--accent" style="margin-top:1rem;">
   <h2 style="margin-top:0;font-size:1.05rem;">Résultat — projet id {{ report_result.analytic_account_id }}
     ({{ report_result.date_from }} → {{ report_result.date_to }})</h2>
+  {% set sc = report_result.scope or {} %}
+  {% if sc.get('account_report_id') %}
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
+    Rapport de référence : id {{ sc.account_report_id }}
+    {% if sc.get('account_report_name') %} — « {{ sc.account_report_name }} »{% endif %}
+    {% if sc.get('scope_filter_applied') %} — <strong>filtrage des comptes appliqué</strong>{% endif %}
+    {% if sc.get('scope_note') %}<br><span class="sn-muted">Note : {{ sc.scope_note }}</span>{% endif %}
+  </p>
+  {% endif %}
   <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0 0 1rem;">
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+    {% if form_report_id %}<input type="hidden" name="report_id" value="{{ form_report_id }}">{% endif %}
     <input type="hidden" name="analytic_account_id" value="{{ form_analytic_id }}">
     <input type="hidden" name="date_from" value="{{ form_date_from }}">
     <input type="hidden" name="date_to" value="{{ form_date_to }}">
