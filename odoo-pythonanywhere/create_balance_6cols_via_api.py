@@ -11,21 +11,23 @@ mouvement sur la période ; ne pas les remplacer par un solde net.
 Un ``root_report_id`` vers le Grand livre faisait par le passé se comporter le rapport comme une
 **variante** (solde signé) : la création toolbox reste **sans** racine ni handler métier.
 
-**Décision toolbox (fin des essais « net » automatiques)** : on **ne tente plus** le moteur
-``aggregation`` sur la ligne groupée (résultat à l’écran trop variable selon les versions).
-**Une seule voie** : moteur **domain** sur la ligne ``bal_ohada``. Les **quatre colonnes
-extérieures** sont par **défaut** des cumuls **bruts** (lignes avec ``debit > 0`` ou
-``credit > 0`` sur la portée de dates), ce qui évite le bug fréquent : solde net **signé**
-dans la colonne débit et colonnes crédit vides. Ce n’est **pas** le solde net OHADA pour un
-compte à mouvements débit et crédit mélangés sur la même période ; pour un vrai découpage net
-il faut une **configuration manuelle** dans Odoo (Studio / module), en s’inspirant du bloc
-``_expressions_aggregation_ohada_line`` ci-dessous (référence non exécutée par la toolbox).
+**Odoo v19 (recommandé)** : sur la ligne feuille ``groupby = account_id``, le moteur
+**``aggregation``** avec ``initial_debit`` / ``initial_credit`` / ``debit`` / ``credit`` et
+``subformula: positive`` pour les colonnes « débit/crédit décomposés » **sépare correctement**
+les montants — contrairement au moteur **``domain``** avec ``[('debit','>',0)]``, qui filtre des
+écritures mais **n’empêche pas** l’agrégat de mélanger débit et crédit sur la même ligne de rapport.
 
-**Option** : ``TOOLBOX_OHADA6_OUTER_NET=1`` pour forcer le mode domain « ``sum_if_pos`` /
-``-sum_if_neg`` » (souvent **défectueux** avec ``groupby`` sur Enterprise — à vos risques).
+**Comportement toolbox** : à la création, on tente **d’abord** ``aggregation`` (sonde RPC : le
+serveur accepte-t-il ``aggregation`` sur une ligne ``groupby`` ?). Si **refus** (schéma
+communautaire strict), **repli** sur le moteur ``domain`` (cumuls bruts sur les colonnes
+extérieures, comme avant).
+
+**Option** : ``TOOLBOX_OHADA6_FORCE_DOMAIN=1`` pour forcer le repli ``domain`` sans tenter
+``aggregation``. ``TOOLBOX_OHADA6_OUTER_NET=1`` : en mode domain uniquement, colonnes extérieures
+en ``sum_if_pos`` / ``-sum_if_neg`` (souvent capricieux à l’affichage).
 
 **Stratégie** : rapport **autonome**, recopie **uniquement** des options depuis le Grand livre
-si trouvé ; réécriture XML-RPC des quatre expressions extérieures après création.
+si trouvé ; en repli ``domain`` uniquement, réécriture XML-RPC des quatre expressions extérieures.
 
 **Rapport déjà déployé** : bouton staff « Colonnes extérieures → brut » ou
 ``python create_balance_6cols_via_api.py --rewrite-outer-gross`` met à jour les quatre
@@ -250,28 +252,31 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     ]
 
 
-def _expressions_aggregation_ohada_line(*, line_code: str) -> list[dict[str, Any]]:
+def _expressions_aggregation_ohada_line() -> list[dict[str, Any]]:
     """
-    **Référence Studio / copier-coller** — découpage net via ``aggregation`` + ``positive``.
+    Balance OHADA 6 colonnes — moteur ``aggregation`` (Odoo v19 / API).
 
-    Non utilisé par ``create_balance_six_columns_rpc`` : à configurer à la main dans Odoo si votre
-    version affiche correctement ce schéma avec ``groupby account_id``.
+    Les colonnes initiales / finales utilisent ``subformula: positive`` pour ne garder que la
+    partie ≥ 0 du solde net (côté débit ou crédit affiché). Les mouvements de période sont les
+    cumuls bruts ``debit`` et ``credit`` (pas de ``-sum``).
+
+    Portées : initiaux = ``to_beginning_of_period`` ; période et soldes finaux décomposés =
+    ``strict_range`` (avec solde initial inclus via les options du rapport).
     """
-    lc = (line_code or "").strip() or BALANCE_OHADA_LINE_CODE
     return [
         {
             "label": OHADA6_OPEN_DEB,
             "engine": "aggregation",
             "formula": "initial_debit - initial_credit",
             "subformula": "positive",
-            "date_scope": "strict_range",
+            "date_scope": "to_beginning_of_period",
         },
         {
             "label": OHADA6_OPEN_CRE,
             "engine": "aggregation",
             "formula": "initial_credit - initial_debit",
             "subformula": "positive",
-            "date_scope": "strict_range",
+            "date_scope": "to_beginning_of_period",
         },
         {
             "label": OHADA6_MOV_DEB,
@@ -288,20 +293,14 @@ def _expressions_aggregation_ohada_line(*, line_code: str) -> list[dict[str, Any
         {
             "label": OHADA6_CLOSE_DEB,
             "engine": "aggregation",
-            "formula": (
-                f"(initial_debit + {lc}.{OHADA6_MOV_DEB}) "
-                f"- (initial_credit + {lc}.{OHADA6_MOV_CRE})"
-            ),
+            "formula": "(initial_debit + debit) - (initial_credit + credit)",
             "subformula": "positive",
             "date_scope": "strict_range",
         },
         {
             "label": OHADA6_CLOSE_CRE,
             "engine": "aggregation",
-            "formula": (
-                f"(initial_credit + {lc}.{OHADA6_MOV_CRE}) "
-                f"- (initial_debit + {lc}.{OHADA6_MOV_DEB})"
-            ),
+            "formula": "(initial_credit + credit) - (initial_debit + debit)",
             "subformula": "positive",
             "date_scope": "strict_range",
         },
@@ -751,7 +750,10 @@ def create_balance_six_columns_rpc(
         except Exception:
             pass
 
-    # Repli domain : « brut » par défaut (sum_if_pos + groupby souvent non fonctionnel en affichage).
+    # v19 : aggregation par défaut si le serveur l’accepte sur une ligne groupby ; sinon domain.
+    force_domain = (
+        os.environ.get("TOOLBOX_OHADA6_FORCE_DOMAIN") or ""
+    ).strip().lower() in ("1", "true", "yes", "on")
     use_net_outer_domain = (
         os.environ.get("TOOLBOX_OHADA6_OUTER_NET") or ""
     ).strip().lower() in ("1", "true", "yes", "on")
@@ -770,23 +772,40 @@ def create_balance_six_columns_rpc(
         )
     )
 
-    dom_exprs = (
-        _expressions_domain_grouped_line()
-        if use_net_outer_domain
-        else _expressions_domain_grouped_line_outer_gross()
+    use_aggregation = (
+        not force_domain
+        and _line_accepts_aggregation_with_groupby(
+            models, db, uid, password, child_id
+        )
     )
-    _populate_line_expressions(
-        models, db, uid, password, child_id, dom_exprs
-    )
-    _force_ohada_outer_domain_expressions(
-        models,
-        db,
-        uid,
-        password,
-        report_id,
-        line_code,
-        outer_mode="net" if use_net_outer_domain else "gross",
-    )
+
+    if use_aggregation:
+        _populate_line_expressions(
+            models,
+            db,
+            uid,
+            password,
+            child_id,
+            _expressions_aggregation_ohada_line(),
+        )
+    else:
+        dom_exprs = (
+            _expressions_domain_grouped_line()
+            if use_net_outer_domain
+            else _expressions_domain_grouped_line_outer_gross()
+        )
+        _populate_line_expressions(
+            models, db, uid, password, child_id, dom_exprs
+        )
+        _force_ohada_outer_domain_expressions(
+            models,
+            db,
+            uid,
+            password,
+            report_id,
+            line_code,
+            outer_mode="net" if use_net_outer_domain else "gross",
+        )
 
     apply_record_field_translations(
         models,
@@ -1015,7 +1034,7 @@ def rewrite_toolbox_balance_ohada_aggregation_all_rpc(
         models, db, uid, password, line_code=lc
     )
     out: list[tuple[int, bool, str]] = []
-    agg = _expressions_aggregation_ohada_line(line_code=lc)
+    agg = _expressions_aggregation_ohada_line()
     for rid in rids:
         lid = _leaf_line_id_for_report_code(
             models, db, uid, password, int(rid), lc

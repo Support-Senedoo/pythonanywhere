@@ -3,10 +3,10 @@
     <!--
       Balance générale 6 colonnes (visée OHADA) — gabarit Studio / module custom, Odoo v19+.
 
-      Odoo 19 : sur une ligne avec groupby, le moteur « aggregation » peut être refusé (schéma
-      communautaire strict) ; le script create_balance_6cols_via_api.py tente d’abord
-      « aggregation » si le serveur l’autorise, sinon « domain ». Ce gabarit XML reste en
-      « domain » pour compatibilité Studio / import sans sonde RPC.
+      Odoo 19 : création via API — « aggregation » par défaut si le serveur l’autorise sur la ligne
+      groupby, sinon repli « domain ». Ce gabarit XML utilise « aggregation » (recommandé v19).
+      Si l’import Studio échoue (édition sans aggregation sur groupby), utiliser la toolbox API
+      ou l’ancien gabarit domain dans l’historique Git.
 
       Libellés d’expressions / expression_label des colonnes : préfixe ohada6_ pour éviter les
       collisions avec debit / credit / debit_initial traités à part par le moteur standard.
@@ -76,45 +76,43 @@
         <field name="expression_ids" eval="[
             (0, 0, {
                 'label': 'ohada6_open_deb',
-                'engine': 'domain',
-                'formula': '[]',
-                'subformula': 'sum_if_pos',
+                'engine': 'aggregation',
+                'formula': 'initial_debit - initial_credit',
+                'subformula': 'positive',
                 'date_scope': 'to_beginning_of_period',
             }),
             (0, 0, {
                 'label': 'ohada6_open_cre',
-                'engine': 'domain',
-                'formula': '[]',
-                'subformula': '-sum_if_neg',
+                'engine': 'aggregation',
+                'formula': 'initial_credit - initial_debit',
+                'subformula': 'positive',
                 'date_scope': 'to_beginning_of_period',
             }),
             (0, 0, {
                 'label': 'ohada6_mov_deb',
-                'engine': 'domain',
-                'formula': &quot;[('debit', '&gt;', 0)]&quot;,
-                'subformula': 'sum',
+                'engine': 'aggregation',
+                'formula': 'debit',
                 'date_scope': 'strict_range',
             }),
             (0, 0, {
                 'label': 'ohada6_mov_cre',
-                'engine': 'domain',
-                'formula': &quot;[('credit', '&gt;', 0)]&quot;,
-                'subformula': '-sum',
+                'engine': 'aggregation',
+                'formula': 'credit',
                 'date_scope': 'strict_range',
             }),
             (0, 0, {
                 'label': 'ohada6_close_deb',
-                'engine': 'domain',
-                'formula': '[]',
-                'subformula': 'sum_if_pos',
-                'date_scope': 'from_beginning',
+                'engine': 'aggregation',
+                'formula': '(initial_debit + debit) - (initial_credit + credit)',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
             }),
             (0, 0, {
                 'label': 'ohada6_close_cre',
-                'engine': 'domain',
-                'formula': '[]',
-                'subformula': '-sum_if_neg',
-                'date_scope': 'from_beginning',
+                'engine': 'aggregation',
+                'formula': '(initial_credit + credit) - (initial_debit + debit)',
+                'subformula': 'positive',
+                'date_scope': 'strict_range',
             }),
         ]"/>
     </record>
