@@ -1873,6 +1873,11 @@ def rapports_comptables():
 @bp.route("/utilities/personalize-pl-budget", methods=["GET", "POST"])
 @login_required_staff
 def rapports_pl_budget():
+    # Ancien écran « P&L analytique / budget » : le parcours est regroupé sous
+    # pl_analytic_project_report (tableau API + copie Odoo). Les favoris GET suivent.
+    if request.method == "GET":
+        q = request.args.to_dict(flat=True)
+        return redirect(url_for("staff.pl_analytic_project_report", **q))
     return _accounting_reports_page("pl_budget")
 
 
