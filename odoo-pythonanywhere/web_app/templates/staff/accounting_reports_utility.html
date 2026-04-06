@@ -98,14 +98,15 @@
 <details class="sn-doc">
   <summary>Descriptif &amp; mode d’emploi — P&amp;L analytique et budget</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Même principe qu’un P&amp;L personnalisé, avec en plus l’activation de <code>filter_analytic</code> et <code>filter_budget</code> sur la copie (si les champs existent sur votre Odoo SaaS). Utile pour piloter un budget financier avec filtre analytique.
+    <strong>But.</strong> Même principe qu’un P&amp;L personnalisé, avec en plus l’activation de <code>filter_analytic</code> et du filtre budgets (<code>filter_budgets</code> sur Odoo 17+, ou <code>filter_budget</code> sur d’anciennes bases) sur la copie. Sans le bon filtre budgets sur la fiche du rapport, les colonnes <strong>budget</strong> et <strong>%</strong> peuvent rester vides ou ne plus suivre le comportement du P&amp;L d’origine lorsque le filtre analytique est actif.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
     La <strong>sonde budget / analytique</strong> (lecture seule) indique si des lignes de budget portent un analytique — prérequis pour qu’un budget « par axe » ait du sens dans le rapport.
   </p>
   <ul>
     <li>Lancez d’abord la <strong>sonde</strong> si besoin, puis <strong>Créer la copie (détail + analytique / budget)</strong>.</li>
-    <li>Détails et contournements : <code>DEPLOY_PYTHONANYWHERE.md</code>.</li>
+    <li>Si le réalisé est bien filtré par analytique mais budget / % « disparaissent » : rouvrir la copie dans Odoo (fiche <code>account.report</code>) et vérifier les options <strong>filtre analytique</strong> et <strong>filtre budgets</strong> ; recréer la copie avec la toolbox actuelle si besoin.</li>
+    <li>Détails et limites du moteur Odoo : <code>DEPLOY_PYTHONANYWHERE.md</code> (checklist budget × analytique).</li>
   </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -621,7 +622,7 @@
   {% endif %}
   {% elif accounting_mode == 'pl_budget' %}
   <h2 style="margin-top:0;font-size:1.1rem;">P&amp;L — analytique et budget</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Copie du rapport avec détail comptes Senedoo + options <code>filter_analytic</code> / <code>filter_budget</code> lorsque le modèle les expose.</p>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Copie du rapport avec détail comptes Senedoo + options <code>filter_analytic</code> et <code>filter_budgets</code> (ou <code>filter_budget</code>) lorsque le modèle les expose.</p>
   <h3 style="margin:0 0 0.5rem;font-size:1rem;">Sonde — lignes de budget et analytique</h3>
   <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
     Lecture seule : comptage des lignes de budget avec analytique (<code>account.budget.line</code> ou <code>crossovered.budget.lines</code>).

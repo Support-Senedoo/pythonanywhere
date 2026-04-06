@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
 Active sur un account.report (typiquement une copie de P&L) les options utiles pour
-piloter budget + analytique dans l’UI Odoo : filter_analytic, et filter_budget si présent.
+piloter budget + analytique dans l’UI Odoo : ``filter_analytic``, et le filtre budget
+(``filter_budgets`` sur Odoo 17+, ou ``filter_budget`` sur d’anciennes bases).
 
 Les champs réellement écrits dépendent de fields_get (Odoo SaaS / Enterprise).
+Sans le bon nom de champ, la colonne budget / % ne se comporte pas comme le P&L d’origine
+lorsque le filtre analytique est actif.
 
 Usage CLI :
   python personalize_pl_analytic_budget.py --report-id 42
@@ -66,15 +69,23 @@ def personalize_pl_analytic_budget_options(
     enable_budget_filter: bool = True,
 ) -> dict[str, Any]:
     """
-    Écrit filter_analytic=True ; filter_budget=True si le champ existe et est modifiable.
+    Écrit ``filter_analytic=True`` ; et le filtre budgets si présent sur le modèle.
+
+    Odoo Enterprise récent expose en général ``filter_budgets`` (pluriel), pas ``filter_budget``.
+    On active le premier nom disponible pour que les colonnes budget / % restent pilotables
+    avec le filtre analytique, comme sur le P&L standard.
     Retourne {written, writable_boolean_filters} pour message utilisateur / logs.
     """
     filters = _writable_boolean_filter_fields(models, db, uid, password)
     vals: dict[str, Any] = {}
     if "filter_analytic" in filters:
         vals["filter_analytic"] = True
-    if enable_budget_filter and "filter_budget" in filters:
-        vals["filter_budget"] = True
+    if enable_budget_filter:
+        # Ordre : nom courant Odoo 17+ puis rétrocompatibilité.
+        if "filter_budgets" in filters:
+            vals["filter_budgets"] = True
+        elif "filter_budget" in filters:
+            vals["filter_budget"] = True
     if "filter_analytic" not in vals:
         raise ValueError(
             "Le champ modifiable « filter_analytic » est absent sur account.report "
@@ -189,7 +200,11 @@ def probe_financial_budget_analytic_summary(
 def main() -> None:
     p = argparse.ArgumentParser(description="Active filter_analytic (+ filter_budget si dispo) sur account.report")
     p.add_argument("--report-id", type=int, required=True, help="ID account.report (copie recommandée)")
-    p.add_argument("--no-budget-filter", action="store_true", help="Ne pas activer filter_budget")
+    p.add_argument(
+        "--no-budget-filter",
+        action="store_true",
+        help="Ne pas activer filter_budgets / filter_budget",
+    )
     p.add_argument("--probe-only", action="store_true", help="Seulement sonder les lignes budget / analytique")
     p.add_argument("--url", default=os.environ.get("ODOO_URL", "").strip() or None)
     p.add_argument("--db", default=os.environ.get("ODOO_DB", "").strip() or None)
