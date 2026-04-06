@@ -46,6 +46,7 @@ from create_balance_6cols_via_api import (
     create_toolbox_balance_ohada,
     find_balance_ohada_report_id,
     purge_balance_ohada_instances,
+    rewrite_toolbox_balance_ohada_outer_gross_all_rpc,
 )
 from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
@@ -580,6 +581,46 @@ def _accounting_reports_page(accounting_mode: str):
                         report_id=new_rid,
                         filter_host=fl_save,
                         balance_done=True,
+                    ),
+                )
+            )
+        if action == "rewrite_balance_ohada_outer_gross" and accounting_mode == "balance":
+            try:
+                pairs = rewrite_toolbox_balance_ohada_outer_gross_all_rpc(
+                    models, db, uid, pwd
+                )
+            except Exception as e:
+                flash(f"Échec réécriture colonnes extérieures : {e!s}", "danger")
+                return redirect(
+                    ru(
+                        **_rapports_url_params(
+                            client_id=cid,
+                            q=filter_q,
+                            filter_host=fl_save,
+                        ),
+                    )
+                )
+            if not pairs:
+                flash(
+                    "Aucun rapport Balance OHADA toolbox sur cette base (ligne bal_ohada).",
+                    "warning",
+                )
+            else:
+                ok_ids = [str(r) for r, o in pairs if o]
+                bad = [str(r) for r, o in pairs if not o]
+                msg = (
+                    "Colonnes extérieures réécrites en mode « brut » (débit/crédit > 0) pour "
+                    f"rapport(s) id : {', '.join(ok_ids) or '—'}."
+                )
+                if bad:
+                    msg += f" Échec partiel sur id : {', '.join(bad)}."
+                flash(msg, "success" if not bad else "warning")
+            return redirect(
+                ru(
+                    **_rapports_url_params(
+                        client_id=cid,
+                        q=filter_q,
+                        filter_host=fl_save,
                     ),
                 )
             )

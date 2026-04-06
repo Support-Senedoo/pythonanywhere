@@ -8,29 +8,28 @@ final** (solde net : partie ≥ 0 en débit, partie ≤ 0 en valeur absolue en c
 colonnes centrales de période** (**Débit** / **Crédit**) restent des **cumuls bruts** de
 mouvement sur la période ; ne pas les remplacer par un solde net.
 
-**Odoo 19 (code communautaire)** : le moteur ``aggregation`` est souvent **refusé** dès qu’une
-ligne porte un ``groupby`` (ex. ``account_id``). Sur **Enterprise** (ou builds assouplis), la
-même combinaison peut être **acceptée** : la toolbox tente alors les formules ``aggregation``
-avec ``positive`` pour le découpage net des colonnes extérieures. Sinon, repli **domain** +
-``sum_if_pos`` / ``-sum_if_neg``. Un ``root_report_id`` vers le Grand livre faisait par le passé
-se comporter le rapport comme une **variante** (solde signé) : la création toolbox reste **sans**
-racine ni handler métier.
+Un ``root_report_id`` vers le Grand livre faisait par le passé se comporter le rapport comme une
+**variante** (solde signé) : la création toolbox reste **sans** racine ni handler métier.
 
-**Stratégie toolbox** : rapport **autonome** (``root_report_id`` = faux), recopie **uniquement**
-des options (filtres, solde initial…) depuis le Grand livre si trouvé.
+**Décision toolbox (fin des essais « net » automatiques)** : on **ne tente plus** le moteur
+``aggregation`` sur la ligne groupée (résultat à l’écran trop variable selon les versions).
+**Une seule voie** : moteur **domain** sur la ligne ``bal_ohada``. Les **quatre colonnes
+extérieures** sont par **défaut** des cumuls **bruts** (lignes avec ``debit > 0`` ou
+``credit > 0`` sur la portée de dates), ce qui évite le bug fréquent : solde net **signé**
+dans la colonne débit et colonnes crédit vides. Ce n’est **pas** le solde net OHADA pour un
+compte à mouvements débit et crédit mélangés sur la même période ; pour un vrai découpage net
+il faut une **configuration manuelle** dans Odoo (Studio / module), en s’inspirant du bloc
+``_expressions_aggregation_ohada_line`` ci-dessous (référence non exécutée par la toolbox).
 
-- **Enterprise / bases où la contrainte ORM l’autorise** : la ligne ``bal_ohada`` est d’abord testée
-  par une expression d’agrégation factice ; si la création est acceptée, les **six** expressions
-  utilisent le moteur **aggregation** (variables ``initial_*`` / ``debit`` / ``credit`` +
-  sous-formule ``positive`` pour le découpage net des colonnes extérieures). C’est le schéma
-  prévu par Odoo lorsque ``groupby`` et ``aggregation`` coexistent.
-- **Sinon (ex. code communautaire strict)** : repli **domain** + ``sum_if_pos`` /
-  ``-sum_if_neg`` sur les quatre colonnes extérieures, puis **réécriture** XML-RPC des
-  expressions pour garantir les sous-formules en base.
-- **Option** : variable d’environnement ``TOOLBOX_OHADA6_OUTER_GROSS=1`` (ou ``true``) pour forcer
-  le repli **domain « mouvements bruts »** sur les colonnes extérieures (débit > 0 / crédit > 0
-  sur la même portée de dates) — utile si le découpage net reste incorrect sur une version
-  donnée ; ce n’est **pas** le solde net OHADA pour comptes mixtes.
+**Option** : ``TOOLBOX_OHADA6_OUTER_NET=1`` pour forcer le mode domain « ``sum_if_pos`` /
+``-sum_if_neg`` » (souvent **défectueux** avec ``groupby`` sur Enterprise — à vos risques).
+
+**Stratégie** : rapport **autonome**, recopie **uniquement** des options depuis le Grand livre
+si trouvé ; réécriture XML-RPC des quatre expressions extérieures après création.
+
+**Rapport déjà déployé** : bouton staff « Colonnes extérieures → brut » ou
+``python create_balance_6cols_via_api.py --rewrite-outer-gross`` met à jour les quatre
+expressions sans supprimer le rapport ni les menus.
 
 **Libellés d’expressions** : préfixe ``ohada6_`` (ex. ``ohada6_open_deb``) pour les colonnes,
 au lieu de ``debit`` / ``debit_initial``, afin d’éviter les collisions avec le moteur standard
@@ -51,6 +50,7 @@ Variables : ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASSWORD (ou .env à côté du sc
 
 Usage :
   python create_balance_6cols_via_api.py
+  python create_balance_6cols_via_api.py --rewrite-outer-gross
   python create_balance_6cols_via_api.py --name-fr "Autre libellé"
   python create_balance_6cols_via_api.py --line-code bal6_client_x
 
@@ -140,8 +140,8 @@ def _expressions_domain_grouped_line_outer_gross() -> list[dict[str, Any]]:
     """
     Colonnes extérieures = **cumuls bruts** débit / crédit (même portées que le mode net).
 
-    À utiliser en secours (ex. ``TOOLBOX_OHADA6_OUTER_GROSS``) si le découpage net ne convient
-    pas sur le moteur domain de l’instance. Les deux colonnes centrales restent inchangées.
+    Mode **par défaut** de la toolbox pour les colonnes extérieures. Les deux colonnes centrales
+    restent inchangées.
     """
     mid = _expressions_domain_grouped_line()
     out: list[dict[str, Any]] = []
@@ -251,11 +251,10 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
 
 def _expressions_aggregation_ohada_line(*, line_code: str) -> list[dict[str, Any]]:
     """
-    Schéma **aggregation** + sous-formule ``positive`` : découpage net des colonnes extérieures.
+    **Référence Studio / copier-coller** — découpage net via ``aggregation`` + ``positive``.
 
-    Sur les builds où la contrainte ORM interdit ``aggregation`` avec ``groupby``, la création
-    échoue et la toolbox retombe sur le moteur **domain** (voir
-    ``_expressions_domain_grouped_line``).
+    Non utilisé par ``create_balance_six_columns_rpc`` : à configurer à la main dans Odoo si votre
+    version affiche correctement ce schéma avec ``groupby account_id``.
     """
     lc = (line_code or "").strip() or BALANCE_OHADA_LINE_CODE
     return [
@@ -466,97 +465,6 @@ def _force_ohada_outer_domain_expressions(
             continue
 
 
-_SN_AGG_GROUPBY_PROBE = "_sn_agg_groupby_probe"
-
-
-def _unlink_all_expressions_on_line(
-    models: Any,
-    db: str,
-    uid: int,
-    password: str,
-    line_id: int,
-) -> None:
-    rows = execute_kw(
-        models,
-        db,
-        uid,
-        password,
-        "account.report.line",
-        "read",
-        [[int(line_id)]],
-        {"fields": ["expression_ids"]},
-    )
-    if not rows:
-        return
-    eids = (rows[0] or {}).get("expression_ids") or []
-    if not eids:
-        return
-    try:
-        execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report.expression",
-            "unlink",
-            [eids],
-        )
-    except Exception:
-        pass
-
-
-def _line_accepts_aggregation_with_groupby(
-    models: Any,
-    db: str,
-    uid: int,
-    password: str,
-    line_id: int,
-) -> bool:
-    """
-    True si le serveur autorise ``engine=aggregation`` sur une ligne qui a déjà un ``groupby``
-    (souvent le cas Enterprise ; refusé sur le schéma communautaire strict Odoo 19).
-    """
-    ctx_fr = {"context": {"lang": "fr_FR"}}
-    try:
-        eid = execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report.expression",
-            "create",
-            [
-                {
-                    "report_line_id": int(line_id),
-                    "label": _SN_AGG_GROUPBY_PROBE,
-                    "engine": "aggregation",
-                    "formula": "0",
-                    "date_scope": "strict_range",
-                }
-            ],
-            ctx_fr,
-        )
-    except Exception:
-        return False
-    try:
-        probe_id = int(eid)
-    except (TypeError, ValueError):
-        return False
-    try:
-        execute_kw(
-            models,
-            db,
-            uid,
-            password,
-            "account.report.expression",
-            "unlink",
-            [[probe_id]],
-        )
-    except Exception:
-        pass
-    return True
-
-
 def _populate_line_expressions(
     models: Any,
     db: str,
@@ -731,10 +639,10 @@ def create_balance_six_columns_rpc(
         except Exception:
             pass
 
-    outer_gross_env = (
-        os.environ.get("TOOLBOX_OHADA6_OUTER_GROSS") or ""
-    ).strip().lower()
-    outer_gross = outer_gross_env in ("1", "true", "yes", "on")
+    # Repli domain : « brut » par défaut (sum_if_pos + groupby souvent non fonctionnel en affichage).
+    use_net_outer_domain = (
+        os.environ.get("TOOLBOX_OHADA6_OUTER_NET") or ""
+    ).strip().lower() in ("1", "true", "yes", "on")
 
     ctx_fr_line = {"context": {"lang": "fr_FR"}}
     child_id = int(
@@ -750,50 +658,23 @@ def create_balance_six_columns_rpc(
         )
     )
 
-    used_aggregation = False
-    if not outer_gross and _line_accepts_aggregation_with_groupby(
-        models, db, uid, password, child_id
-    ):
-        try:
-            agg_exprs = _expressions_aggregation_ohada_line(line_code=line_code)
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report.line",
-                "write",
-                [
-                    [int(child_id)],
-                    {"expression_ids": [(0, 0, dict(x)) for x in agg_exprs]},
-                ],
-                ctx_fr_line,
-            )
-            used_aggregation = True
-        except Exception:
-            _unlink_all_expressions_on_line(
-                models, db, uid, password, child_id
-            )
-            used_aggregation = False
-
-    if not used_aggregation:
-        dom_exprs = (
-            _expressions_domain_grouped_line_outer_gross()
-            if outer_gross
-            else _expressions_domain_grouped_line()
-        )
-        _populate_line_expressions(
-            models, db, uid, password, child_id, dom_exprs
-        )
-        _force_ohada_outer_domain_expressions(
-            models,
-            db,
-            uid,
-            password,
-            report_id,
-            line_code,
-            outer_mode="gross" if outer_gross else "net",
-        )
+    dom_exprs = (
+        _expressions_domain_grouped_line()
+        if use_net_outer_domain
+        else _expressions_domain_grouped_line_outer_gross()
+    )
+    _populate_line_expressions(
+        models, db, uid, password, child_id, dom_exprs
+    )
+    _force_ohada_outer_domain_expressions(
+        models,
+        db,
+        uid,
+        password,
+        report_id,
+        line_code,
+        outer_mode="net" if use_net_outer_domain else "gross",
+    )
 
     apply_record_field_translations(
         models,
@@ -965,6 +846,41 @@ def find_balance_ohada_report_id(
     return min(ids) if len(ids) > 1 else ids[0]
 
 
+def rewrite_toolbox_balance_ohada_outer_gross_all_rpc(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    *,
+    line_code: str = BALANCE_OHADA_LINE_CODE,
+) -> list[tuple[int, bool]]:
+    """
+    Pour chaque ``account.report`` repéré par la ligne feuille ``line_code``, réécrit les quatre
+    expressions ``ohada6_*`` extérieures en moteur **domain** « brut » (sans supprimer le rapport).
+    """
+    lc = (line_code or "").strip() or BALANCE_OHADA_LINE_CODE
+    rids = find_all_balance_ohada_report_ids(
+        models, db, uid, password, line_code=lc
+    )
+    out: list[tuple[int, bool]] = []
+    for rid in rids:
+        ok = True
+        try:
+            _force_ohada_outer_domain_expressions(
+                models,
+                db,
+                uid,
+                password,
+                int(rid),
+                lc,
+                outer_mode="gross",
+            )
+        except Exception:
+            ok = False
+        out.append((int(rid), ok))
+    return out
+
+
 def create_toolbox_balance_ohada(
     models: Any,
     db: str,
@@ -1015,6 +931,11 @@ def main() -> int:
         default=BALANCE_OHADA_LINE_CODE,
         help="Code unique de la ligne feuille (account.report.line.code)",
     )
+    p.add_argument(
+        "--rewrite-outer-gross",
+        action="store_true",
+        help="Ne pas créer : réécrit les 4 colonnes extérieures en « brut » pour chaque rapport bal_ohada.",
+    )
 
     args = p.parse_args()
     missing = [
@@ -1035,6 +956,29 @@ def main() -> int:
     line_code = (args.line_code or "").strip() or BALANCE_OHADA_LINE_CODE
 
     client = OdooClient(args.url, args.db, args.user, args.password)
+    if args.rewrite_outer_gross:
+        try:
+            uid = client.authenticate()
+            pairs = rewrite_toolbox_balance_ohada_outer_gross_all_rpc(
+                client._object,
+                client.db,
+                uid,
+                client.password,
+                line_code=line_code,
+            )
+        except Exception as e:
+            print("Échec :", e, file=sys.stderr)
+            return 1
+        if not pairs:
+            print(
+                f"Aucun account.report avec une ligne code={line_code!r}.",
+                file=sys.stderr,
+            )
+            return 2
+        for rid, ok in pairs:
+            print(f"account.report id={rid} : {'OK' if ok else 'ÉCHEC'}")
+        return 0 if all(p[1] for p in pairs) else 1
+
     try:
         rid = create_balance_six_columns(
             client,

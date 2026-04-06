@@ -146,7 +146,7 @@
         </li>
         <li style="margin:0.35rem 0;" class="sn-muted">
           <strong>Balance OHADA (toolbox)</strong> : la création automatique utilise des <code>expression_label</code> préfixés <code>ohada6_</code>
-          (<code>ohada6_open_deb</code>, <code>ohada6_open_cre</code>, <code>ohada6_mov_deb</code>, <code>ohada6_mov_cre</code>, <code>ohada6_close_deb</code>, <code>ohada6_close_cre</code>) pour éviter les collisions avec le moteur standard Odoo. Le script tente d’abord le moteur <strong>aggregation</strong> (découpage net) si le serveur l’autorise avec <code>groupby</code>, sinon le moteur <strong>domain</strong>. Sur l’hébergement PythonAnywhere, variable optionnelle <code>TOOLBOX_OHADA6_OUTER_GROSS=1</code> pour forcer des colonnes extérieures en <strong>mouvements bruts</strong> (repli fonctionnel). La liste ci-dessus reste valable pour une configuration manuelle sur une balance générale, si vous renommez partout de façon cohérente (colonnes = expressions).
+          (<code>ohada6_open_deb</code>, <code>ohada6_open_cre</code>, <code>ohada6_mov_deb</code>, <code>ohada6_mov_cre</code>, <code>ohada6_close_deb</code>, <code>ohada6_close_cre</code>) pour éviter les collisions avec le moteur standard Odoo. La toolbox n’utilise plus l’<strong>aggregation</strong> automatique sur la ligne groupée : les colonnes extérieures sont en <strong>domain</strong>, cumuls <strong>bruts</strong> (débit/crédit &gt; 0). Option env <code>TOOLBOX_OHADA6_OUTER_NET=1</code> pour réessayer le « net » (<code>sum_if_pos</code>, souvent défectueux à l’écran). Rapport déjà créé : bouton <strong>Colonnes extérieures → brut</strong> sur la page Balance OHADA staff. La liste ci-dessus reste valable pour une configuration manuelle, si vous renommez partout de façon cohérente (colonnes = expressions).
         </li>
         <li style="margin:0.35rem 0;">
           <strong>Onglet Lignes</strong> — ligne principale (souvent « Accounts », « Balance », etc.) avec <strong><code>groupby = account_id</code></strong>. Sous <strong>Expressions</strong>, créer ou vérifier <strong>une expression par colonne</strong> (label = expression_label de la colonne) :
@@ -557,6 +557,18 @@
     <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.85rem;">L’instance actuelle (id {{ balance_ohada_report_id }}) sera remplacée.</p>
     {% endif %}
   </form>
+  {% if balance_ohada_report_id %}
+  <form id="form-rewrite-balance-ohada-outer" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin-top:0.85rem;">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="action" value="rewrite_balance_ohada_outer_gross">
+    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;font-size:0.88rem;">
+      <strong>Dernier correctif sans supprimer le rapport :</strong> réécrit les quatre expressions des colonnes <em>initiales / finales</em> en cumuls <strong>bruts</strong> (écritures débit &gt; 0 / crédit &gt; 0). À utiliser si le crédit initial ou final reste vide et que le débit affiche des montants négatifs rouges pour les comptes créditeurs.
+    </p>
+    <button type="submit" class="sn-btn sn-btn--ghost" {% if conn_status != 'ok' %}disabled{% endif %}>Colonnes extérieures → brut (API)</button>
+  </form>
+  {% endif %}
   {% if balance_ohada_report_id %}
   <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--sn-border);">
   <h3 style="margin:0 0 0.5rem;font-size:1rem;">Supprimer de la base Odoo</h3>
