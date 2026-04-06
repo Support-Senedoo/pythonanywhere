@@ -3,8 +3,10 @@
     <!--
       Balance générale 6 colonnes (visée OHADA) — gabarit Studio / module custom, Odoo v19+.
 
-      Odoo 19 : sur une ligne avec groupby (ex. account_id), le moteur « aggregation » est
-      refusé. Ce gabarit utilise le moteur « domain » (comme create_balance_6cols_via_api.py).
+      Odoo 19 : sur une ligne avec groupby, le moteur « aggregation » peut être refusé (schéma
+      communautaire strict) ; le script create_balance_6cols_via_api.py tente d’abord
+      « aggregation » si le serveur l’autorise, sinon « domain ». Ce gabarit XML reste en
+      « domain » pour compatibilité Studio / import sans sonde RPC.
 
       Libellés d’expressions / expression_label des colonnes : préfixe ohada6_ pour éviter les
       collisions avec debit / credit / debit_initial traités à part par le moteur standard.

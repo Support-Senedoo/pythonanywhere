@@ -146,7 +146,7 @@
         </li>
         <li style="margin:0.35rem 0;" class="sn-muted">
           <strong>Balance OHADA (toolbox)</strong> : la création automatique utilise des <code>expression_label</code> préfixés <code>ohada6_</code>
-          (<code>ohada6_open_deb</code>, <code>ohada6_open_cre</code>, <code>ohada6_mov_deb</code>, <code>ohada6_mov_cre</code>, <code>ohada6_close_deb</code>, <code>ohada6_close_cre</code>) pour éviter les collisions avec le moteur standard Odoo. La liste ci-dessus reste valable pour une configuration manuelle sur une balance générale, si vous renommez partout de façon cohérente (colonnes = expressions).
+          (<code>ohada6_open_deb</code>, <code>ohada6_open_cre</code>, <code>ohada6_mov_deb</code>, <code>ohada6_mov_cre</code>, <code>ohada6_close_deb</code>, <code>ohada6_close_cre</code>) pour éviter les collisions avec le moteur standard Odoo. Le script tente d’abord le moteur <strong>aggregation</strong> (découpage net) si le serveur l’autorise avec <code>groupby</code>, sinon le moteur <strong>domain</strong>. Sur l’hébergement PythonAnywhere, variable optionnelle <code>TOOLBOX_OHADA6_OUTER_GROSS=1</code> pour forcer des colonnes extérieures en <strong>mouvements bruts</strong> (repli fonctionnel). La liste ci-dessus reste valable pour une configuration manuelle sur une balance générale, si vous renommez partout de façon cohérente (colonnes = expressions).
         </li>
         <li style="margin:0.35rem 0;">
           <strong>Onglet Lignes</strong> — ligne principale (souvent « Accounts », « Balance », etc.) avec <strong><code>groupby = account_id</code></strong>. Sous <strong>Expressions</strong>, créer ou vérifier <strong>une expression par colonne</strong> (label = expression_label de la colonne) :

@@ -8,17 +8,29 @@ final** (solde net : partie ≥ 0 en débit, partie ≤ 0 en valeur absolue en c
 colonnes centrales de période** (**Débit** / **Crédit**) restent des **cumuls bruts** de
 mouvement sur la période ; ne pas les remplacer par un solde net.
 
-**Odoo 19 (constat code source communautaire)** : le moteur ``aggregation`` est **refusé**
-dès qu’une ligne porte un ``groupby`` (ex. ``account_id``). Une balance par compte **ne peut
-donc pas** utiliser ``initial_debit - initial_credit`` + ``positive`` sur cette ligne : la
-création échoue et on retombait sur le domaine — avec en plus un ``root_report_id`` vers le
-Grand livre, le rapport se comporte souvent comme une **variante** et affiche encore le **solde
-signé** dans la colonne débit au lieu du découpage attendu.
+**Odoo 19 (code communautaire)** : le moteur ``aggregation`` est souvent **refusé** dès qu’une
+ligne porte un ``groupby`` (ex. ``account_id``). Sur **Enterprise** (ou builds assouplis), la
+même combinaison peut être **acceptée** : la toolbox tente alors les formules ``aggregation``
+avec ``positive`` pour le découpage net des colonnes extérieures. Sinon, repli **domain** +
+``sum_if_pos`` / ``-sum_if_neg``. Un ``root_report_id`` vers le Grand livre faisait par le passé
+se comporter le rapport comme une **variante** (solde signé) : la création toolbox reste **sans**
+racine ni handler métier.
 
 **Stratégie toolbox** : rapport **autonome** (``root_report_id`` = faux), recopie **uniquement**
-des options (filtres, solde initial…) depuis le Grand livre si trouvé, lignes en **domain** +
-``sum_if_pos`` / ``-sum_if_neg`` sur les quatre colonnes extérieures, puis **réécriture**
-XML-RPC des expressions pour garantir les sous-formules en base.
+des options (filtres, solde initial…) depuis le Grand livre si trouvé.
+
+- **Enterprise / bases où la contrainte ORM l’autorise** : la ligne ``bal_ohada`` est d’abord testée
+  par une expression d’agrégation factice ; si la création est acceptée, les **six** expressions
+  utilisent le moteur **aggregation** (variables ``initial_*`` / ``debit`` / ``credit`` +
+  sous-formule ``positive`` pour le découpage net des colonnes extérieures). C’est le schéma
+  prévu par Odoo lorsque ``groupby`` et ``aggregation`` coexistent.
+- **Sinon (ex. code communautaire strict)** : repli **domain** + ``sum_if_pos`` /
+  ``-sum_if_neg`` sur les quatre colonnes extérieures, puis **réécriture** XML-RPC des
+  expressions pour garantir les sous-formules en base.
+- **Option** : variable d’environnement ``TOOLBOX_OHADA6_OUTER_GROSS=1`` (ou ``true``) pour forcer
+  le repli **domain « mouvements bruts »** sur les colonnes extérieures (débit > 0 / crédit > 0
+  sur la même portée de dates) — utile si le découpage net reste incorrect sur une version
+  donnée ; ce n’est **pas** le solde net OHADA pour comptes mixtes.
 
 **Libellés d’expressions** : préfixe ``ohada6_`` (ex. ``ohada6_open_deb``) pour les colonnes,
 au lieu de ``debit`` / ``debit_initial``, afin d’éviter les collisions avec le moteur standard
@@ -124,6 +136,62 @@ def _section_line_code(leaf_code: str) -> str:
     return f"{leaf_code}_section"
 
 
+def _expressions_domain_grouped_line_outer_gross() -> list[dict[str, Any]]:
+    """
+    Colonnes extérieures = **cumuls bruts** débit / crédit (même portées que le mode net).
+
+    À utiliser en secours (ex. ``TOOLBOX_OHADA6_OUTER_GROSS``) si le découpage net ne convient
+    pas sur le moteur domain de l’instance. Les deux colonnes centrales restent inchangées.
+    """
+    mid = _expressions_domain_grouped_line()
+    out: list[dict[str, Any]] = []
+    for e in mid:
+        lbl = e.get("label")
+        if lbl == OHADA6_OPEN_DEB:
+            out.append(
+                {
+                    "label": OHADA6_OPEN_DEB,
+                    "engine": "domain",
+                    "formula": "[('debit', '>', 0)]",
+                    "subformula": "sum",
+                    "date_scope": "to_beginning_of_period",
+                }
+            )
+        elif lbl == OHADA6_OPEN_CRE:
+            out.append(
+                {
+                    "label": OHADA6_OPEN_CRE,
+                    "engine": "domain",
+                    "formula": "[('credit', '>', 0)]",
+                    "subformula": "-sum",
+                    "date_scope": "to_beginning_of_period",
+                }
+            )
+        elif lbl == OHADA6_CLOSE_DEB:
+            out.append(
+                {
+                    "label": OHADA6_CLOSE_DEB,
+                    "engine": "domain",
+                    "formula": "[('debit', '>', 0)]",
+                    "subformula": "sum",
+                    "date_scope": "from_beginning",
+                }
+            )
+        elif lbl == OHADA6_CLOSE_CRE:
+            out.append(
+                {
+                    "label": OHADA6_CLOSE_CRE,
+                    "engine": "domain",
+                    "formula": "[('credit', '>', 0)]",
+                    "subformula": "-sum",
+                    "date_scope": "from_beginning",
+                }
+            )
+        else:
+            out.append(dict(e))
+    return out
+
+
 def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     """
     Expressions moteur « domain » compatibles avec groupby (Odoo 19+).
@@ -181,14 +249,15 @@ def _expressions_domain_grouped_line() -> list[dict[str, Any]]:
     ]
 
 
-def _expressions_aggregation_ohada_line() -> list[dict[str, Any]]:
+def _expressions_aggregation_ohada_line(*, line_code: str) -> list[dict[str, Any]]:
     """
-    Référence **Studio / import XML** (ligne **sans** ``groupby`` ou hors v19). Avec
-    ``groupby = account_id``, Odoo 19 **refuse** l’engine ``aggregation`` sur la même ligne :
-    la toolbox n’utilise pas ce bloc pour la création API ; voir le domaine +
-    ``_force_ohada_outer_domain_expressions``.
+    Schéma **aggregation** + sous-formule ``positive`` : découpage net des colonnes extérieures.
+
+    Sur les builds où la contrainte ORM interdit ``aggregation`` avec ``groupby``, la création
+    échoue et la toolbox retombe sur le moteur **domain** (voir
+    ``_expressions_domain_grouped_line``).
     """
-    lc = BALANCE_OHADA_LINE_CODE
+    lc = (line_code or "").strip() or BALANCE_OHADA_LINE_CODE
     return [
         {
             "label": OHADA6_OPEN_DEB,
@@ -277,10 +346,15 @@ def _force_ohada_outer_domain_expressions(
     password: str,
     report_id: int,
     line_code: str,
+    *,
+    outer_mode: str = "net",
 ) -> None:
     """
-    Réécrit les expressions des colonnes extérieures (initiaux / finaux) pour forcer le
-    découpage solde : ``sum_if_pos`` / ``-sum_if_neg`` sur ``[]``, quoi qu’ait stocké la création.
+    Réécrit les expressions des colonnes extérieures (initiaux / finaux).
+
+    ``outer_mode`` : ``net`` (défaut) = ``sum_if_pos`` / ``-sum_if_neg`` sur ``[]`` ;
+    ``gross`` = mouvements bruts ``debit`` / ``credit`` comme
+    ``_expressions_domain_grouped_line_outer_gross``.
     """
     line_ids = execute_kw(
         models,
@@ -317,32 +391,60 @@ def _force_ohada_outer_domain_expressions(
         [expr_ids],
         {"fields": ["id", "label"]},
     )
-    targets: dict[str, dict[str, Any]] = {
-        OHADA6_OPEN_DEB: {
-            "engine": "domain",
-            "formula": "[]",
-            "subformula": "sum_if_pos",
-            "date_scope": "to_beginning_of_period",
-        },
-        OHADA6_OPEN_CRE: {
-            "engine": "domain",
-            "formula": "[]",
-            "subformula": "-sum_if_neg",
-            "date_scope": "to_beginning_of_period",
-        },
-        OHADA6_CLOSE_DEB: {
-            "engine": "domain",
-            "formula": "[]",
-            "subformula": "sum_if_pos",
-            "date_scope": "from_beginning",
-        },
-        OHADA6_CLOSE_CRE: {
-            "engine": "domain",
-            "formula": "[]",
-            "subformula": "-sum_if_neg",
-            "date_scope": "from_beginning",
-        },
-    }
+    if (outer_mode or "net").strip().lower() == "gross":
+        targets: dict[str, dict[str, Any]] = {
+            OHADA6_OPEN_DEB: {
+                "engine": "domain",
+                "formula": "[('debit', '>', 0)]",
+                "subformula": "sum",
+                "date_scope": "to_beginning_of_period",
+            },
+            OHADA6_OPEN_CRE: {
+                "engine": "domain",
+                "formula": "[('credit', '>', 0)]",
+                "subformula": "-sum",
+                "date_scope": "to_beginning_of_period",
+            },
+            OHADA6_CLOSE_DEB: {
+                "engine": "domain",
+                "formula": "[('debit', '>', 0)]",
+                "subformula": "sum",
+                "date_scope": "from_beginning",
+            },
+            OHADA6_CLOSE_CRE: {
+                "engine": "domain",
+                "formula": "[('credit', '>', 0)]",
+                "subformula": "-sum",
+                "date_scope": "from_beginning",
+            },
+        }
+    else:
+        targets = {
+            OHADA6_OPEN_DEB: {
+                "engine": "domain",
+                "formula": "[]",
+                "subformula": "sum_if_pos",
+                "date_scope": "to_beginning_of_period",
+            },
+            OHADA6_OPEN_CRE: {
+                "engine": "domain",
+                "formula": "[]",
+                "subformula": "-sum_if_neg",
+                "date_scope": "to_beginning_of_period",
+            },
+            OHADA6_CLOSE_DEB: {
+                "engine": "domain",
+                "formula": "[]",
+                "subformula": "sum_if_pos",
+                "date_scope": "from_beginning",
+            },
+            OHADA6_CLOSE_CRE: {
+                "engine": "domain",
+                "formula": "[]",
+                "subformula": "-sum_if_neg",
+                "date_scope": "from_beginning",
+            },
+        }
     for er in expr_rows:
         lbl = er.get("label")
         if lbl not in targets:
@@ -364,59 +466,135 @@ def _force_ohada_outer_domain_expressions(
             continue
 
 
-def _create_report_line_with_expressions(
+_SN_AGG_GROUPBY_PROBE = "_sn_agg_groupby_probe"
+
+
+def _unlink_all_expressions_on_line(
     models: Any,
     db: str,
     uid: int,
     password: str,
-    child_vals_base: dict[str, Any],
-    exprs: list[dict[str, Any]],
-) -> int:
-    """Crée une ligne avec ``expression_ids`` ; repli création ligne puis expressions une à une."""
-    expr_cmds = [(0, 0, dict(e)) for e in exprs]
-    child_vals = dict(child_vals_base)
-    child_vals["expression_ids"] = expr_cmds
-    ctx_fr = {"context": {"lang": "fr_FR"}}
+    line_id: int,
+) -> None:
+    rows = execute_kw(
+        models,
+        db,
+        uid,
+        password,
+        "account.report.line",
+        "read",
+        [[int(line_id)]],
+        {"fields": ["expression_ids"]},
+    )
+    if not rows:
+        return
+    eids = (rows[0] or {}).get("expression_ids") or []
+    if not eids:
+        return
     try:
-        return int(
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report.line",
-                "create",
-                [child_vals],
-                ctx_fr,
-            )
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "unlink",
+            [eids],
         )
     except Exception:
-        child_vals.pop("expression_ids", None)
-        child_id = int(
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report.line",
-                "create",
-                [child_vals],
-                ctx_fr,
-            )
+        pass
+
+
+def _line_accepts_aggregation_with_groupby(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    line_id: int,
+) -> bool:
+    """
+    True si le serveur autorise ``engine=aggregation`` sur une ligne qui a déjà un ``groupby``
+    (souvent le cas Enterprise ; refusé sur le schéma communautaire strict Odoo 19).
+    """
+    ctx_fr = {"context": {"lang": "fr_FR"}}
+    try:
+        eid = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "create",
+            [
+                {
+                    "report_line_id": int(line_id),
+                    "label": _SN_AGG_GROUPBY_PROBE,
+                    "engine": "aggregation",
+                    "formula": "0",
+                    "date_scope": "strict_range",
+                }
+            ],
+            ctx_fr,
         )
-        for e in exprs:
-            ev = dict(e)
-            ev["report_line_id"] = child_id
-            execute_kw(
-                models,
-                db,
-                uid,
-                password,
-                "account.report.expression",
-                "create",
-                [ev],
-            )
-        return child_id
+    except Exception:
+        return False
+    try:
+        probe_id = int(eid)
+    except (TypeError, ValueError):
+        return False
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "unlink",
+            [[probe_id]],
+        )
+    except Exception:
+        pass
+    return True
+
+
+def _populate_line_expressions(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    line_id: int,
+    exprs: list[dict[str, Any]],
+) -> None:
+    """Attache les expressions à une ligne existante : ``write`` en lot, repli création unitaire."""
+    ctx_fr = {"context": {"lang": "fr_FR"}}
+    cmds = [(0, 0, dict(e)) for e in exprs]
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "write",
+            [[int(line_id)], {"expression_ids": cmds}],
+            ctx_fr,
+        )
+        return
+    except Exception:
+        pass
+    for e in exprs:
+        ev = dict(e)
+        ev["report_line_id"] = int(line_id)
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "create",
+            [ev],
+            ctx_fr,
+        )
 
 
 def create_balance_six_columns_rpc(
@@ -501,7 +679,7 @@ def create_balance_six_columns_rpc(
             en_lbl,
         )
 
-    # Ligne parente sans groupby (Odoo 19 : aggregation + groupby interdit sur la même ligne).
+    # Ligne parente sans groupby (la feuille groupée est l’enfant).
     section_code = _section_line_code(line_code)
     parent_vals: dict[str, Any] = {
         "report_id": report_id,
@@ -553,17 +731,69 @@ def create_balance_six_columns_rpc(
         except Exception:
             pass
 
-    child_id = _create_report_line_with_expressions(
-        models,
-        db,
-        uid,
-        password,
-        child_vals_base,
-        _expressions_domain_grouped_line(),
+    outer_gross_env = (
+        os.environ.get("TOOLBOX_OHADA6_OUTER_GROSS") or ""
+    ).strip().lower()
+    outer_gross = outer_gross_env in ("1", "true", "yes", "on")
+
+    ctx_fr_line = {"context": {"lang": "fr_FR"}}
+    child_id = int(
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "create",
+            [child_vals_base],
+            ctx_fr_line,
+        )
     )
-    _force_ohada_outer_domain_expressions(
-        models, db, uid, password, report_id, line_code
-    )
+
+    used_aggregation = False
+    if not outer_gross and _line_accepts_aggregation_with_groupby(
+        models, db, uid, password, child_id
+    ):
+        try:
+            agg_exprs = _expressions_aggregation_ohada_line(line_code=line_code)
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.line",
+                "write",
+                [
+                    [int(child_id)],
+                    {"expression_ids": [(0, 0, dict(x)) for x in agg_exprs]},
+                ],
+                ctx_fr_line,
+            )
+            used_aggregation = True
+        except Exception:
+            _unlink_all_expressions_on_line(
+                models, db, uid, password, child_id
+            )
+            used_aggregation = False
+
+    if not used_aggregation:
+        dom_exprs = (
+            _expressions_domain_grouped_line_outer_gross()
+            if outer_gross
+            else _expressions_domain_grouped_line()
+        )
+        _populate_line_expressions(
+            models, db, uid, password, child_id, dom_exprs
+        )
+        _force_ohada_outer_domain_expressions(
+            models,
+            db,
+            uid,
+            password,
+            report_id,
+            line_code,
+            outer_mode="gross" if outer_gross else "net",
+        )
 
     apply_record_field_translations(
         models,
