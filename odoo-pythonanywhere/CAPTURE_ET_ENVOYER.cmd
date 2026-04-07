@@ -34,6 +34,14 @@ if not exist "odoo_browser_state.json" (
   exit /b 1
 )
 
+if exist "debug_odoo_defaults.json" (
+  echo Mode Ripaille : lecture de debug_odoo_defaults.json (aucune question).
+  "%PY_EXE%" run_debug_capture.py
+  if errorlevel 1 pause
+  pause
+  exit /b 0
+)
+
 echo --- URL de base Odoo (ex. https://la-ripaille-presences.odoo.com)
 set /p OURL="> "
 if "%OURL%"=="" (

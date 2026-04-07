@@ -1,6 +1,9 @@
-# Meme role que CAPTURE_ET_ENVOYER.cmd — a lancer depuis PowerShell / Cursor
-#   cd ...\odoo-pythonanywhere
-#   .\CAPTURE_ET_ENVOYER_PS.ps1
+# Capture + bundle. Si debug_odoo_defaults.json existe : aucune question (sauf -Interactive).
+# Sinon : questions comme avant.
+param(
+    [switch]$Interactive
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -17,6 +20,14 @@ if (-not (Test-Path "odoo_browser_state.json")) {
     exit 1
 }
 
+if (-not $Interactive -and (Test-Path "debug_odoo_defaults.json")) {
+    Write-Host "Utilisation de debug_odoo_defaults.json (sans questions)…" -ForegroundColor Cyan
+    Write-Host "Python: $py" -ForegroundColor Cyan
+    & $py "run_debug_capture.py"
+    exit $LASTEXITCODE
+}
+
+Write-Host "Mode questions (pas de debug_odoo_defaults.json, ou -Interactive)." -ForegroundColor Yellow
 Write-Host "Python: $py" -ForegroundColor Cyan
 $base = Read-Host "URL de base Odoo (ex. https://xxx.odoo.com)"
 $report = Read-Host "URL complete du rapport (barre d'adresse)"

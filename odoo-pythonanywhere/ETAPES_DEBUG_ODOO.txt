@@ -1,53 +1,35 @@
 ================================================================================
-  DEBUG RAPPORT P&L ODOO — 3 CHOSES À FAIRE (sur votre PC, pas sur internet)
+  DEBUG RAPPORT ODOO — VERSION RIPAILLE (sans ressaisie)
 ================================================================================
 
 AVANT TOUT
-  Dans ce dossier, vous devez avoir un fichier ".env" avec au minimum :
-    ODOO_URL=https://votre-instance.odoo.com
-    ODOO_DB=nom_de_la_base
-    ODOO_USER=votre_login
-    ODOO_PASSWORD=mot_de_passe_ou_cle_API
-  (Voir toolbox-env-exemple.txt pour un modèle.)
+  - Fichier ".env" (ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASSWORD)
+  - Une fois : INSTALLER_PLAYWRIGHT.cmd puis CONNEXION_ODOO_UNE_FOIS.cmd
 
---------------------------------------------------------------------------------
-  ÉTAPE 1 — une seule fois : installer le navigateur automatisé
---------------------------------------------------------------------------------
-  Double-cliquez :  INSTALLER_PLAYWRIGHT.cmd
-  Attendez la fin (fenêtre noire).
+CONFIGURATION UNE FOIS (base + rapport + analytique fixes)
+  1) Copiez le fichier :
+       debug_odoo_defaults.example.json   -->   debug_odoo_defaults.json
+     (dans le meme dossier odoo-pythonanywhere)
 
---------------------------------------------------------------------------------
-  ÉTAPE 2 — une seule fois : enregistrer votre connexion Odoo
---------------------------------------------------------------------------------
-  Double-cliquez :  CONNEXION_ODOO_UNE_FOIS.cmd
-  Un navigateur s’ouvre : connectez-vous à Odoo normalement.
-  Quand vous voyez le menu (Comptabilité, etc.), revenez à la fenêtre noire
-  et appuyez sur ENTRÉE.
+  2) Ouvrez debug_odoo_defaults.json avec le Bloc-notes.
 
---------------------------------------------------------------------------------
-  ÉTAPE 3 — quand vous voulez de l’aide (répétable)
---------------------------------------------------------------------------------
-  a) Dans Odoo : ouvrez VOTRE rapport (filtres analytique + dates comme d’habitude).
-  b) Cliquez dans la barre d’adresse du navigateur, faites Ctrl+C pour copier l’URL.
+  3) Collez UNE FOIS l'URL complete du rapport Odoo dans "report_url"
+     (barre d'adresse du navigateur quand le rapport est affiche).
 
-  c) Deux possibilités :
+  Les champs base_url et analytic_name sont deja remplis pour Ripaille / Aliments PP.
+  "dates_ytd": true = periode comme la toolbox (1er jan. -> aujourd'hui).
 
-     • Explorateur Windows : double-cliquez  CAPTURE_ET_ENVOYER.cmd
-       (dans le dossier odoo-pythonanywhere). Une fenêtre noire pose les questions ;
-       à la fin l’Explorateur s’ouvre sur  debug_pl_bundle.json
+A CHAQUE FOIS QUE VOUS VOULEZ UN FICHIER debug_pl_bundle.json
+  Double-clic :  CAPTURE_DEBUG_RIPAILLE.cmd
+  (ou CAPTURE_ET_ENVOYER.cmd / CAPTURE_ET_ENVOYER.ps1 si debug_odoo_defaults.json existe)
 
-     • Terminal Cursor / PowerShell : les questions du .cmd peuvent ne PAS s’affichent.
-       Dans ce dossier, lancez plutôt :
-         .\CAPTURE_ET_ENVOYER_PS.ps1
-       (Si « scripts désactivés » : une fois, dans PowerShell :
-         Set-ExecutionPolicy -Scope CurrentUser RemoteSigned )
+  Puis envoyez debug_pl_bundle.json dans le chat Cursor.
 
-  d) Répondez aux questions (URL de base, URL copiée, nom ou code du projet analytique, dates).
+Ne commitez pas : debug_odoo_defaults.json, odoo_browser_state.json, debug_pl_bundle.json
 
-  e) Un fichier "debug_pl_bundle.json" est créé dans ce dossier.
-
-  f) Dans Cursor : glissez-déposez "debug_pl_bundle.json" dans le chat avec l’assistant.
-
-C’est tout. Ne commitez pas debug_pl_bundle.json ni odoo_browser_state.json sur Git.
+================================================================================
+  MODE ANCIEN (questions a chaque fois)
+================================================================================
+  Supprimez ou renommez debug_odoo_defaults.json, puis utilisez CAPTURE_ET_ENVOYER.cmd
 
 ================================================================================

@@ -13,3 +13,5 @@ odoo_browser_state.json
 odoo_report_capture.json
 debug_pl_bundle.json
 pl_capture_meta.json
+# Debug Ripaille : URL du rapport (ne pas versionner)
+debug_odoo_defaults.json

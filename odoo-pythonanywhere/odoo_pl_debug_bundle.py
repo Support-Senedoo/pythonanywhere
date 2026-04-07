@@ -55,6 +55,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 from project_pl_analytic_report import (  # noqa: E402
     build_report,
     connect,
+    default_period_ytd,
     resolve_analytic_account_id_from_name,
     rows_for_api_export,
 )
@@ -194,8 +195,13 @@ def main() -> None:
         default=None,
         help="Nom ou code du compte analytique (recherche Odoo), si vous ne connaissez pas l’id.",
     )
-    p.add_argument("--date-from", required=True)
-    p.add_argument("--date-to", required=True)
+    p.add_argument("--date-from", default=None, help="YYYY-MM-DD (ou avec --dates-ytd)")
+    p.add_argument("--date-to", default=None, help="YYYY-MM-DD (ou avec --dates-ytd)")
+    p.add_argument(
+        "--dates-ytd",
+        action="store_true",
+        help="Période : 1er janvier année en cours → aujourd’hui (comme la toolbox).",
+    )
     p.add_argument("--capture-json", type=Path, default=_DEFAULT_CAPTURE, help="Sortie de capture_odoo_report_view.py")
     p.add_argument("--out", type=Path, default=_DEFAULT_OUT, help="Fichier bundle JSON")
     p.add_argument("--url", default=os.environ.get("ODOO_URL", "").strip() or None)
@@ -211,6 +217,15 @@ def main() -> None:
         help="Écrit un JSON (analytic_id, dates) pour --meta-json de capture_odoo_report_view.py.",
     )
     args = p.parse_args()
+
+    if args.dates_ytd:
+        args.date_from, args.date_to = default_period_ytd()
+    elif not (args.date_from and args.date_to):
+        print(
+            "Indiquez --date-from et --date-to, ou bien --dates-ytd.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     has_id = args.analytic_id is not None
     has_name = bool((args.analytic_name or "").strip())
