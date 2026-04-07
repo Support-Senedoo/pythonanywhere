@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+# Playwright — session navigateur Odoo (ne jamais commiter)
+odoo_browser_state.json
+odoo_report_capture.json

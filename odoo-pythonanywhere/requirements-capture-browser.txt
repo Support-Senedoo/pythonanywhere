@@ -1,0 +1,3 @@
+# Dépendances optionnelles — capture d'écran / export HTML du rapport Odoo (machine locale).
+# Ne pas installer sur PythonAnywhere (toolbox Flask) sauf besoin rare.
+playwright>=1.40.0

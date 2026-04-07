@@ -334,6 +334,12 @@ Référence copier-coller : fichier **[`toolbox-env-exemple.txt`](toolbox-env-ex
 
 Les comptes **gratuits** n’ont pas un service mail intégré pour votre domaine : il faut un **relais externe** (Gmail, SendGrid, Mailgun, SMTP du registrar, etc.). Si aucune variable SMTP n’est configurée, la page « mot de passe oublié » affiche que l’e-mail n’est pas configuré et invite à contacter l’administrateur.
 
+## Capture locale du rendu rapport Odoo (débogage)
+
+Sur **votre PC** (pas sur PythonAnywhere), le script **[`capture_odoo_report_view.py`](capture_odoo_report_view.py)** utilise **Playwright** : vous vous connectez **une fois** (`--init`), la session est stockée dans **`odoo_browser_state.json`** (fichier **gitignored**, ne jamais commiter). Les lancements suivants ouvrent l’**URL complète** du rapport (`--report-url`, copie depuis la barre d’adresse) et exportent les **tableaux** en JSON (`odoo_report_capture.json` par défaut), avec options `--html` / `--screenshot` pour analyse.
+
+Dépendances : **`requirements-capture-browser.txt`**, puis `playwright install chromium`. Permet de comparer l’affichage Odoo avec le calcul API (`project_pl_analytic_report.py`) sans enchaîner des tests manuels à l’aveugle.
+
 ---
 
 *Intention globale : toolbox Flask unifiée (portails client / staff Senedoo, admin clients & comptes, utilitaires Odoo), registre multi-bases, auth par fichiers JSON.*
