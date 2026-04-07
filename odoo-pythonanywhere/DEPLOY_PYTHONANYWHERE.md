@@ -336,9 +336,9 @@ Les comptes **gratuits** n’ont pas un service mail intégré pour votre domain
 
 ## Capture locale du rendu rapport Odoo (débogage)
 
-Sur **votre PC** (pas sur PythonAnywhere), le script **[`capture_odoo_report_view.py`](capture_odoo_report_view.py)** utilise **Playwright** : vous vous connectez **une fois** (`--init`), la session est stockée dans **`odoo_browser_state.json`** (fichier **gitignored**, ne jamais commiter). Les lancements suivants ouvrent l’**URL complète** du rapport (`--report-url`, copie depuis la barre d’adresse) et exportent les **tableaux** en JSON (`odoo_report_capture.json` par défaut), avec options `--html` / `--screenshot` pour analyse.
+Sur **votre PC** (pas sur PythonAnywhere), le script **[`capture_odoo_report_view.py`](capture_odoo_report_view.py)** utilise **Playwright** : vous vous connectez **une fois** (`--init`), la session est stockée dans **`odoo_browser_state.json`** (fichier **gitignored**, ne jamais commiter). Les lancements suivants ouvrent l’**URL complète** du rapport (`--report-url`, copie depuis la barre d’adresse) et exportent les **tableaux** en JSON (`odoo_report_capture.json` par défaut), avec options `--html` / `--screenshot` pour analyse. Option **`--meta-json`** : fichier JSON (ex. produit par **`--emit-capture-meta`** dans le script ci‑dessous) pour tracer analytique / période dans la capture.
 
-Dépendances : **`requirements-capture-browser.txt`**, puis `playwright install chromium`. Permet de comparer l’affichage Odoo avec le calcul API (`project_pl_analytic_report.py`) sans enchaîner des tests manuels à l’aveugle.
+Ensuite, **[`odoo_pl_debug_bundle.py`](odoo_pl_debug_bundle.py)** assemble **la même période et le même analytique** (calcul API `build_report`) + **`odoo_report_capture.json`**, et écrit **`debug_pl_bundle.json`** (gitignored) : un seul fichier à joindre à une conversation pour comparaison / correctifs. Raccourci Windows : **`pl_debug_odoo.cmd`**. Dépendances capture : **`requirements-capture-browser.txt`**, puis `playwright install chromium`.
 
 ---
 

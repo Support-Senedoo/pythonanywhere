@@ -38,6 +38,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _DEFAULT_STATE = _SCRIPT_DIR / "odoo_browser_state.json"
@@ -158,6 +159,7 @@ def cmd_capture(
     timeout_ms: int,
     headless: bool,
     screenshot_path: Path | None,
+    user_meta: dict[str, Any] | None,
 ) -> None:
     sync_playwright = _require_playwright()
     if not state_path.is_file():
@@ -192,6 +194,8 @@ def cmd_capture(
             "requested_url": dest,
             "tables": tables,
         }
+        if user_meta:
+            payload["user_meta"] = user_meta
 
         if html_path:
             try:
@@ -228,9 +232,24 @@ def main() -> None:
     p.add_argument("--screenshot", type=Path, default=None, help="Optionnel : capture pleine page PNG.")
     p.add_argument("--timeout-ms", type=int, default=120_000, help="Timeout navigation / attente.")
     p.add_argument("--headless", action="store_true", help="Sans fenêtre (défaut si --init non utilisé).")
+    p.add_argument(
+        "--meta-json",
+        type=Path,
+        default=None,
+        help="JSON fusionné dans la sortie (clé user_meta), ex. paramètres alignés avec odoo_pl_debug_bundle.py.",
+    )
     args = p.parse_args()
 
     base = args.base_url.rstrip("/")
+
+    user_meta: dict[str, Any] | None = None
+    if args.meta_json and args.meta_json.is_file():
+        try:
+            user_meta = json.loads(args.meta_json.read_text(encoding="utf-8"))
+            if not isinstance(user_meta, dict):
+                user_meta = {"raw": user_meta}
+        except Exception as e:
+            print(f"Attention --meta-json illisible : {e}", file=sys.stderr)
 
     if args.init:
         cmd_init(base, args.state)
@@ -245,6 +264,7 @@ def main() -> None:
         timeout_ms=max(30_000, args.timeout_ms),
         headless=bool(args.headless),
         screenshot_path=args.screenshot,
+        user_meta=user_meta,
     )
 
 

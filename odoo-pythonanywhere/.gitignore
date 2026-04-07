@@ -11,3 +11,5 @@ venv/
 # Playwright — session navigateur Odoo (ne jamais commiter)
 odoo_browser_state.json
 odoo_report_capture.json
+debug_pl_bundle.json
+pl_capture_meta.json
