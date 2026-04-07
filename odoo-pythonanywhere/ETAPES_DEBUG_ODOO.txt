@@ -1,0 +1,39 @@
+================================================================================
+  DEBUG RAPPORT P&L ODOO — 3 CHOSES À FAIRE (sur votre PC, pas sur internet)
+================================================================================
+
+AVANT TOUT
+  Dans ce dossier, vous devez avoir un fichier ".env" avec au minimum :
+    ODOO_URL=https://votre-instance.odoo.com
+    ODOO_DB=nom_de_la_base
+    ODOO_USER=votre_login
+    ODOO_PASSWORD=mot_de_passe_ou_cle_API
+  (Voir toolbox-env-exemple.txt pour un modèle.)
+
+--------------------------------------------------------------------------------
+  ÉTAPE 1 — une seule fois : installer le navigateur automatisé
+--------------------------------------------------------------------------------
+  Double-cliquez :  INSTALLER_PLAYWRIGHT.cmd
+  Attendez la fin (fenêtre noire).
+
+--------------------------------------------------------------------------------
+  ÉTAPE 2 — une seule fois : enregistrer votre connexion Odoo
+--------------------------------------------------------------------------------
+  Double-cliquez :  CONNEXION_ODOO_UNE_FOIS.cmd
+  Un navigateur s’ouvre : connectez-vous à Odoo normalement.
+  Quand vous voyez le menu (Comptabilité, etc.), revenez à la fenêtre noire
+  et appuyez sur ENTRÉE.
+
+--------------------------------------------------------------------------------
+  ÉTAPE 3 — quand vous voulez de l’aide (répétable)
+--------------------------------------------------------------------------------
+  a) Dans Odoo : ouvrez VOTRE rapport (filtres analytique + dates comme d’habitude).
+  b) Cliquez dans la barre d’adresse du navigateur, faites Ctrl+C pour copier l’URL.
+  c) Double-cliquez :  CAPTURE_ET_ENVOYER.cmd
+  d) Répondez aux questions (URL de base, URL copiée, n° du projet analytique, dates).
+  e) Un fichier "debug_pl_bundle.json" est créé dans ce dossier.
+  f) Dans Cursor : glissez-déposez "debug_pl_bundle.json" dans le chat avec l’assistant.
+
+C’est tout. Ne commitez pas debug_pl_bundle.json ni odoo_browser_state.json sur Git.
+
+================================================================================

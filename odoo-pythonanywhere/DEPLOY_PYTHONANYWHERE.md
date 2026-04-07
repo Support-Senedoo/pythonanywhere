@@ -340,6 +340,8 @@ Sur **votre PC** (pas sur PythonAnywhere), le script **[`capture_odoo_report_vie
 
 Ensuite, **[`odoo_pl_debug_bundle.py`](odoo_pl_debug_bundle.py)** assemble **la même période et le même analytique** (calcul API `build_report`) + **`odoo_report_capture.json`**, et écrit **`debug_pl_bundle.json`** (gitignored) : un seul fichier à joindre à une conversation pour comparaison / correctifs. Raccourci Windows : **`pl_debug_odoo.cmd`**. Dépendances capture : **`requirements-capture-browser.txt`**, puis `playwright install chromium`.
 
+**Parcours minimal utilisateur (Windows)** : lire **[`ETAPES_DEBUG_ODOO.txt`](ETAPES_DEBUG_ODOO.txt)** puis enchaîner les double-clics **`INSTALLER_PLAYWRIGHT.cmd`** → **`CONNEXION_ODOO_UNE_FOIS.cmd`** → **`CAPTURE_ET_ENVOYER.cmd`**.
+
 ---
 
 *Intention globale : toolbox Flask unifiée (portails client / staff Senedoo, admin clients & comptes, utilitaires Odoo), registre multi-bases, auth par fichiers JSON.*
