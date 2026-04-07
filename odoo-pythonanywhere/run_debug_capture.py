@@ -5,6 +5,9 @@ Lance capture + bundle en lisant ``debug_odoo_defaults.json`` (pas de questions)
 1. Copiez ``debug_odoo_defaults.example.json`` → ``debug_odoo_defaults.json``
 2. Collez ``report_url`` (une fois) depuis Odoo
 3. ``python run_debug_capture.py``  ou  double-clic ``CAPTURE_DEBUG_RIPAILLE.cmd``
+
+Si la capture Playwright échoue (session absente : ``odoo_browser_state.json``), le script
+génère quand même ``debug_pl_bundle.json`` (partie API + message sur l’UI manquante).
 """
 from __future__ import annotations
 
@@ -61,13 +64,20 @@ def main() -> None:
     capture = _SCRIPT_DIR / "capture_odoo_report_view.py"
     bundle = _SCRIPT_DIR / "odoo_pl_debug_bundle.py"
 
+    state = _SCRIPT_DIR / "odoo_browser_state.json"
     print("Capture navigateur…")
     r1 = subprocess.run(
         [py, str(capture), "--base-url", base, "--report-url", report],
         cwd=str(_SCRIPT_DIR),
     )
     if r1.returncode != 0:
-        sys.exit(r1.returncode)
+        print(
+            f"\n--- Capture navigateur en échec (code {r1.returncode}) — le bundle API est quand même généré. ---\n"
+            "Causes fréquentes : pas de session Playwright. Une fois :\n"
+            f'  python capture_odoo_report_view.py --init --base-url "{base}"\n'
+            f"ou le script CONNEXION_ODOO_UNE_FOIS — fichier attendu : {state}\n",
+            file=sys.stderr,
+        )
 
     print("Calcul API + bundle…")
     r2 = subprocess.run(
