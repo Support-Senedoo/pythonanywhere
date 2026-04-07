@@ -29,9 +29,23 @@ AVANT TOUT
 --------------------------------------------------------------------------------
   a) Dans Odoo : ouvrez VOTRE rapport (filtres analytique + dates comme d’habitude).
   b) Cliquez dans la barre d’adresse du navigateur, faites Ctrl+C pour copier l’URL.
-  c) Double-cliquez :  CAPTURE_ET_ENVOYER.cmd
+
+  c) Deux possibilités :
+
+     • Explorateur Windows : double-cliquez  CAPTURE_ET_ENVOYER.cmd
+       (dans le dossier odoo-pythonanywhere). Une fenêtre noire pose les questions ;
+       à la fin l’Explorateur s’ouvre sur  debug_pl_bundle.json
+
+     • Terminal Cursor / PowerShell : les questions du .cmd peuvent ne PAS s’affichent.
+       Dans ce dossier, lancez plutôt :
+         .\CAPTURE_ET_ENVOYER_PS.ps1
+       (Si « scripts désactivés » : une fois, dans PowerShell :
+         Set-ExecutionPolicy -Scope CurrentUser RemoteSigned )
+
   d) Répondez aux questions (URL de base, URL copiée, n° du projet analytique, dates).
+
   e) Un fichier "debug_pl_bundle.json" est créé dans ce dossier.
+
   f) Dans Cursor : glissez-déposez "debug_pl_bundle.json" dans le chat avec l’assistant.
 
 C’est tout. Ne commitez pas debug_pl_bundle.json ni odoo_browser_state.json sur Git.
