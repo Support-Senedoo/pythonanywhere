@@ -138,6 +138,49 @@ def search_analytic_accounts_for_select(
     return out
 
 
+def resolve_analytic_account_id_from_name(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    name_or_code: str,
+) -> tuple[int, str, str | None]:
+    """
+    Trouve l’id ``account.analytic.account`` à partir d’un libellé saisi par l’utilisateur
+    (recherche ilike sur nom / code, comme la liste déroulante de la toolbox).
+
+    Retourne ``(id, label, avertissement)`` ; ``avertissement`` si plusieurs correspondances
+    et qu’on a pris la première après essais d’égalité stricte sur nom ou code.
+    """
+    q = (name_or_code or "").strip()
+    if not q:
+        raise ValueError("Nom / code analytique vide.")
+    candidates = search_analytic_accounts_for_select(
+        models, db, uid, password, q, limit=80
+    )
+    if not candidates:
+        raise ValueError(f"Aucun compte analytique ne correspond à « {q} ».")
+    qlow = q.lower()
+    for c in candidates:
+        if (c.get("name") or "").strip().lower() == qlow:
+            return int(c["id"]), c["label"], None
+        if (c.get("code") or "").strip().lower() == qlow:
+            return int(c["id"]), c["label"], None
+        if (c.get("label") or "").strip().lower() == qlow:
+            return int(c["id"]), c["label"], None
+    if len(candidates) == 1:
+        c = candidates[0]
+        return int(c["id"]), c["label"], None
+    first = candidates[0]
+    others = ", ".join(x["label"] for x in candidates[1:6])
+    more = " …" if len(candidates) > 6 else ""
+    warn = (
+        f"Plusieurs comptes correspondent à « {q} » ; utilisation du premier : « {first['label']} ». "
+        f"Autres : {others}{more} Précisez le nom ou utilisez l’id numérique (API)."
+    )
+    return int(first["id"]), first["label"], warn
+
+
 def read_analytic_account_label(
     models: Any,
     db: str,

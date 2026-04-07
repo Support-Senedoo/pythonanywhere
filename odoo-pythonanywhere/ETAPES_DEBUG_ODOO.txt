@@ -42,7 +42,7 @@ AVANT TOUT
        (Si « scripts désactivés » : une fois, dans PowerShell :
          Set-ExecutionPolicy -Scope CurrentUser RemoteSigned )
 
-  d) Répondez aux questions (URL de base, URL copiée, n° du projet analytique, dates).
+  d) Répondez aux questions (URL de base, URL copiée, nom ou code du projet analytique, dates).
 
   e) Un fichier "debug_pl_bundle.json" est créé dans ce dossier.
 

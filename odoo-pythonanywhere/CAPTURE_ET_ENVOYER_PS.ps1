@@ -20,7 +20,7 @@ if (-not (Test-Path "odoo_browser_state.json")) {
 Write-Host "Python: $py" -ForegroundColor Cyan
 $base = Read-Host "URL de base Odoo (ex. https://xxx.odoo.com)"
 $report = Read-Host "URL complete du rapport (barre d'adresse)"
-$aidIn = Read-Host "ID compte analytique (nombre entier)"
+$aname = Read-Host "Nom ou code du compte analytique (comme dans Odoo, ex. Aliments PP)"
 $d1 = Read-Host "Date debut YYYY-MM-DD"
 $d2 = Read-Host "Date fin YYYY-MM-DD"
 
@@ -28,16 +28,15 @@ if ([string]::IsNullOrWhiteSpace($base) -or [string]::IsNullOrWhiteSpace($report
     Write-Host "URL vide." -ForegroundColor Red
     exit 1
 }
-$aid = 0
-if (-not [int]::TryParse($aidIn, [ref]$aid)) {
-    Write-Host "ID analytique invalide." -ForegroundColor Red
+if ([string]::IsNullOrWhiteSpace($aname)) {
+    Write-Host "Nom analytique vide." -ForegroundColor Red
     exit 1
 }
 
 & $py "capture_odoo_report_view.py" "--base-url" $base "--report-url" $report
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-& $py "odoo_pl_debug_bundle.py" "--analytic-id" $aid "--date-from" $d1 "--date-to" $d2
+& $py "odoo_pl_debug_bundle.py" "--analytic-name" $aname "--date-from" $d1 "--date-to" $d2
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $out = Join-Path $PSScriptRoot "debug_pl_bundle.json"

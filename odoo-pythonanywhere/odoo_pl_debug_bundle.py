@@ -20,8 +20,10 @@ Prérequis
   3. Copier l’URL du rapport, lancer :
        python capture_odoo_report_view.py --base-url https://... --report-url "URL"
      (session Playwright déjà initialisée avec ``--init``).
-  4. Lancer ce script avec les **mêmes** ``--analytic-id``, ``--date-from``, ``--date-to`` que l’UI :
-       python odoo_pl_debug_bundle.py --analytic-id 42 --date-from 2026-01-01 --date-to 2026-04-06
+  4. Lancer ce script avec les **mêmes** période / analytique que l’UI — de préférence **par nom**
+     (l’id n’est pas toujours visible dans Odoo) :
+       python odoo_pl_debug_bundle.py --analytic-name "Aliments PP" --date-from 2026-01-01 --date-to 2026-04-06
+     (ou ``--analytic-id 42`` si vous connaissez l’id.)
 
 Sortie : ``debug_pl_bundle.json`` (gitignored par défaut). Contient ``api_report``,
 ``ui_capture`` si présent, ``comparison`` (écarts détectés ligne / compte).
@@ -53,6 +55,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 from project_pl_analytic_report import (  # noqa: E402
     build_report,
     connect,
+    resolve_analytic_account_id_from_name,
     rows_for_api_export,
 )
 
@@ -185,7 +188,12 @@ def main() -> None:
     p = argparse.ArgumentParser(
         description="Assemble API build_report + capture UI pour debug (un JSON à joindre au chat)."
     )
-    p.add_argument("--analytic-id", type=int, required=True)
+    p.add_argument("--analytic-id", type=int, default=None, help="ID account.analytic.account (si connu).")
+    p.add_argument(
+        "--analytic-name",
+        default=None,
+        help="Nom ou code du compte analytique (recherche Odoo), si vous ne connaissez pas l’id.",
+    )
     p.add_argument("--date-from", required=True)
     p.add_argument("--date-to", required=True)
     p.add_argument("--capture-json", type=Path, default=_DEFAULT_CAPTURE, help="Sortie de capture_odoo_report_view.py")
@@ -204,16 +212,17 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    if args.emit_capture_meta:
-        meta = {
-            "analytic_id": args.analytic_id,
-            "date_from": args.date_from,
-            "date_to": args.date_to,
-            "full_line_balance": args.full_line_balance,
-            "currency_mode": args.currency,
-        }
-        args.emit_capture_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"Méta capture écrite : {args.emit_capture_meta.resolve()}")
+    has_id = args.analytic_id is not None
+    has_name = bool((args.analytic_name or "").strip())
+    if has_id == has_name:
+        print(
+            "Indiquez exactement l’un des deux : --analytic-id … ou --analytic-name « … ».",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if has_id and args.analytic_id is not None and args.analytic_id <= 0:
+        print("--analytic-id doit être > 0.", file=sys.stderr)
+        sys.exit(1)
 
     missing = [
         n
@@ -231,12 +240,43 @@ def main() -> None:
 
     models, uid, db, pwd = connect(args.url, args.db, args.user, args.password)
 
+    analytic_id: int
+    analytic_label_resolved: str | None = None
+    resolution_warning: str | None = None
+    name_query: str | None = (args.analytic_name or "").strip() or None
+
+    if has_name:
+        assert name_query is not None
+        analytic_id, analytic_label_resolved, resolution_warning = resolve_analytic_account_id_from_name(
+            models, db, uid, pwd, name_query
+        )
+        if resolution_warning:
+            print(resolution_warning, file=sys.stderr)
+        print(f"Compte analytique résolu : id={analytic_id} — {analytic_label_resolved}")
+    else:
+        analytic_id = int(args.analytic_id)
+
+    if args.emit_capture_meta:
+        meta: dict[str, Any] = {
+            "analytic_id": analytic_id,
+            "date_from": args.date_from,
+            "date_to": args.date_to,
+            "full_line_balance": args.full_line_balance,
+            "currency_mode": args.currency,
+        }
+        if name_query:
+            meta["analytic_name_query"] = name_query
+        if analytic_label_resolved:
+            meta["analytic_label_resolved"] = analytic_label_resolved
+        args.emit_capture_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Méta capture écrite : {args.emit_capture_meta.resolve()}")
+
     api_report = build_report(
         models,
         db,
         uid,
         pwd,
-        args.analytic_id,
+        analytic_id,
         args.date_from,
         args.date_to,
         full_line_balance=args.full_line_balance,
@@ -269,7 +309,10 @@ def main() -> None:
     bundle: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "parameters": {
-            "analytic_id": args.analytic_id,
+            "analytic_id": analytic_id,
+            "analytic_name_query": name_query,
+            "analytic_label_resolved": analytic_label_resolved,
+            "resolution_warning": resolution_warning,
             "date_from": args.date_from,
             "date_to": args.date_to,
             "full_line_balance": args.full_line_balance,

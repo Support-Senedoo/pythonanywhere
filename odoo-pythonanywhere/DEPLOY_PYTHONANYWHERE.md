@@ -340,7 +340,7 @@ Sur **votre PC** (pas sur PythonAnywhere), le script **[`capture_odoo_report_vie
 
 Ensuite, **[`odoo_pl_debug_bundle.py`](odoo_pl_debug_bundle.py)** assemble **la même période et le même analytique** (calcul API `build_report`) + **`odoo_report_capture.json`**, et écrit **`debug_pl_bundle.json`** (gitignored) : un seul fichier à joindre à une conversation pour comparaison / correctifs. Raccourci Windows : **`pl_debug_odoo.cmd`**. Dépendances capture : **`requirements-capture-browser.txt`**, puis `playwright install chromium`.
 
-**Parcours minimal utilisateur (Windows)** : lire **[`ETAPES_DEBUG_ODOO.txt`](ETAPES_DEBUG_ODOO.txt)** puis enchaîner les double-clics **`INSTALLER_PLAYWRIGHT.cmd`** → **`CONNEXION_ODOO_UNE_FOIS.cmd`** → **`CAPTURE_ET_ENVOYER.cmd`**. Depuis le terminal intégré Cursor, préférer **`CAPTURE_ET_ENVOYER_PS.ps1`** (les invites `set /p` du `.cmd` peuvent ne rien afficher). Les scripts utilisent le **`python.exe` du `.venv`** à la racine du projet s’il existe (là où Playwright est installé).
+**Parcours minimal utilisateur (Windows)** : lire **[`ETAPES_DEBUG_ODOO.txt`](ETAPES_DEBUG_ODOO.txt)** puis enchaîner les double-clics **`INSTALLER_PLAYWRIGHT.cmd`** → **`CONNEXION_ODOO_UNE_FOIS.cmd`** → **`CAPTURE_ET_ENVOYER.cmd`**. Depuis le terminal intégré Cursor, préférer **`CAPTURE_ET_ENVOYER_PS.ps1`** (les invites `set /p` du `.cmd` peuvent ne rien afficher). Les scripts utilisent le **`python.exe` du `.venv`** à la racine du projet s’il existe (là où Playwright est installé). Le bundle demande le **nom ou code** du compte analytique (recherche Odoo) ; l’**id** reste possible en CLI : **`odoo_pl_debug_bundle.py --analytic-id …`**.
 
 ---
 

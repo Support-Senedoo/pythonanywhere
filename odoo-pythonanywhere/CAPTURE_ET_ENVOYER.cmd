@@ -52,10 +52,10 @@ if "%RURL%"=="" (
 )
 
 echo.
-echo --- ID du compte analytique / projet (nombre entier)
-set /p AID="> "
-if "%AID%"=="" (
-  echo ERREUR : ID analytique vide.
+echo --- Nom ou CODE du compte analytique (comme dans Odoo, ex. Aliments PP — pas besoin de l'ID)
+set /p ANAME="> "
+if "%ANAME%"=="" (
+  echo ERREUR : nom analytique vide.
   pause
   exit /b 1
 )
@@ -91,7 +91,7 @@ if errorlevel 1 (
 
 echo.
 echo Calcul API Odoo + comparaison...
-"%PY_EXE%" odoo_pl_debug_bundle.py --analytic-id %AID% --date-from %D1% --date-to %D2%
+"%PY_EXE%" odoo_pl_debug_bundle.py --analytic-name "%ANAME%" --date-from %D1% --date-to %D2%
 if errorlevel 1 (
   echo.
   echo ERREUR pendant le calcul API. Verifiez le fichier .env et les dates.
