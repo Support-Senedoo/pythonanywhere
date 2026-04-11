@@ -40,6 +40,10 @@ des rapports comptables Odoo qui peut réinjecter un solde signé dans une colon
 **Balance OHADA (toolbox)** : constantes ``BALANCE_OHADA_*`` + ``create_toolbox_balance_ohada`` /
 ``find_balance_ohada_report_id`` (ligne feuille ``code = bal_ohada``).
 
+Prototype alternatif (classes 1–9, colonnes aux libellés moteur « standard ») :
+``odoo_balance_6colonnes_claude.py`` — utile pour expérimenter ; ne pas substituer à la prod
+toolbox (risque de collision avec le moteur Odoo, voir préfixe ``ohada6_*`` ci-dessus).
+
 **Rapport déjà créé avec des en-têtes ``{'fr_FR': ...}`` en clair :** anciennes versions
 passaient un dict via XML-RPC → Odoo stockait une chaîne. Supprimer le rapport depuis la
 toolbox et le recréer (ou réécrire les ``name`` des colonnes/lignes avec deux ``write``
