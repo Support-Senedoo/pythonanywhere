@@ -104,6 +104,33 @@ def _agg_formula_with_suffix(formula_agg: str, suffix: str) -> str:
     return re.sub(r'\b([A-Z]{2})\b', lambda m: f'{m.group(1)}.{suffix}', formula_agg)
 
 
+def _create_column_safe(
+    models: Any, db: str, uid: int, password: str, col_vals: dict
+) -> tuple[int | None, str | None]:
+    """
+    Crée une colonne account.report.column ; repli sur champs minimaux si l'API refuse.
+    Retourne (id, None) ou (None, message d'erreur).
+    """
+    try:
+        return int(_ek(models, db, uid, password, "account.report.column", "create", [col_vals])), None
+    except Exception as e:
+        err1 = str(e)
+        minimal: dict[str, Any] = {
+            k: col_vals[k]
+            for k in ("name", "expression_label", "figure_type", "report_id", "sequence")
+            if k in col_vals
+        }
+        if "blank_if_zero" in col_vals:
+            minimal["blank_if_zero"] = col_vals["blank_if_zero"]
+        try:
+            return (
+                int(_ek(models, db, uid, password, "account.report.column", "create", [minimal])),
+                f"colonne « {col_vals.get('expression_label')} » : 1er refus ({err1[:200]}), créée en minimal.",
+            )
+        except Exception as e2:
+            return None, f"colonne « {col_vals.get('expression_label')} » : {err1} | minimal: {e2}"
+
+
 def _create_expression_safe(models: Any, db: str, uid: int, password: str,
                              expr_vals: dict) -> int | None:
     """
@@ -189,6 +216,7 @@ def create_toolbox_cpc_budget_analytique(
       prior_ids   : IDs supprim\u00e9s avant cr\u00e9ation
       filter_written : bool\u00e9ens \u00e9crits sur le rapport (filter_analytic, filter_budgets, \u2026)
       filter_personalization_error : message si l\u2019activation des filtres a \u00e9chou\u00e9
+      column_errors : messages si une colonne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
     """
     # \u00c9tape 1 \u2014 nettoyage
     prior_ids = purge_cpc_budget_analytique_instances(models, db, uid, password)
@@ -228,12 +256,15 @@ def create_toolbox_cpc_budget_analytique(
          "report_id": report_id, "sequence": 40, "blank_if_zero": False, "sortable": True},
     ]
     col_count = 0
+    column_errors: list[str] = []
     for col in col_defs:
-        try:
-            _ek(models, db, uid, password, "account.report.column", "create", [col])
+        cid, warn = _create_column_safe(models, db, uid, password, col)
+        if cid is not None:
             col_count += 1
-        except Exception:
-            pass
+            if warn:
+                column_errors.append(warn)
+        else:
+            column_errors.append(warn or "colonne inconnue")
 
     # \u00c9tape 4 \u2014 lignes CPC + expressions
     seq = 10
@@ -332,4 +363,5 @@ def create_toolbox_cpc_budget_analytique(
         "prior_ids":  prior_ids,
         "filter_written": filter_written,
         "filter_personalization_error": filter_personalization_error,
+        "column_errors": column_errors,
     }

@@ -680,9 +680,11 @@ def pl_analytic_project_report():
                 rid = result["report_id"]
                 prior = result["prior_ids"]
                 rlabel = read_account_report_label(models, db, uid, pwd, rid) or CPC_BUDGET_ANALYTIQUE_NAME
+                cc = int(result.get("col_count") or 0)
+                cerr = result.get("column_errors") or []
                 msg = (
                     f"Rapport « {rlabel} » créé (account.report id={rid}) — "
-                    f"{result['col_count']} colonnes, {result['line_count']} lignes CPC SYSCOHADA."
+                    f"{cc} colonne(s), {result['line_count']} lignes CPC SYSCOHADA."
                 )
                 if prior:
                     msg += (
@@ -696,15 +698,28 @@ def pl_analytic_project_report():
                 ferr = result.get("filter_personalization_error")
                 if ferr:
                     msg += f" Attention filtres budgets : {ferr}"
+                if cerr:
+                    msg += " Détail colonnes : " + " | ".join(str(x) for x in cerr[:4])
+                    if len(cerr) > 4:
+                        msg += " …"
                 msg += (
-                    " Dans Odoo, ouvrez le rapport, choisissez la période, le budget et l’analytique "
-                    "dans les filtres : la colonne Budget lit crossovered.budget.lines (données natives)."
+                    " Dans Odoo : menu Comptabilité → Rapports (ou lien « Ouvrir dans Odoo » dans la liste), "
+                    "puis Filtres → période, analytique, budget ; déplier les lignes si tout semble vide."
                 )
                 msg += (
                     " Contrôle technique (CLI, .env Odoo) : "
                     "`python verify_cpc_budget_analytique.py` ou "
                     f"`python verify_cpc_budget_analytique.py --report-id {rid}`."
                 )
+                flash_cat = "success"
+                if cc < 4:
+                    flash_cat = "danger"
+                    msg = (
+                        "Création CPC incomplète : moins de 4 colonnes sur le rapport Odoo — "
+                        "l’interface peut n’afficher aucune colonne. " + msg
+                    )
+                elif cerr:
+                    flash_cat = "warning"
                 try:
                     _ba, menu_mid = ensure_account_report_reporting_menu(
                         models, db, uid, pwd, rid,
@@ -715,7 +730,7 @@ def pl_analytic_project_report():
                         msg += " Entrée de menu ajoutée sous Rapports comptables."
                 except Exception:
                     pass
-                flash(msg, "success")
+                flash(msg, flash_cat)
                 _pl_analytic_prefs_merge_save(
                     client_id=cid,
                     filter_host=fl_save,

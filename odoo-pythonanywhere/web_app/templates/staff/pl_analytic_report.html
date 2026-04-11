@@ -105,6 +105,23 @@
 </div>
 
 {% if selected_client and conn_status == 'ok' %}
+<div class="sn-card" style="border:1px solid rgba(59,130,246,0.35);background:rgba(59,130,246,0.06);">
+  <h2 style="margin-top:0;font-size:1.05rem;">Nouveau rapport CPC dans Odoo — quel bouton ?</h2>
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.5;font-size:0.93rem;">
+    Ce n’est <strong>pas</strong> le bouton <strong>« Générer le rapport »</strong> du tableau plus bas (celui-ci produit un
+    <strong>tableau dans la toolbox</strong> + Excel, sans créer de rapport comptable dans Odoo).
+  </p>
+  <p style="margin:0 0 0.65rem;line-height:1.55;font-size:0.95rem;">
+    Pour créer le <strong>compte de résultat CPC SYSCOHADA</strong> avec <strong>4 colonnes</strong> (Réalisé / Budget / Écart / %)
+    dans Odoo, faites défiler jusqu’à la carte <strong>« CPC SYSCOHADA — Budget Analytique (rapport neuf) »</strong> et cliquez sur
+    <strong>« Créer / recréer le CPC Budget Analytique »</strong>.
+  </p>
+  <p class="sn-muted" style="margin:0;line-height:1.45;font-size:0.88rem;">
+    Dans Odoo : ouvrez ce rapport, utilisez <strong>Filtres</strong> pour la <strong>période</strong>, le <strong>compte analytique</strong>
+    et le <strong>budget</strong> ; dépliez les lignes (elles sont repliées par défaut). Si tout est à zéro, vérifiez qu’il existe des
+    écritures sur la période et l’analytique choisis, et un budget croisé avec les mêmes critères.
+  </p>
+</div>
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Copie Odoo — P&amp;L analytique / budget</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
@@ -244,6 +261,19 @@
     <strong>4 colonnes</strong> (Réalisé / Budget / Écart / % Réalisation), filtre analytique activé.
     Toute instance Senedoo existante est supprimée avant la création.
   </p>
+  <details class="sn-doc" style="margin:0 0 0.85rem;">
+    <summary style="cursor:pointer;font-weight:600;">À quoi servent les autres boutons de cette page ?</summary>
+    <ul style="margin:0.55rem 0 0;line-height:1.55;font-size:0.9rem;padding-left:1.2rem;">
+      <li><strong>Actualiser la liste</strong> (carte Base Odoo) : recharge la base choisie, la liste des rapports Odoo et des axes analytiques.</li>
+      <li><strong>Ajouter une base</strong> : enregistrer une nouvelle connexion Odoo.</li>
+      <li><strong>Préparer (budget)</strong> puis <strong>Créer la copie</strong> : duplique un <strong>rapport existant</strong> de la grille (ex. P&amp;L) avec options analytique / budget — ce n’est pas le CPC neuf.</li>
+      <li><strong>Ouvrir dans Odoo</strong> : fiche technique du rapport dans le backend.</li>
+      <li><strong>Renommer / Supprimer</strong> : agissent sur le rapport dont la ligne est affichée.</li>
+      <li><strong>Lancer la sonde</strong> : lecture seule sur les modèles budget / analytique (diagnostic).</li>
+      <li><strong>Générer le rapport</strong> (tableau API) : calcule un tableau ici + bouton Excel — <strong>aucun</strong> <code>account.report</code> créé.</li>
+      <li><strong>Supprimer</strong> (rouge, carte CPC) : enlève uniquement le rapport toolbox « CPC … Senedoo », pas les autres rapports.</li>
+    </ul>
+  </details>
   <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.4;font-size:0.85rem;">
     La colonne Budget utilise le moteur natif <code>engine='budget'</code> (données
     <code>crossovered.budget.lines</code>). Le rapport est créé avec
