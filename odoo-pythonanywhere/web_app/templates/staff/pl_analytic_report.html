@@ -342,6 +342,63 @@
 </div>
 
 <div class="sn-card">
+  <h2 style="margin-top:0;font-size:1.05rem;">CR analytique budgété (rapport Odoo pour utilisateurs)</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
+    Rapport <code>account.report</code> distinct du CPC : <strong>Réalisé</strong> (écritures sur la période,
+    ventilées sur l’analytique choisi dans Odoo), <strong>Budget analytique</strong> (crossovered),
+    et si la base le permet une colonne <strong>Budget financier</strong> pilotée par le filtre budgets
+    natif du rapport (comme sur le compte de résultat). Les utilisateurs n’ont pas besoin de la toolbox :
+    période, analytique et budget financier se règlent dans Odoo. L’injection ci-dessous (staff) sert
+    uniquement à alimenter la colonne budget analytique lorsque le moteur <code>external</code> est utilisé
+    (ex. Odoo 19 sans moteur budget sur les expressions) ; une action planifiée Odoo peut reprendre la même API.
+  </p>
+  <div class="sn-report-btn-row">
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="create_cr_analytique_budget">
+      <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Créer / recréer le CR analytique budgété</button>
+    </form>
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="delete_cr_analytique_budget">
+      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
+    </form>
+  </div>
+  {% if conn_status == 'ok' and cr_budget_report_id %}
+  <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);">
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Injecter le budget analytique (colonne budget_analytic)</h3>
+    <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
+      Rapport id {{ cr_budget_report_id }} — période YTD. Réservé staff / automatisation ; les utilisateurs
+      choisissent l’analytique dans Odoo après injection.
+    </p>
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic" style="margin:0;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="action" value="sync_cr_analytique_budget_external">
+      <label for="cr_inject_analytic_id">Axe analytique (obligatoire)</label>
+      <select id="cr_inject_analytic_id" name="analytic_account_id_cr" required>
+        <option value="">— Choisir —</option>
+        {% for a in analytic_accounts %}
+        <option value="{{ a.id }}" {% if form_analytic_id is not none and form_analytic_id == a.id %}selected{% endif %}>{{ a.label }}</option>
+        {% endfor %}
+      </select>
+      <div style="margin-top:0.65rem;">
+        <button type="submit" {% if not selected_client %}disabled{% endif %}>Injecter budget analytique (CR)</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Tableau API — réalisé / budget / %</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
     Connexion : {{ conn_detail or 'OK' }}

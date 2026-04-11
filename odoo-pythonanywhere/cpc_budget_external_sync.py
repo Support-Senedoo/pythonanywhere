@@ -36,7 +36,13 @@ def _ek(
 
 
 def collect_budget_expression_id_by_line_code(
-    models: Any, db: str, uid: int, password: str, report_id: int
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    *,
+    expression_label: str = "budget",
 ) -> dict[str, int]:
     lines = (
         _ek(
@@ -75,9 +81,10 @@ def collect_budget_expression_id_by_line_code(
     )
     label_by_id = {int(e["id"]): (e.get("label") or "").strip() for e in exprs}
     out: dict[str, int] = {}
+    want = (expression_label or "budget").strip()
     for code, eids in line_exprs.items():
         for eid in eids:
-            if label_by_id.get(eid) == "budget":
+            if label_by_id.get(eid) == want:
                 out[code] = eid
                 break
     return out
@@ -375,6 +382,7 @@ def sync_cpc_budget_external_values(
     date_to: str,
     company_id: int | None = None,
     account_report_budget_id: int | None = None,
+    expression_label: str = "budget",
 ) -> dict[str, Any]:
     """
     Écrit des ``account.report.external.value`` pour chaque ligne détail CPC (expression
@@ -387,11 +395,19 @@ def sync_cpc_budget_external_values(
     Supprime d’abord les anciennes valeurs externes ciblant ces expressions (toutes dates).
     """
     if report_id <= 0:
-        return {"ok": False, "reason": "Rapport CPC invalide.", "written": 0, "source": None}
+        return {"ok": False, "reason": "Rapport invalide.", "written": 0, "source": None}
+
+    expr_lab = (expression_label or "budget").strip()
+    # Colonne « budget analytique » : uniquement crossovered (pas de budget financier item).
+    if expr_lab == "budget_analytic":
+        account_report_budget_id = None
 
     item_ok = cpc_account_report_budget_item_available(models, db, uid, password)
     cross_ok = cpc_crossovered_budget_available(models, db, uid, password)
-    use_items = bool(account_report_budget_id and int(account_report_budget_id) > 0 and item_ok)
+    use_items = (
+        bool(account_report_budget_id and int(account_report_budget_id) > 0 and item_ok)
+        and expr_lab != "budget_analytic"
+    )
 
     if not use_items:
         if analytic_account_id <= 0:
@@ -410,10 +426,15 @@ def sync_cpc_budget_external_values(
             }
 
     expr_by_code = collect_budget_expression_id_by_line_code(
-        models, db, uid, password, report_id
+        models, db, uid, password, report_id, expression_label=expression_label
     )
     if not expr_by_code:
-        return {"ok": False, "reason": "Aucune expression « budget » sur ce rapport.", "written": 0, "source": None}
+        return {
+            "ok": False,
+            "reason": f"Aucune expression « {expr_lab} » sur ce rapport.",
+            "written": 0,
+            "source": None,
+        }
 
     comp = int(company_id or _default_company_id(models, db, uid, password))
     budget_by_account: dict[int, float] = {}

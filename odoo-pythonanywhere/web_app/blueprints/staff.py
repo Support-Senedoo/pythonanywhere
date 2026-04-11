@@ -70,6 +70,11 @@ from create_cpc_budget_analytique import (
     create_toolbox_cpc_budget_analytique,
     purge_cpc_budget_analytique_instances,
 )
+from create_cr_analytique_budget_senedoo import (
+    CR_ANALYTIQUE_BUDGET_REPORT_NAME,
+    create_toolbox_cr_analytique_budget_report,
+    purge_cr_analytique_budget_report_instances,
+)
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
 from project_pl_analytic_report import (
@@ -372,6 +377,23 @@ def _staff_resolve_cpc_budget_report_id(models: Any, db: str, uid: int, pwd: str
             "account.report",
             "search",
             [[["name", "=", CPC_BUDGET_ANALYTIQUE_NAME]]],
+            {"limit": 1},
+        )
+        return int(ids[0]) if ids else 0
+    except Exception:
+        return 0
+
+
+def _staff_resolve_cr_analytique_budget_report_id(models: Any, db: str, uid: int, pwd: str) -> int:
+    try:
+        ids = execute_kw(
+            models,
+            db,
+            uid,
+            pwd,
+            "account.report",
+            "search",
+            [[["name", "=", CR_ANALYTIQUE_BUDGET_REPORT_NAME]]],
             {"limit": 1},
         )
         return int(ids[0]) if ids else 0
@@ -925,6 +947,122 @@ def pl_analytic_project_report():
                 ),
             )
 
+        if action == "sync_cr_analytique_budget_external":
+            try:
+                aid = int(request.form.get("analytic_account_id_cr") or "0")
+            except ValueError:
+                aid = 0
+            date_from, date_to = default_period_ytd()
+            try:
+                rid = _staff_resolve_cr_analytique_budget_report_id(models, db, uid, pwd)
+                sync = sync_cpc_budget_external_values(
+                    models,
+                    db,
+                    uid,
+                    pwd,
+                    report_id=rid,
+                    analytic_account_id=aid,
+                    date_from=date_from,
+                    date_to=date_to,
+                    account_report_budget_id=None,
+                    expression_label="budget_analytic",
+                )
+                if sync.get("ok"):
+                    flash(
+                        f"Injection budget analytique (CR) : {int(sync.get('written') or 0)} "
+                        f"ligne(s), période {date_from} → {date_to}.",
+                        "success",
+                    )
+                else:
+                    flash(sync.get("reason") or "Injection CR impossible.", "danger")
+            except Exception as e:
+                flash(f"Injection CR analytique budgété : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
+
+        if action == "create_cr_analytique_budget":
+            try:
+                result = create_toolbox_cr_analytique_budget_report(models, db, uid, pwd)
+                rid = result["report_id"]
+                prior = result["prior_ids"]
+                rlabel = read_account_report_label(models, db, uid, pwd, rid) or CR_ANALYTIQUE_BUDGET_REPORT_NAME
+                cc = int(result.get("col_count") or 0)
+                min_c = int(result.get("min_columns_expected") or 4)
+                cw = result.get("creation_warnings") or []
+                msg = (
+                    f"Rapport « {rlabel} » créé (id={rid}) — {cc} colonne(s), "
+                    f"{int(result.get('line_count') or 0)} lignes."
+                )
+                if cw:
+                    msg += " " + " ".join(str(x) for x in cw[:2])
+                if prior:
+                    msg += f" Ancienne instance retirée (id : {', '.join(str(x) for x in prior)})."
+                flash_cat = "success" if cc >= min_c else "warning"
+                if cc < min_c:
+                    msg = (
+                        f"Création incomplète : {cc}/{min_c} colonnes attendues. " + msg
+                    )
+                    flash_cat = "danger"
+                try:
+                    _, menu_mid = ensure_account_report_reporting_menu(
+                        models,
+                        db,
+                        uid,
+                        pwd,
+                        rid,
+                        rlabel.strip()[:240] or CR_ANALYTIQUE_BUDGET_REPORT_NAME,
+                        under_trial_balance=False,
+                    )
+                    if menu_mid:
+                        msg += " Entrée de menu sous Rapports comptables."
+                except Exception:
+                    pass
+                flash(msg, flash_cat)
+            except Exception as e:
+                flash(f"Échec création CR analytique budgété : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
+
+        if action == "delete_cr_analytique_budget":
+            try:
+                prior = purge_cr_analytique_budget_report_instances(models, db, uid, pwd)
+                if prior:
+                    flash(
+                        f"Rapport(s) « {CR_ANALYTIQUE_BUDGET_REPORT_NAME} » supprimé(s) "
+                        f"(id : {', '.join(str(x) for x in prior)}).",
+                        "success",
+                    )
+                else:
+                    flash("Aucun rapport CR analytique budgété toolbox sur cette base.", "info")
+            except Exception as e:
+                flash(f"Échec suppression CR analytique budgété : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
+
         if action == "run_report":
             try:
                 aid = int(request.form.get("analytic_account_id") or "0")
@@ -1196,6 +1334,7 @@ def pl_analytic_project_report():
     financial_budgets: list[dict[str, Any]] = []
     report_budget_item_model = False
     cpc_budget_report_id = 0
+    cr_budget_report_id = 0
     if selected:
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
@@ -1212,10 +1351,14 @@ def pl_analytic_project_report():
                     )
                     financial_budgets = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
                     cpc_budget_report_id = _staff_resolve_cpc_budget_report_id(models, db, uid, pwd)
+                    cr_budget_report_id = _staff_resolve_cr_analytique_budget_report_id(
+                        models, db, uid, pwd
+                    )
                 except Exception:
                     report_budget_item_model = False
                     financial_budgets = []
                     cpc_budget_report_id = 0
+                    cr_budget_report_id = 0
                 try:
                     reports = search_account_reports(models, db, uid, pwd, filter_q)
                 except Exception:
@@ -1305,6 +1448,7 @@ def pl_analytic_project_report():
         financial_budgets=financial_budgets,
         report_budget_item_model=report_budget_item_model,
         cpc_budget_report_id=cpc_budget_report_id,
+        cr_budget_report_id=cr_budget_report_id,
     )
 
 
