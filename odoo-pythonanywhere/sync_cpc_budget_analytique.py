@@ -78,10 +78,16 @@ def _filter_budget_lines_by_analytic(
             if int(ref_id) == analytic_account_id:
                 filtered.append(bl)
                 continue
-        # Cas 2 : analytic_distribution (v17+)
+        # Cas 2 : analytic_distribution (v17+) — clés souvent "123" mais parfois int
         dist = bl.get("analytic_distribution")
-        if isinstance(dist, dict) and ana_str in dist:
-            filtered.append(bl)
+        if isinstance(dist, dict) and dist:
+            if ana_str in dist:
+                filtered.append(bl)
+                continue
+            for k in dist:
+                if str(k).strip() == ana_str:
+                    filtered.append(bl)
+                    break
     return filtered
 
 
@@ -178,11 +184,14 @@ def sync_cpc_budget_to_external_values(
           ["engine", "=", "account_codes"]]],
         {"fields": ["report_line_id", "formula"]},
     ) or []
-    formula_by_line: dict[int, str] = {
-        e["report_line_id"][0] if isinstance(e["report_line_id"], (list, tuple))
-        else int(e["report_line_id"]): e["formula"]
-        for e in all_exprs
-    }
+    formula_by_line: dict[int, str] = {}
+    for e in all_exprs:
+        rid = e.get("report_line_id")
+        if rid in (None, False):
+            continue
+        line_key = rid[0] if isinstance(rid, (list, tuple)) else int(rid)
+        if e.get("formula"):
+            formula_by_line[line_key] = e["formula"]
 
     # ── 3. Lignes de budget (crossovered.budget.lines) ───────────────────────
     # Tentative avec filtre analytique v16 dans le domaine
@@ -304,7 +313,49 @@ def sync_cpc_budget_to_external_values(
             errors.append(f"Nettoyage external.value : {e}")
 
     # ── 7. Créer les nouvelles external.value ─────────────────────────────────
-    company_id = _ek(models, db, uid, password, "res.company", "search", [[]])[0]
+    company_id: int | None = None
+    try:
+        brows = _ek(
+            models, db, uid, password, "crossovered.budget", "read",
+            [[budget_id]], {"fields": ["company_id"]},
+        )
+        if brows and brows[0].get("company_id"):
+            cid = brows[0]["company_id"]
+            company_id = int(cid[0] if isinstance(cid, (list, tuple)) else cid)
+    except Exception:
+        company_id = None
+    if not company_id:
+        try:
+            urows = _ek(
+                models, db, uid, password, "res.users", "read",
+                [[uid]], {"fields": ["company_id"]},
+            )
+            if urows and urows[0].get("company_id"):
+                cid = urows[0]["company_id"]
+                company_id = int(cid[0] if isinstance(cid, (list, tuple)) else cid)
+        except Exception:
+            company_id = None
+    if not company_id:
+        try:
+            cids = _ek(
+                models, db, uid, password, "res.company", "search",
+                [[]], {"limit": 1},
+            )
+            if cids:
+                company_id = int(cids[0])
+        except Exception:
+            company_id = None
+    if not company_id:
+        return {
+            "stored": 0,
+            "skipped": len(detail_lines),
+            "errors": errors + [
+                "Impossible de déterminer company_id (budget, utilisateur ou res.company)."
+            ],
+            "lines_found": len(detail_lines),
+            "budget_lines_count": len(budget_lines),
+        }
+
     text_note = f"budget={budget_id} / analytique={analytic_account_id or 'all'}"
 
     for rl in detail_lines:

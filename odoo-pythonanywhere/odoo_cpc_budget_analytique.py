@@ -35,7 +35,10 @@
 import xmlrpc.client
 import sys
 import json
+import re
 from datetime import date, datetime
+
+from sync_cpc_budget_analytique import sync_cpc_budget_to_external_values
 
 # =============================================================================
 # 🔧 CONFIGURATION — À ADAPTER
@@ -292,9 +295,8 @@ def create_columns(models, uid, report_id):
             "sortable"         : True,
         },
         # ── COL 2 : BUDGET ANALYTIQUE ─────────────────────────────────────
-        # Expression engine 'budget' lit dans crossovered.budget.lines
-        # Le contexte analytique (analytic_account_ids) est transmis par
-        # le moteur de rapports d'Odoo v17+ quand filter_analytic=True
+        # Valeurs lues via engine external (account.report.external.value),
+        # alimentées par sync_cpc_budget_analytique / create_external_budget_values.
         {
             "name"             : "Budget",
             "expression_label" : "budget",
@@ -346,6 +348,11 @@ def create_columns(models, uid, report_id):
 # Structure du CPC SYSCOHADA — Plan comptable OHADA/Sénégal
 # Format : (code_ligne, libellé, nature, formule_account_codes, formule_aggregation)
 # nature : 'account' → engine account_codes | 'aggregate' → engine aggregation
+
+def _agg_formula_with_suffix(formula_agg: str, suffix: str) -> str:
+    """Référence chaque code CPC (2 lettres) avec .suffix (ex. TA.budget)."""
+    return re.sub(r"\b([A-Z]{2})\b", lambda m: f"{m.group(1)}.{suffix}", formula_agg)
+
 
 CPC_STRUCTURE = [
     # ── PRODUITS D'EXPLOITATION ────────────────────────────────────────────────
@@ -465,14 +472,13 @@ def create_report_lines(models, uid, report_id):
                     # On laisse le moteur calculer le solde net
                 })
 
-                # COL 2 : BUDGET ANALYTIQUE
-                # L'engine 'budget' lit crossovered.budget.lines
-                # Le moteur passe analytic_account_ids depuis le contexte du filtre
+                # COL 2 : BUDGET — engine external (voir sync_cpc_budget_analytique.py)
+                # engine='budget' est masqué par Odoo quand le filtre analytique est actif.
                 create_expression_safe(models, uid, {
                     "report_line_id" : line_id,
                     "label"          : "budget",
-                    "engine"         : "budget",
-                    "formula"        : formula_ac,    # même formule → mapping compte = position budget
+                    "engine"         : "external",
+                    "formula"        : "",
                     "date_scope"     : "strict_range",
                 })
 
@@ -496,36 +502,37 @@ def create_report_lines(models, uid, report_id):
                 })
 
             elif nature == "aggregate":
-                # Pour les totaux, on agrège les expressions des lignes de détail
-                for lbl, formula in [
-                    ("balance", formula_agg),
-                    ("budget",  formula_agg.replace(".balance", ".budget").replace(
-                                "TA", "TA").replace("RA", "RA")),   # même formule sur .budget
-                    ("ecart",   formula_agg.replace(".balance", ".ecart")),
-                    ("pct",     f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)"),
-                ]:
-                    # Pour budget/ecart on remplace les suffixes si nécessaire
-                    if lbl == "budget":
-                        f = " + ".join(
-                            f"{t.strip()}.budget" if not t.strip().startswith("-")
-                            else f"-{t.strip().lstrip('-').strip()}.budget"
-                            for t in formula_agg.replace("-", " - ").split("+")
-                        )
-                        f = formula_agg  # fallback : même formule d'agrégation
-                    elif lbl == "ecart":
-                        f = f"{code}.budget - {code}.balance"
-                    elif lbl == "pct":
-                        f = f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)"
-                    else:
-                        f = formula
-
-                    create_expression_safe(models, uid, {
-                        "report_line_id" : line_id,
-                        "label"          : lbl,
-                        "engine"         : "aggregation",
-                        "formula"        : f,
-                        "date_scope"     : "strict_range",
-                    })
+                create_expression_safe(models, uid, {
+                    "report_line_id": line_id,
+                    "label":          "balance",
+                    "engine":         "aggregation",
+                    "formula":        formula_agg,
+                    "date_scope":     "strict_range",
+                })
+                create_expression_safe(models, uid, {
+                    "report_line_id": line_id,
+                    "label":          "budget",
+                    "engine":         "aggregation",
+                    "formula":        _agg_formula_with_suffix(formula_agg, "budget"),
+                    "date_scope":     "strict_range",
+                })
+                create_expression_safe(models, uid, {
+                    "report_line_id": line_id,
+                    "label":          "ecart",
+                    "engine":         "aggregation",
+                    "formula":        f"{code}.budget - {code}.balance",
+                    "date_scope":     "strict_range",
+                })
+                create_expression_safe(models, uid, {
+                    "report_line_id": line_id,
+                    "label":          "pct",
+                    "engine":         "aggregation",
+                    "formula":        (
+                        f"if_other_is_zero({code}.budget, 0, "
+                        f"{code}.balance / {code}.budget * 100)"
+                    ),
+                    "date_scope":     "strict_range",
+                })
 
             icon = "Σ" if is_total else "·"
             print(f"  {icon} [{code:<4}] {label[:55]:<55}")
@@ -568,11 +575,13 @@ def create_external_budget_values(models, uid, report_id, analytic_account_id,
     pour un compte analytique et un budget donnés, et les stocke
     dans account.report.external.value.
 
-    Cette fonction résout le bug du filtre analytique sur la colonne budget.
-    Elle est appelée APRÈS avoir sélectionné le budget et le compte analytique.
+    Délègue à ``sync_cpc_budget_to_external_values`` (même algorithme que la Toolbox) :
+      - pas de champ erroné sur crossovered.budget.lines ;
+      - un montant ``planned_amount`` par ligne de budget ne peut être attribué
+        qu'une fois par ligne CPC (évite la sur-comptabilisation par compte).
 
     Paramètres :
-      analytic_account_id : ID du compte analytique filtré
+      analytic_account_id : ID du compte analytique filtré (0 = sans filtre analytique)
       budget_id           : ID du crossovered.budget sélectionné
       date_from, date_to  : période
     """
@@ -580,102 +589,26 @@ def create_external_budget_values(models, uid, report_id, analytic_account_id,
     print("  ÉTAPE 6 — CALCUL BUDGET ANALYTIQUE → external.value")
     print(f"{'═'*64}\n")
 
-    # Récupérer les lignes du budget pour ce compte analytique
-    budget_lines = rpc(models, uid, "crossovered.budget.lines", "search_read",
-                       [[["crossovered_budget_id", "=", budget_id],
-                         ["analytic_account_id", "=", analytic_account_id],
-                         ["date_from", ">=", date_from],
-                         ["date_to", "<=", date_to]]],
-                       {"fields": ["id", "analytic_account_id", "general_budget_id",
-                                   "planned_amount", "date_from", "date_to",
-                                   "account_ids"]})
-
-    if not budget_lines:
-        print(f"  ⚠️  Aucune ligne de budget pour ce compte analytique et cette période")
-        return 0
-
-    print(f"  {len(budget_lines)} ligne(s) de budget trouvées\n")
-
-    # Récupérer les lignes du rapport
-    report_lines = rpc(models, uid, "account.report.line", "search_read",
-                       [[["report_id", "=", report_id], ["code", "!=", False]]],
-                       {"fields": ["id", "code", "name"]})
-
-    # Construire un mapping compte → montant budget
-    account_budget_map = {}
-    for bl in budget_lines:
-        # Récupérer les comptes liés à la position budgétaire
-        budget_pos_id = bl["general_budget_id"][0] if bl["general_budget_id"] else None
-        if budget_pos_id:
-            pos = rpc(models, uid, "account.budget.post", "read",
-                      [[budget_pos_id]], {"fields": ["account_ids"]})[0]
-            for acc_id in pos.get("account_ids", []):
-                account_budget_map[acc_id] = account_budget_map.get(acc_id, 0) + bl["planned_amount"]
-
-    print(f"  Comptes avec budget analytique : {len(account_budget_map)}")
-
-    # Stocker dans account.report.external.value
-    # Ce modèle est disponible en Odoo v16+ pour les rapports custom
-    stored = 0
-    company_id = rpc(models, uid, "res.company", "search", [[]])[0]
-
-    for rl in report_lines:
-        code = rl["code"]
-        if code.startswith("X"):
-            continue  # Les totaux sont calculés par aggregation
-
-        # Calculer le budget pour cette ligne du rapport
-        # On lit les expressions pour connaître les comptes associés
-        exprs = rpc(models, uid, "account.report.expression", "search_read",
-                    [[["report_line_id", "=", rl["id"]], ["label", "=", "balance"],
-                      ["engine", "=", "account_codes"]]],
-                    {"fields": ["formula"]})
-
-        if not exprs:
-            continue
-
-        formula = exprs[0]["formula"]
-        prefixes = [p.strip().lstrip("^") for p in formula.split(",") if p.strip()]
-
-        # Somme du budget pour les comptes matchant les préfixes
-        line_budget = 0
-        for acc_id, amount in account_budget_map.items():
-            acc_data = rpc(models, uid, "account.account", "read",
-                           [[acc_id]], {"fields": ["code"]})[0]
-            acc_code = acc_data["code"]
-            for prefix in prefixes:
-                if acc_code.startswith(prefix):
-                    line_budget += amount
-                    break
-
-        if line_budget == 0:
-            continue
-
-        # Supprimer ancienne valeur externe si elle existe
-        old_ext = rpc(models, uid, "account.report.external.value", "search",
-                      [[["report_line_id", "=", rl["id"]],
-                        ["target_move", "=", "posted"],
-                        ["company_id", "=", company_id]]])
-        if old_ext:
-            rpc(models, uid, "account.report.external.value", "unlink", [old_ext])
-
-        # Créer la valeur externe
-        try:
-            ext_vals = {
-                "report_line_id" : rl["id"],
-                "value"          : line_budget,
-                "date"           : date_to,
-                "company_id"     : company_id,
-                "text_value"     : f"Budget analytique [{analytic_account_id}]",
-                "target_move"    : "posted",
-            }
-            rpc(models, uid, "account.report.external.value", "create", [ext_vals])
-            stored += 1
-            print(f"  ✅ [{code:<4}] Budget stocké : {line_budget:>15,.0f} FCFA")
-        except Exception as e:
-            print(f"  ⚠️  [{code}] external.value : {e}")
-
-    print(f"\n  ✅ {stored} valeurs budgétaires stockées\n")
+    result = sync_cpc_budget_to_external_values(
+        models,
+        DB,
+        uid,
+        API_KEY,
+        report_id=int(report_id),
+        analytic_account_id=int(analytic_account_id or 0),
+        budget_id=int(budget_id),
+        date_from=str(date_from),
+        date_to=str(date_to),
+    )
+    stored = int(result.get("stored", 0))
+    for msg in result.get("errors") or []:
+        print(f"  ⚠️  {msg}")
+    print(
+        f"  Résumé : {stored} valeur(s) stockée(s), "
+        f"{result.get('skipped', 0)} ignorée(s), "
+        f"{result.get('budget_lines_count', 0)} ligne(s) de budget utilisée(s).\n"
+    )
+    print(f"  ✅ {stored} valeurs budgétaires stockées\n")
     return stored
 
 
