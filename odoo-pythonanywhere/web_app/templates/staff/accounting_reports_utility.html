@@ -237,14 +237,14 @@
   </p>
   <div class="sn-report-btn-row">
     {% if balance_exec_url %}
-    <a class="sn-btn" href="{{ balance_exec_url }}" target="_blank" rel="noopener noreferrer">Ouvrir l’analyse</a>
+    <a class="sn-btn sn-btn--odoo" href="{{ balance_exec_url }}" target="_blank" rel="noopener noreferrer">Ouvrir l’analyse (Odoo)</a>
     {% else %}
-    <span class="sn-btn sn-btn--ghost" style="opacity:0.65;cursor:not-allowed;" title="Action/menu non créés par l’API (droits Odoo)">Analyse indisponible</span>
+    <span class="sn-btn sn-btn--odoo sn-btn--odoo-disabled" title="Action/menu non créés par l’API (droits Odoo)">Analyse Odoo indisponible</span>
     {% endif %}
     {% if balance_list_url %}
-    <a class="sn-btn sn-btn--ghost" href="{{ balance_list_url }}" target="_blank" rel="noopener noreferrer">Liste des rapports</a>
+    <a class="sn-btn sn-btn--odoo sn-btn--odoo-ghost" href="{{ balance_list_url }}" target="_blank" rel="noopener noreferrer">Liste rapports (Odoo)</a>
     {% endif %}
-    <a class="sn-btn sn-btn--ghost" href="{{ balance_form_url }}" target="_blank" rel="noopener noreferrer">Fiche technique</a>
+    <a class="sn-btn sn-btn--odoo sn-btn--odoo-ghost" href="{{ balance_form_url }}" target="_blank" rel="noopener noreferrer">Fiche technique (Odoo)</a>
   </div>
   {% if not balance_exec_url %}
   <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.82rem;">Ouvrez le rapport depuis Odoo (Reporting / rapports comptables) si l’API n’a pas pu créer l’action client.</p>
@@ -374,11 +374,13 @@
   {% endif %}
 
   {% if conn_status == 'ok' and accounting_mode != 'balance' %}
-  <details id="sn-reports-list" class="sn-reports-details" style="margin-top:1rem;">
-    <summary style="cursor:pointer;font-weight:600;font-size:1.02rem;">
-      Liste des rapports ({{ reports|length }}{% if prefill_report_id %} · id {{ prefill_report_id }} sélectionné{% endif %})
-    </summary>
-    <div style="margin-top:0.75rem;">
+  <div id="sn-reports-list" class="sn-reports-panel" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--sn-border);">
+    <h3 style="margin:0 0 0.5rem;font-size:1.05rem;">Rapports — liste et gestion</h3>
+    <p class="sn-muted" style="margin:0 0 0.65rem;font-size:0.85rem;line-height:1.4;">
+      Colonne <strong>Odoo</strong> : liens vers votre base (<span class="sn-legend-odoo">teal</span>).
+      Colonne <strong>Gestion</strong> : actions <strong>toolbox</strong> (violet) — personnaliser, renommer, supprimer.
+      {% if prefill_report_id %}Rapport <code>{{ prefill_report_id }}</code> présélectionné pour le bloc ci-dessous.{% endif %}
+    </p>
   {% if not reports %}
   <p class="sn-muted">Aucun rapport ne correspond au filtre.</p>
   {% else %}
@@ -399,7 +401,7 @@
         <td>{{ r.name }}</td>
         <td>
           {% if report_open_urls.get(r.id) %}
-          <a class="sn-btn sn-btn--ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;white-space:nowrap;" href="{{ report_open_urls[r.id] }}" target="_blank" rel="noopener noreferrer">Ouvrir dans Odoo</a>
+          <a class="sn-btn sn-btn--odoo sn-btn--odoo-ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;white-space:nowrap;" href="{{ report_open_urls[r.id] }}" target="_blank" rel="noopener noreferrer">Ouvrir dans Odoo</a>
           {% else %}
           <span class="sn-muted">—</span>
           {% endif %}
@@ -453,8 +455,7 @@
   </table>
   </div>
   {% endif %}
-    </div>
-  </details>
+  </div>
   {% endif %}
 </div>
 

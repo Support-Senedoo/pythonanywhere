@@ -31,12 +31,12 @@ REQUIRED_COMMON = [
     "Ajouter une nouvelle base",
     "Enregistrer la base",
     "sn-page-bottom-flash",
-    "Autres personnalisations",
+    "Navigation — autres utilitaires",
 ]
 
 REQUIRED_PL_STANDARD_BASE = [
     "Compte de résultat — personnalisation (détail / SYSCOHADA)",
-    "compte de résultat personnalisé",
+    "P&amp;L personnalisé (SYSCOHADA)",
 ]
 
 REQUIRED_BALANCE_PAGE = REQUIRED_COMMON + [
@@ -52,7 +52,7 @@ REQUIRED_PL_BUDGET_BASE = [
 REQUIRED_BALANCE_WITH_CLIENT_EXTRA = [
     'id="form-create-balance-ohada"',
     'value="create_balance_ohada"',
-    "Créer Balance OHADA sur Odoo",
+    "Balance OHADA",
 ]
 
 REQUIRED_WITH_CLIENT_PL_STANDARD = [
