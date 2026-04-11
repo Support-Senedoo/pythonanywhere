@@ -39,6 +39,7 @@ import re
 from datetime import date, datetime
 
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
+from create_cpc_budget_analytique import normalize_cpc_account_codes_formula
 
 # =============================================================================
 # 🔧 CONFIGURATION — À ADAPTER
@@ -407,11 +408,15 @@ CPC_STRUCTURE = [
 
 def create_expression_safe(models, uid, expr_vals):
     """Crée une expression avec fallback si champ non supporté."""
+    ev = dict(expr_vals)
+    eng = (ev.get("engine") or "").strip()
+    if eng in ("account_codes", "budget") and ev.get("formula"):
+        ev["formula"] = normalize_cpc_account_codes_formula(ev["formula"])
     try:
-        return rpc(models, uid, "account.report.expression", "create", [expr_vals])
+        return rpc(models, uid, "account.report.expression", "create", [ev])
     except Exception as e:
         # Retry sans champs optionnels
-        safe = {k: v for k, v in expr_vals.items()
+        safe = {k: v for k, v in ev.items()
                 if k in ("report_line_id", "label", "engine", "formula", "date_scope")}
         try:
             return rpc(models, uid, "account.report.expression", "create", [safe])

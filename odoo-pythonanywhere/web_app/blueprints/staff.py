@@ -684,6 +684,7 @@ def pl_analytic_project_report():
                 cc = int(result.get("col_count") or 0)
                 cerr = result.get("column_errors") or []
                 lerr = result.get("line_errors") or []
+                xerr = result.get("expression_errors") or []
                 verif = result.get("verification") or {}
                 ver_ok = bool(verif.get("ok"))
                 expected_lines = len(CPC_BUDGET_STRUCTURE)
@@ -720,6 +721,10 @@ def pl_analytic_project_report():
                     msg += " Détail lignes : " + " | ".join(str(x) for x in lerr[:3])
                     if len(lerr) > 3:
                         msg += " …"
+                if xerr:
+                    msg += " Expressions : " + " | ".join(str(x) for x in xerr[:3])
+                    if len(xerr) > 3:
+                        msg += " …"
                 msg += (
                     " Dans Odoo : menu Comptabilité → Rapports (ou lien « Ouvrir dans Odoo » dans la liste), "
                     "puis Filtres → période, analytique, budget ; déplier les lignes si tout semble vide."
@@ -736,8 +741,12 @@ def pl_analytic_project_report():
                         "Création CPC incomplète : moins de 4 colonnes sur le rapport Odoo — "
                         "l’interface peut n’afficher aucune colonne. " + msg
                     )
-                elif lc < expected_lines or lerr or not ver_ok:
-                    flash_cat = "danger" if (lc < expected_lines or not ver_ok) else "warning"
+                elif lc < expected_lines or lerr or xerr or not ver_ok:
+                    flash_cat = (
+                        "danger"
+                        if (lc < expected_lines or not ver_ok or bool(xerr))
+                        else "warning"
+                    )
                     if lc < expected_lines:
                         msg = (
                             f"Création CPC incomplète : {lc}/{expected_lines} lignes — "

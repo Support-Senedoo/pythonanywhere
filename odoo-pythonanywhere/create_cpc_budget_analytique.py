@@ -15,6 +15,7 @@ Stratégie colonne Budget (données 100 % Odoo) :
     Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
     ne plus piloter correctement les colonnes budget / % avec l’analytique.
   - Les totaux (codes X*) : engine ``aggregation`` sur les .budget des lignes de détail.
+  - Formules ``account_codes`` / ``budget`` : normalisation Odoo 19 (``^601,^6011`` → ``601+6011``).
 """
 from __future__ import annotations
 
@@ -93,6 +94,32 @@ def _ek(models: Any, db: str, uid: int, password: str, model: str, method: str,
         args: list | None = None, kw: dict | None = None) -> Any:
     """Raccourci execute_kw avec defaults."""
     return execute_kw(models, db, uid, password, model, method, args or [], kw)
+
+
+def normalize_cpc_account_codes_formula(formula: str | None) -> str:
+    """
+    Adapte les formules style SYSCOHADA / ancien XML-RPC (``^601,^6011``) au moteur
+    ``account_codes`` d'Odoo 19+ : termes additionnés avec ``+``, sans ``^`` devant les préfixes
+    (le ``^`` n'est pas un caractère autorisé dans le jeton ``prefix`` de la validation serveur).
+    """
+    if not formula:
+        return ""
+    raw = str(formula).strip()
+    compact = raw.replace(" ", "")
+    if "tag(" in compact:
+        return compact
+    parts = [p.strip().replace(" ", "") for p in raw.split(",") if p.strip()]
+    if not parts:
+        return compact
+    cleaned: list[str] = []
+    for p in parts:
+        if p.startswith("^"):
+            p = p[1:]
+        if p:
+            cleaned.append(p)
+    if len(cleaned) == 1:
+        return cleaned[0]
+    return "+".join(cleaned)
 
 
 def _agg_formula_with_suffix(formula_agg: str, suffix: str) -> str:
@@ -174,22 +201,40 @@ def _create_column_safe(
             return None, f"colonne « {col_vals.get('expression_label')} » : {err1} | minimal: {e2}"
 
 
-def _create_expression_safe(models: Any, db: str, uid: int, password: str,
-                             expr_vals: dict) -> int | None:
+def _create_expression_safe(
+    models: Any, db: str, uid: int, password: str, expr_vals: dict
+) -> tuple[Any | None, str | None]:
     """
     Cr\u00e9e une expression account.report.expression.
     Fallback sur un sous-ensemble de champs si l'API rejette la premi\u00e8re tentative
     (champs non support\u00e9s selon la version Odoo).
+    Retourne (id cr\u00e9\u00e9 ou valeur renvoy\u00e9e par create, None) ou (None, message d'erreur).
     """
+    label = expr_vals.get("label") or "?"
     try:
-        return _ek(models, db, uid, password, "account.report.expression", "create", [expr_vals])
-    except Exception:
-        safe = {k: v for k, v in expr_vals.items()
-                if k in ("report_line_id", "label", "engine", "formula", "date_scope")}
+        return _ek(models, db, uid, password, "account.report.expression", "create", [expr_vals]), None
+    except Exception as e1:
+        safe = {
+            k: v
+            for k, v in expr_vals.items()
+            if k in ("report_line_id", "label", "engine", "formula", "date_scope")
+        }
         try:
-            return _ek(models, db, uid, password, "account.report.expression", "create", [safe])
-        except Exception:
-            return None
+            return (
+                _ek(models, db, uid, password, "account.report.expression", "create", [safe]),
+                None,
+            )
+        except Exception as e2:
+            return None, f"expression {label!r} : {e1!s} | minimal: {e2!s}"
+
+
+def _expr_formula_for_engine(expr_vals: dict) -> dict:
+    """Copie des vals avec formule normalis\u00e9e pour account_codes et budget."""
+    out = dict(expr_vals)
+    eng = (out.get("engine") or "").strip()
+    if eng in ("account_codes", "budget") and "formula" in out:
+        out["formula"] = normalize_cpc_account_codes_formula(out["formula"])
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +306,7 @@ def create_toolbox_cpc_budget_analytique(
       filter_personalization_error : message si l\u2019activation des filtres a \u00e9chou\u00e9
       column_errors : messages si une colonne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
       line_errors   : messages si une ligne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
+      expression_errors : \u00e9checs cr\u00e9ation account.report.expression
       verification  : r\u00e9sultat de verify_cpc_budget_analytique_report (contr\u00f4le auto)
     """
     # \u00c9tape 1 \u2014 nettoyage
@@ -315,6 +361,16 @@ def create_toolbox_cpc_budget_analytique(
     seq = 10
     line_count = 0
     line_errors: list[str] = []
+    expression_errors: list[str] = []
+
+    def _push_expr(expr_vals: dict) -> None:
+        c = expr_vals.get("_line_code") or "?"
+        base = {k: v for k, v in expr_vals.items() if k != "_line_code"}
+        vals = _expr_formula_for_engine(base)
+        _eid, eerr = _create_expression_safe(models, db, uid, password, vals)
+        if eerr:
+            expression_errors.append(f"{c} / {vals.get('label')!s} : {eerr}")
+
     for code, label, nature, formula_ac, formula_agg in CPC_BUDGET_STRUCTURE:
         is_total = code.startswith("X")
         line_id, lwarn = _create_report_line_safe(
@@ -331,7 +387,8 @@ def create_toolbox_cpc_budget_analytique(
 
         if nature == "account":
             # R\u00e9alis\u00e9 : engine account_codes respecte filter_analytic
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "balance",
                 "engine":         "account_codes",
@@ -339,7 +396,8 @@ def create_toolbox_cpc_budget_analytique(
                 "date_scope":     "strict_range",
             })
             # Budget : engine budget (crossovered.budget.lines), m\u00eame mapping comptes
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "budget",
                 "engine":         "budget",
@@ -347,7 +405,8 @@ def create_toolbox_cpc_budget_analytique(
                 "date_scope":     "strict_range",
             })
             # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "ecart",
                 "engine":         "aggregation",
@@ -355,7 +414,8 @@ def create_toolbox_cpc_budget_analytique(
                 "date_scope":     "strict_range",
             })
             # % R\u00e9alisation
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
@@ -365,7 +425,8 @@ def create_toolbox_cpc_budget_analytique(
 
         elif nature == "aggregate":
             # R\u00e9alis\u00e9 (agr\u00e9gation des lignes de d\u00e9tail \u2014 r\u00e9f\u00e9rence implicite .balance)
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "balance",
                 "engine":         "aggregation",
@@ -373,7 +434,8 @@ def create_toolbox_cpc_budget_analytique(
                 "date_scope":     "strict_range",
             })
             # Budget (m\u00eame formule mais sur .budget de chaque code)
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "budget",
                 "engine":         "aggregation",
@@ -381,7 +443,8 @@ def create_toolbox_cpc_budget_analytique(
                 "date_scope":     "strict_range",
             })
             # \u00c9cart
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "ecart",
                 "engine":         "aggregation",
@@ -389,7 +452,8 @@ def create_toolbox_cpc_budget_analytique(
                 "date_scope":     "strict_range",
             })
             # % R\u00e9alisation
-            _create_expression_safe(models, db, uid, password, {
+            _push_expr({
+                "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
@@ -421,5 +485,6 @@ def create_toolbox_cpc_budget_analytique(
         "filter_personalization_error": filter_personalization_error,
         "column_errors": column_errors,
         "line_errors":   line_errors,
+        "expression_errors": expression_errors,
         "verification":  verification,
     }

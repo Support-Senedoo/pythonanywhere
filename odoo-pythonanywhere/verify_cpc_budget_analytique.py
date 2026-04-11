@@ -32,7 +32,11 @@ try:
 except ImportError:
     pass
 
-from create_cpc_budget_analytique import CPC_BUDGET_ANALYTIQUE_NAME, CPC_BUDGET_STRUCTURE
+from create_cpc_budget_analytique import (
+    CPC_BUDGET_ANALYTIQUE_NAME,
+    CPC_BUDGET_STRUCTURE,
+    normalize_cpc_account_codes_formula,
+)
 from personalize_syscohada_detail import connect, execute_kw
 
 EXPECTED_COLUMN_LABELS = ("balance", "budget", "ecart", "pct")
@@ -275,16 +279,16 @@ def verify_cpc_budget_analytique_report(
                         lc_errors.append(f"{lab}: engine={eng!r}, attendu aggregation")
 
                 if row_spec and row_spec[2] == "account" and row_spec[3]:
-                    f_bal = (ex["balance"].get("formula") or "").replace(" ", "")
-                    f_exp = (row_spec[3] or "").replace(" ", "")
+                    f_bal = normalize_cpc_account_codes_formula(ex["balance"].get("formula"))
+                    f_exp = normalize_cpc_account_codes_formula(row_spec[3])
                     if f_bal != f_exp:
                         lc_errors.append(
-                            f"formule balance « {f_bal} » ≠ attendue « {f_exp} »"
+                            f"formule balance « {f_bal} » ≠ attendue (normalisée) « {f_exp} »"
                         )
-                    f_bud = (ex["budget"].get("formula") or "").replace(" ", "")
+                    f_bud = normalize_cpc_account_codes_formula(ex["budget"].get("formula"))
                     if f_bud != f_exp:
                         lc_errors.append(
-                            f"formule budget « {f_bud} » ≠ attendue « {f_exp} »"
+                            f"formule budget « {f_bud} » ≠ attendue (normalisée) « {f_exp} »"
                         )
 
         line_checks.append(
