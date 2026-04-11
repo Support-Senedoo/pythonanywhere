@@ -64,6 +64,7 @@ from personalize_pl_analytic_budget import (
 )
 from create_cpc_budget_analytique import (
     CPC_BUDGET_ANALYTIQUE_NAME,
+    CPC_BUDGET_STRUCTURE,
     create_toolbox_cpc_budget_analytique,
     purge_cpc_budget_analytique_instances,
 )
@@ -682,10 +683,23 @@ def pl_analytic_project_report():
                 rlabel = read_account_report_label(models, db, uid, pwd, rid) or CPC_BUDGET_ANALYTIQUE_NAME
                 cc = int(result.get("col_count") or 0)
                 cerr = result.get("column_errors") or []
+                lerr = result.get("line_errors") or []
+                verif = result.get("verification") or {}
+                ver_ok = bool(verif.get("ok"))
+                expected_lines = len(CPC_BUDGET_STRUCTURE)
+                lc = int(result.get("line_count") or 0)
                 msg = (
                     f"Rapport « {rlabel} » créé (account.report id={rid}) — "
-                    f"{cc} colonne(s), {result['line_count']} lignes CPC SYSCOHADA."
+                    f"{cc} colonne(s), {lc} lignes CPC SYSCOHADA."
                 )
+                if verif:
+                    vtag = "OK" if ver_ok else "à contrôler"
+                    msg += f" Vérification automatique : {vtag}."
+                    ver_errs = verif.get("errors") or []
+                    if ver_errs:
+                        msg += " " + " | ".join(str(x) for x in ver_errs[:3])
+                        if len(ver_errs) > 3:
+                            msg += " …"
                 if prior:
                     msg += (
                         f" Instance(s) précédente(s) retirée(s) (anciens id : {', '.join(str(x) for x in prior)})."
@@ -701,6 +715,10 @@ def pl_analytic_project_report():
                 if cerr:
                     msg += " Détail colonnes : " + " | ".join(str(x) for x in cerr[:4])
                     if len(cerr) > 4:
+                        msg += " …"
+                if lerr:
+                    msg += " Détail lignes : " + " | ".join(str(x) for x in lerr[:3])
+                    if len(lerr) > 3:
                         msg += " …"
                 msg += (
                     " Dans Odoo : menu Comptabilité → Rapports (ou lien « Ouvrir dans Odoo » dans la liste), "
@@ -718,6 +736,17 @@ def pl_analytic_project_report():
                         "Création CPC incomplète : moins de 4 colonnes sur le rapport Odoo — "
                         "l’interface peut n’afficher aucune colonne. " + msg
                     )
+                elif lc < expected_lines or lerr or not ver_ok:
+                    flash_cat = "danger" if (lc < expected_lines or not ver_ok) else "warning"
+                    if lc < expected_lines:
+                        msg = (
+                            f"Création CPC incomplète : {lc}/{expected_lines} lignes — "
+                            "l’interface peut rester vide ou sans en-têtes. " + msg
+                        )
+                    elif not ver_ok:
+                        msg = (
+                            "Vérification automatique : le rapport semble incorrect ou incomplet. " + msg
+                        )
                 elif cerr:
                     flash_cat = "warning"
                 try:

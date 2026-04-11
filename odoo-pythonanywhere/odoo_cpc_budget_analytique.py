@@ -443,17 +443,29 @@ def create_report_lines(models, uid, report_id):
     for code, label, nature, formula_ac, formula_agg in CPC_STRUCTURE:
         is_total = code.startswith("X")
         try:
+            # Odoo 19+ : pas de champ unfoldable ; hierarchy_level est calculé.
             line_vals = {
-                "name"            : f"{code} — {label}",
-                "report_id"       : report_id,
-                "code"            : code,
-                "sequence"        : seq,
-                "unfoldable"      : not is_total,
-                "foldable"        : not is_total,
-                "hide_if_zero"    : False,
-                "hierarchy_level" : 0 if is_total else 1,
+                "name"         : f"{code} — {label}",
+                "report_id"    : report_id,
+                "code"         : code,
+                "sequence"     : seq,
+                "foldable"     : not is_total,
+                "hide_if_zero" : False,
             }
-            line_id = rpc(models, uid, "account.report.line", "create", [line_vals])
+            try:
+                line_id = rpc(models, uid, "account.report.line", "create", [line_vals])
+            except Exception as e1:
+                minimal = {
+                    "name": line_vals["name"],
+                    "report_id": report_id,
+                    "code": code,
+                    "sequence": seq,
+                }
+                try:
+                    line_id = rpc(models, uid, "account.report.line", "create", [minimal])
+                    print(f"      ⚠️  Ligne {code} : créée en minimal ({e1})")
+                except Exception as e2:
+                    raise RuntimeError(f"{e1} | minimal: {e2}") from e2
             line_ids.append(line_id)
             seq += 10
 

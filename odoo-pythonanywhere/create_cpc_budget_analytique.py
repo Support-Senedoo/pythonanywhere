@@ -104,6 +104,49 @@ def _agg_formula_with_suffix(formula_agg: str, suffix: str) -> str:
     return re.sub(r'\b([A-Z]{2})\b', lambda m: f'{m.group(1)}.{suffix}', formula_agg)
 
 
+def _create_report_line_safe(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    *,
+    code: str,
+    label: str,
+    report_id: int,
+    sequence: int,
+    is_total: bool,
+) -> tuple[int | None, str | None]:
+    """
+    Crée account.report.line. Odoo 19+ : pas de champ ``unfoldable`` ; ``hierarchy_level`` est calculé
+    (ne pas l'écrire à la création).
+    """
+    vals: dict[str, Any] = {
+        "name":            f"{code} \u2014 {label}",
+        "report_id":       report_id,
+        "code":            code,
+        "sequence":        sequence,
+        "foldable":        not is_total,
+        "hide_if_zero":    False,
+    }
+    try:
+        return int(_ek(models, db, uid, password, "account.report.line", "create", [vals])), None
+    except Exception as e:
+        err1 = str(e)
+        minimal = {
+            "name":      vals["name"],
+            "report_id": report_id,
+            "code":      code,
+            "sequence":  sequence,
+        }
+        try:
+            return (
+                int(_ek(models, db, uid, password, "account.report.line", "create", [minimal])),
+                f"ligne {code} : 1er refus ({err1[:220]}), créée en minimal.",
+            )
+        except Exception as e2:
+            return None, f"ligne {code} : {err1} | minimal: {e2}"
+
+
 def _create_column_safe(
     models: Any, db: str, uid: int, password: str, col_vals: dict
 ) -> tuple[int | None, str | None]:
@@ -217,6 +260,8 @@ def create_toolbox_cpc_budget_analytique(
       filter_written : bool\u00e9ens \u00e9crits sur le rapport (filter_analytic, filter_budgets, \u2026)
       filter_personalization_error : message si l\u2019activation des filtres a \u00e9chou\u00e9
       column_errors : messages si une colonne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
+      line_errors   : messages si une ligne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
+      verification  : r\u00e9sultat de verify_cpc_budget_analytique_report (contr\u00f4le auto)
     """
     # \u00c9tape 1 \u2014 nettoyage
     prior_ids = purge_cpc_budget_analytique_instances(models, db, uid, password)
@@ -269,92 +314,103 @@ def create_toolbox_cpc_budget_analytique(
     # \u00c9tape 4 \u2014 lignes CPC + expressions
     seq = 10
     line_count = 0
+    line_errors: list[str] = []
     for code, label, nature, formula_ac, formula_agg in CPC_BUDGET_STRUCTURE:
         is_total = code.startswith("X")
-        try:
-            line_id = int(_ek(models, db, uid, password, "account.report.line", "create", [{
-                "name":            f"{code} \u2014 {label}",
-                "report_id":       report_id,
-                "code":            code,
-                "sequence":        seq,
-                "unfoldable":      not is_total,
-                "foldable":        not is_total,
-                "hide_if_zero":    False,
-                "hierarchy_level": 0 if is_total else 1,
-            }]))
-            seq += 10
-            line_count += 1
+        line_id, lwarn = _create_report_line_safe(
+            models, db, uid, password,
+            code=code, label=label, report_id=report_id, sequence=seq, is_total=is_total,
+        )
+        seq += 10
+        if line_id is None:
+            line_errors.append(lwarn or f"{code}: ligne non cr\u00e9\u00e9e")
+            continue
+        if lwarn:
+            line_errors.append(lwarn)
+        line_count += 1
 
-            if nature == "account":
-                # R\u00e9alis\u00e9 : engine account_codes respecte filter_analytic
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "balance",
-                    "engine":         "account_codes",
-                    "formula":        formula_ac,
-                    "date_scope":     "strict_range",
-                })
-                # Budget : engine budget (crossovered.budget.lines), m\u00eame mapping comptes
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "budget",
-                    "engine":         "budget",
-                    "formula":        formula_ac,
-                    "date_scope":     "strict_range",
-                })
-                # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "ecart",
-                    "engine":         "aggregation",
-                    "formula":        f"{code}.budget - {code}.balance",
-                    "date_scope":     "strict_range",
-                })
-                # % R\u00e9alisation
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "pct",
-                    "engine":         "aggregation",
-                    "formula":        f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
-                    "date_scope":     "strict_range",
-                })
+        if nature == "account":
+            # R\u00e9alis\u00e9 : engine account_codes respecte filter_analytic
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "balance",
+                "engine":         "account_codes",
+                "formula":        formula_ac,
+                "date_scope":     "strict_range",
+            })
+            # Budget : engine budget (crossovered.budget.lines), m\u00eame mapping comptes
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "budget",
+                "engine":         "budget",
+                "formula":        formula_ac,
+                "date_scope":     "strict_range",
+            })
+            # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "ecart",
+                "engine":         "aggregation",
+                "formula":        f"{code}.budget - {code}.balance",
+                "date_scope":     "strict_range",
+            })
+            # % R\u00e9alisation
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "pct",
+                "engine":         "aggregation",
+                "formula":        f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
+                "date_scope":     "strict_range",
+            })
 
-            elif nature == "aggregate":
-                # R\u00e9alis\u00e9 (agr\u00e9gation des lignes de d\u00e9tail \u2014 r\u00e9f\u00e9rence implicite .balance)
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "balance",
-                    "engine":         "aggregation",
-                    "formula":        formula_agg,
-                    "date_scope":     "strict_range",
-                })
-                # Budget (m\u00eame formule mais sur .budget de chaque code)
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "budget",
-                    "engine":         "aggregation",
-                    "formula":        _agg_formula_with_suffix(formula_agg, "budget"),
-                    "date_scope":     "strict_range",
-                })
-                # \u00c9cart
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "ecart",
-                    "engine":         "aggregation",
-                    "formula":        f"{code}.budget - {code}.balance",
-                    "date_scope":     "strict_range",
-                })
-                # % R\u00e9alisation
-                _create_expression_safe(models, db, uid, password, {
-                    "report_line_id": line_id,
-                    "label":          "pct",
-                    "engine":         "aggregation",
-                    "formula":        f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
-                    "date_scope":     "strict_range",
-                })
+        elif nature == "aggregate":
+            # R\u00e9alis\u00e9 (agr\u00e9gation des lignes de d\u00e9tail \u2014 r\u00e9f\u00e9rence implicite .balance)
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "balance",
+                "engine":         "aggregation",
+                "formula":        formula_agg,
+                "date_scope":     "strict_range",
+            })
+            # Budget (m\u00eame formule mais sur .budget de chaque code)
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "budget",
+                "engine":         "aggregation",
+                "formula":        _agg_formula_with_suffix(formula_agg, "budget"),
+                "date_scope":     "strict_range",
+            })
+            # \u00c9cart
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "ecart",
+                "engine":         "aggregation",
+                "formula":        f"{code}.budget - {code}.balance",
+                "date_scope":     "strict_range",
+            })
+            # % R\u00e9alisation
+            _create_expression_safe(models, db, uid, password, {
+                "report_line_id": line_id,
+                "label":          "pct",
+                "engine":         "aggregation",
+                "formula":        f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
+                "date_scope":     "strict_range",
+            })
 
-        except Exception:
-            pass
+    verification: dict[str, Any] = {}
+    try:
+        from verify_cpc_budget_analytique import verify_cpc_budget_analytique_report
+
+        verification = verify_cpc_budget_analytique_report(
+            models, db, uid, password, report_id=report_id
+        )
+    except Exception as e:
+        verification = {
+            "ok": False,
+            "errors": [f"V\u00e9rification automatique impossible : {e}"],
+            "warnings": [],
+            "report_id": report_id,
+        }
 
     return {
         "report_id":  report_id,
@@ -364,4 +420,6 @@ def create_toolbox_cpc_budget_analytique(
         "filter_written": filter_written,
         "filter_personalization_error": filter_personalization_error,
         "column_errors": column_errors,
+        "line_errors":   line_errors,
+        "verification":  verification,
     }
