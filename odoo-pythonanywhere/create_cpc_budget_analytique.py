@@ -7,10 +7,12 @@ Structure CPC SYSCOHADA complète (plan comptable OHADA / Sénégal).
 Compatible avec les fonctions execute_kw de personalize_syscohada_detail.py.
 Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
-Limitations connues (Odoo SaaS v16-v19) :
-  La colonne « Budget » peut rester vide quand un filtre analytique est actif,
-  car Odoo masque les expressions engine='budget' en présence d'analytic_account_ids.
-  Contournement avancé : account.report.external.value (voir odoo_cpc_budget_analytique.py).
+Stratégie colonne Budget (contournement limitation Odoo SaaS v16-v19) :
+  engine='budget' est masqué par Odoo quand le filtre analytique est actif.
+  Solution : les expressions Budget des lignes de détail utilisent engine='external',
+  lues depuis account.report.external.value (pré-calculées par sync_cpc_budget_analytique.py).
+  Les lignes de totaux (X*) utilisent engine='aggregation' sur .budget des lignes de détail.
+  → Lancer "Synchroniser le budget" dans la Toolbox pour peupler les valeurs externes.
 """
 from __future__ import annotations
 
@@ -247,12 +249,14 @@ def create_toolbox_cpc_budget_analytique(
                     "formula":        formula_ac,
                     "date_scope":     "strict_range",
                 })
-                # Budget : engine budget (peut \u00eatre masqu\u00e9 si filter_analytic actif)
+                # Budget : engine external (lit account.report.external.value)
+                # \u2192 engine='budget' masqu\u00e9 par Odoo avec filtre analytique actif.
+                # \u2192 Peupler via action "Synchroniser le budget" dans la Toolbox.
                 _create_expression_safe(models, db, uid, password, {
                     "report_line_id": line_id,
                     "label":          "budget",
-                    "engine":         "budget",
-                    "formula":        formula_ac,
+                    "engine":         "external",
+                    "formula":        "",
                     "date_scope":     "strict_range",
                 })
                 # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9

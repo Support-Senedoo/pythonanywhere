@@ -67,6 +67,10 @@ from create_cpc_budget_analytique import (
     create_toolbox_cpc_budget_analytique,
     purge_cpc_budget_analytique_instances,
 )
+from sync_cpc_budget_analytique import (
+    list_crossovered_budgets,
+    sync_cpc_budget_to_external_values,
+)
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import personalize_fix_detail_complete
 from project_pl_analytic_report import (
@@ -747,6 +751,77 @@ def pl_analytic_project_report():
                 ),
             )
 
+        if action == "sync_cpc_budget_analytique":
+            try:
+                sync_report_id = int(request.form.get("sync_report_id") or "0")
+                sync_analytic_id = int(request.form.get("sync_analytic_id") or "0")
+                sync_budget_id = int(request.form.get("sync_budget_id") or "0")
+                sync_date_from = (request.form.get("sync_date_from") or "").strip()
+                sync_date_to = (request.form.get("sync_date_to") or "").strip()
+            except (ValueError, TypeError):
+                flash("Paramètres de synchronisation invalides.", "danger")
+                return redirect(
+                    ru(**_pl_analytic_url_params(
+                        client_id=cid, filter_host=fl_save,
+                        analytic_q=analytic_q_post, filter_q=filter_q_post,
+                    ))
+                )
+            if not sync_report_id:
+                flash(
+                    "Identifiant du rapport CPC Budget Analytique manquant. "
+                    "Créez d'abord le rapport via le bouton « Créer / recréer ».",
+                    "warning",
+                )
+                return redirect(
+                    ru(**_pl_analytic_url_params(
+                        client_id=cid, filter_host=fl_save,
+                        analytic_q=analytic_q_post, filter_q=filter_q_post,
+                    ))
+                )
+            if not sync_budget_id:
+                flash("Sélectionnez un budget à synchroniser.", "warning")
+                return redirect(
+                    ru(**_pl_analytic_url_params(
+                        client_id=cid, filter_host=fl_save,
+                        analytic_q=analytic_q_post, filter_q=filter_q_post,
+                    ))
+                )
+            if not sync_date_from or not sync_date_to:
+                flash("Saisissez une période (date de début et de fin).", "warning")
+                return redirect(
+                    ru(**_pl_analytic_url_params(
+                        client_id=cid, filter_host=fl_save,
+                        analytic_q=analytic_q_post, filter_q=filter_q_post,
+                    ))
+                )
+            try:
+                result = sync_cpc_budget_to_external_values(
+                    models, db, uid, pwd,
+                    report_id=sync_report_id,
+                    analytic_account_id=sync_analytic_id,
+                    budget_id=sync_budget_id,
+                    date_from=sync_date_from,
+                    date_to=sync_date_to,
+                )
+                msg = (
+                    f"Budget synchronisé : {result['stored']} valeur(s) stockée(s)"
+                    f" sur {result['lines_found']} lignes CPC"
+                    f" ({result['budget_lines_count']} ligne(s) de budget utilisées)."
+                )
+                if result["skipped"]:
+                    msg += f" {result['skipped']} ligne(s) sans budget correspondant."
+                if result["errors"]:
+                    msg += " Notes : " + " | ".join(result["errors"][:3])
+                flash(msg, "success" if result["stored"] > 0 else "warning")
+            except Exception as e:
+                flash(f"Échec synchronisation budget : {e!s}", "danger")
+            return redirect(
+                ru(**_pl_analytic_url_params(
+                    client_id=cid, filter_host=fl_save,
+                    analytic_q=analytic_q_post, filter_q=filter_q_post,
+                ))
+            )
+
         if action == "run_report":
             try:
                 aid = int(request.form.get("analytic_account_id") or "0")
@@ -1012,6 +1087,7 @@ def pl_analytic_project_report():
     conn_status = "idle"
     conn_detail = ""
     analytic_accounts: list[dict[str, Any]] = []
+    cpc_budgets: list[dict] = []
     reports: list = []
     report_open_urls: dict[int, str] = {}
     prefill_report_name = ""
@@ -1025,6 +1101,10 @@ def pl_analytic_project_report():
                 analytic_accounts = search_analytic_accounts_for_select(
                     models, db, uid, pwd, analytic_q
                 )
+                try:
+                    cpc_budgets = list_crossovered_budgets(models, db, uid, pwd)
+                except Exception:
+                    cpc_budgets = []
                 try:
                     reports = search_account_reports(models, db, uid, pwd, filter_q)
                 except Exception:
@@ -1094,6 +1174,7 @@ def pl_analytic_project_report():
         filter_q=filter_q,
         analytic_q=analytic_q,
         analytic_accounts=analytic_accounts,
+        cpc_budgets=cpc_budgets,
         reports=reports,
         report_open_urls=report_open_urls,
         prefill_report_id=prefill_rid,
@@ -1111,6 +1192,8 @@ def pl_analytic_project_report():
         form_full_line=False,
         form_currency_mode="company",
         add_base_only=add_base_only,
+        sync_date_from_default=default_period_ytd()[0],
+        sync_date_to_default=default_period_ytd()[1],
     )
 
 
