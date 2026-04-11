@@ -81,6 +81,9 @@ _CPC_STRUCTURE: list[tuple[str, str, str, str | None, str | None]] = [
     ("XI", "R\u00c9SULTAT NET (XG+XH-RQ-RS)",             "aggregate", None, "XG + XH - RQ - RS"),
 ]
 
+# Tuple public (même contenu que _CPC_STRUCTURE) pour scripts externes ex. verify_cpc_budget_analytique.py
+CPC_BUDGET_STRUCTURE: tuple[tuple[str, str, str, str | None, str | None], ...] = tuple(_CPC_STRUCTURE)
+
 
 # ---------------------------------------------------------------------------
 # Utilitaires internes
@@ -235,7 +238,7 @@ def create_toolbox_cpc_budget_analytique(
     # \u00c9tape 4 \u2014 lignes CPC + expressions
     seq = 10
     line_count = 0
-    for code, label, nature, formula_ac, formula_agg in _CPC_STRUCTURE:
+    for code, label, nature, formula_ac, formula_agg in CPC_BUDGET_STRUCTURE:
         is_total = code.startswith("X")
         try:
             line_id = int(_ek(models, db, uid, password, "account.report.line", "create", [{

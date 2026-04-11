@@ -700,6 +700,11 @@ def pl_analytic_project_report():
                     " Dans Odoo, ouvrez le rapport, choisissez la période, le budget et l’analytique "
                     "dans les filtres : la colonne Budget lit crossovered.budget.lines (données natives)."
                 )
+                msg += (
+                    " Contrôle technique (CLI, .env Odoo) : "
+                    "`python verify_cpc_budget_analytique.py` ou "
+                    f"`python verify_cpc_budget_analytique.py --report-id {rid}`."
+                )
                 try:
                     _ba, menu_mid = ensure_account_report_reporting_menu(
                         models, db, uid, pwd, rid,
