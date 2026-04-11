@@ -275,11 +275,11 @@
     </ul>
   </details>
   <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.4;font-size:0.85rem;">
-    La colonne Budget utilise le moteur natif <code>engine='budget'</code> (données
-    <code>crossovered.budget.lines</code>). Le rapport est créé avec
-    <code>filter_analytic</code> et, si votre version l’expose,
-    <code>filter_budgets</code> / <code>filter_budget</code> — comme sur une copie P&amp;L Senedoo :
-    dans Odoo, choisissez la période, le budget et l’analytique dans les filtres du rapport.
+    Colonne Budget : moteur natif <code>budget</code> si votre Odoo l’expose ; sinon moteur
+    <code>external</code> avec injection depuis <strong>account.report.budget.item</strong>
+    (budget financier créé dans le rapport comptable) ou, à défaut, depuis
+    <code>crossovered.budget.lines</code> (budget analytique). Le rapport active
+    <code>filter_analytic</code> et, si disponible, <code>filter_budgets</code> / <code>filter_budget</code>.
   </p>
   <div class="sn-report-btn-row">
     <form id="form-create-cpc-budget" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
@@ -299,6 +299,46 @@
       <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
     </form>
   </div>
+  {% if conn_status == 'ok' and cpc_budget_report_id %}
+  <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);">
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Injecter le budget dans le CPC (Odoo)</h3>
+    <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
+      Remplit la colonne Budget du rapport toolbox (id {{ cpc_budget_report_id }}) via
+      <code>account.report.external.value</code>. Période : année en cours jusqu’à aujourd’hui (YTD),
+      comme le tableau API.
+      {% if report_budget_item_model %}Priorité : budget financier
+      (<code>account.report.budget</code> / lignes <code>account.report.budget.item</code>) si vous en choisissez un ;
+      sinon budget crossovered pour l’analytique sélectionné.{% else %}Source :
+      lignes crossovered pour l’analytique sélectionné (obligatoire).{% endif %}
+    </p>
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic" style="margin:0;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="action" value="sync_cpc_budget_external">
+      {% if financial_budgets and report_budget_item_model %}
+      <label for="account_report_budget_id">Budget financier (account.report.budget)</label>
+      <select id="account_report_budget_id" name="account_report_budget_id">
+        <option value="">— Optionnel : laisser vide pour n’utiliser que le crossovered —</option>
+        {% for b in financial_budgets %}
+        <option value="{{ b.id }}">{{ b.name }} (#{{ b.id }})</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <label for="cpc_inject_analytic_id">Axe analytique (crossovered)</label>
+      <select id="cpc_inject_analytic_id" name="analytic_account_id">
+        <option value="">— Aucun —</option>
+        {% for a in analytic_accounts %}
+        <option value="{{ a.id }}" {% if form_analytic_id is not none and form_analytic_id == a.id %}selected{% endif %}>{{ a.label }}</option>
+        {% endfor %}
+      </select>
+      <div style="margin-top:0.65rem;">
+        <button type="submit" {% if not selected_client %}disabled{% endif %}>Injecter budget CPC dans Odoo</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
 </div>
 
 <div class="sn-card">

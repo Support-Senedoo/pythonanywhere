@@ -19,8 +19,8 @@
   ARCHITECTURE TECHNIQUE :
     - Les expressions "réalisé" utilisent l'engine account_codes
       avec date_scope = strict_range (respecte le filtre analytique)
-    - Les expressions "budget" utilisent l'engine budget si la base l'expose ; sinon
-      account_codes (même formule que le réalisé, Odoo 19+ SaaS). Le rapport active filter_budgets /
+    - Les expressions "budget" utilisent l'engine budget si la base l'expose ; sinon external
+      (crossovered + valeurs injectées) si le modèle budget existe ; sinon account_codes. Le rapport active filter_budgets /
       filter_budget lorsque le modèle Odoo les expose (comme le P&L Senedoo).
     - Les expressions "%" utilisent l'engine aggregation
 
@@ -40,7 +40,9 @@ from datetime import date, datetime
 
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
 from create_cpc_budget_analytique import (
+    cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
+    cpc_crossovered_budget_available,
     normalize_cpc_account_codes_formula,
 )
 
@@ -429,8 +431,19 @@ def create_expression_safe(models, uid, expr_vals):
         return rpc(models, uid, "account.report.expression", "create", [ev])
     except Exception as e:
         # Retry sans champs optionnels
-        safe = {k: v for k, v in ev.items()
-                if k in ("report_line_id", "label", "engine", "formula", "date_scope")}
+        safe = {
+            k: v
+            for k, v in ev.items()
+            if k in (
+                "report_line_id",
+                "label",
+                "engine",
+                "formula",
+                "date_scope",
+                "subformula",
+                "figure_type",
+            )
+        }
         try:
             return rpc(models, uid, "account.report.expression", "create", [safe])
         except Exception as e2:
@@ -445,12 +458,31 @@ def create_report_lines(models, uid, report_id):
     print(f"{'═'*64}\n")
 
     eng_keys = _expression_engine_keys_local(models, uid)
-    budget_engine_native = "budget" in eng_keys
-    budget_engine = "budget" if budget_engine_native else "account_codes"
-    if not budget_engine_native:
+    report_item_ok = cpc_account_report_budget_item_available(models, DB, uid, API_KEY)
+    cross_ok = cpc_crossovered_budget_available(models, DB, uid, API_KEY)
+    if "budget" in eng_keys:
+        budget_mode = "native"
+    elif report_item_ok:
+        budget_mode = "external"
+    elif cross_ok:
+        budget_mode = "external"
+    else:
+        budget_mode = "fallback_gl"
+    budget_pct_meaningful = budget_mode != "fallback_gl"
+    if budget_mode == "fallback_gl":
         print(
-            "  ⚠️  Moteur « budget » absent sur account.report.expression (Odoo 19+ / SaaS) : "
-            "colonne Budget = account_codes comme le Réalisé ; % et écart neutralisés sur détail.\n"
+            "  ⚠️  Pas de moteur « budget » sur les expressions ni account.report.budget.item ni "
+            "crossovered.budget.lines : colonne Budget = account_codes comme le Réalisé.\n"
+        )
+    elif budget_mode == "external" and report_item_ok:
+        print(
+            "  ℹ️  Colonne Budget = engine « external » : privilégier l'injection depuis "
+            "account.report.budget.item (budget financier Odoo).\n"
+        )
+    elif budget_mode == "external":
+        print(
+            "  ℹ️  Colonne Budget = engine « external » : injecter depuis crossovered (analytique) "
+            "vers account.report.external.value.\n"
         )
 
     # Nettoyage
@@ -510,14 +542,33 @@ def create_report_lines(models, uid, report_id):
                     # On laisse le moteur calculer le solde net
                 })
 
-                # COL 2 : BUDGET — engine budget (crossovered.budget.lines)
-                create_expression_safe(models, uid, {
-                    "report_line_id" : line_id,
-                    "label"          : "budget",
-                    "engine"         : budget_engine,
-                    "formula"        : formula_ac,
-                    "date_scope"     : "strict_range",
-                })
+                # COL 2 : BUDGET
+                if budget_mode == "native":
+                    create_expression_safe(models, uid, {
+                        "report_line_id": line_id,
+                        "label":          "budget",
+                        "engine":         "budget",
+                        "formula":        formula_ac,
+                        "date_scope":     "strict_range",
+                    })
+                elif budget_mode == "external":
+                    create_expression_safe(models, uid, {
+                        "report_line_id": line_id,
+                        "label":          "budget",
+                        "engine":         "external",
+                        "formula":        "sum",
+                        "subformula":     "editable",
+                        "figure_type":    "monetary",
+                        "date_scope":     "strict_range",
+                    })
+                else:
+                    create_expression_safe(models, uid, {
+                        "report_line_id": line_id,
+                        "label":          "budget",
+                        "engine":         "account_codes",
+                        "formula":        formula_ac,
+                        "date_scope":     "strict_range",
+                    })
 
                 # COL 3 : ÉCART (Budget - Réalisé) via aggregation
                 create_expression_safe(models, uid, {
@@ -535,7 +586,7 @@ def create_report_lines(models, uid, report_id):
                     "label"          : "pct",
                     "engine"         : "aggregation",
                     "formula"        : cpc_budget_pct_aggregation_formula(
-                        code, budget_engine_native=budget_engine_native
+                        code, budget_pct_meaningful=budget_pct_meaningful
                     ),
                     "date_scope"     : "strict_range",
                 })
@@ -567,7 +618,7 @@ def create_report_lines(models, uid, report_id):
                     "label":          "pct",
                     "engine":         "aggregation",
                     "formula":        cpc_budget_pct_aggregation_formula(
-                        code, budget_engine_native=budget_engine_native
+                        code, budget_pct_meaningful=budget_pct_meaningful
                     ),
                     "date_scope":     "strict_range",
                 })

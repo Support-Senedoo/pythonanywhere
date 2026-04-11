@@ -62,14 +62,16 @@ from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
     probe_financial_budget_analytic_summary,
 )
+from cpc_budget_external_sync import sync_cpc_budget_external_values
 from create_cpc_budget_analytique import (
     CPC_BUDGET_ANALYTIQUE_NAME,
     CPC_BUDGET_STRUCTURE,
+    cpc_account_report_budget_item_available,
     create_toolbox_cpc_budget_analytique,
     purge_cpc_budget_analytique_instances,
 )
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
-from personalize_syscohada_detail import personalize_fix_detail_complete
+from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
 from project_pl_analytic_report import (
     build_report,
     default_period_ytd,
@@ -320,6 +322,61 @@ def _pl_analytic_highlight_info(
     if rid_i in ids_in:
         return rid_i, False
     return rid_i, True
+
+
+def _staff_financial_budgets_for_odoo(
+    models: Any, db: str, uid: int, pwd: str
+) -> list[dict[str, Any]]:
+    try:
+        n = int(
+            execute_kw(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.model",
+                "search_count",
+                [[["model", "=", "account.report.budget"]]],
+            )
+            or 0
+        )
+    except Exception:
+        return []
+    if n <= 0:
+        return []
+    try:
+        return (
+            execute_kw(
+                models,
+                db,
+                uid,
+                pwd,
+                "account.report.budget",
+                "search_read",
+                [[]],
+                {"fields": ["id", "name"], "order": "name asc", "limit": 400},
+            )
+            or []
+        )
+    except Exception:
+        return []
+
+
+def _staff_resolve_cpc_budget_report_id(models: Any, db: str, uid: int, pwd: str) -> int:
+    try:
+        ids = execute_kw(
+            models,
+            db,
+            uid,
+            pwd,
+            "account.report",
+            "search",
+            [[["name", "=", CPC_BUDGET_ANALYTIQUE_NAME]]],
+            {"limit": 1},
+        )
+        return int(ids[0]) if ids else 0
+    except Exception:
+        return 0
 
 
 @bp.route("/utilities/pl-analytique-projet", methods=["GET", "POST"])
@@ -823,6 +880,51 @@ def pl_analytic_project_report():
                 ),
             )
 
+        if action == "sync_cpc_budget_external":
+            try:
+                aid = int(request.form.get("analytic_account_id") or "0")
+            except ValueError:
+                aid = 0
+            try:
+                fb = int(request.form.get("account_report_budget_id") or "0")
+            except ValueError:
+                fb = 0
+            date_from, date_to = default_period_ytd()
+            try:
+                rid = _staff_resolve_cpc_budget_report_id(models, db, uid, pwd)
+                sync = sync_cpc_budget_external_values(
+                    models,
+                    db,
+                    uid,
+                    pwd,
+                    report_id=rid,
+                    analytic_account_id=aid,
+                    date_from=date_from,
+                    date_to=date_to,
+                    account_report_budget_id=fb if fb > 0 else None,
+                )
+                if sync.get("ok"):
+                    src = sync.get("source") or "?"
+                    flash(
+                        f"Injection budget CPC : {int(sync.get('written') or 0)} ligne(s) Odoo, "
+                        f"période {date_from} → {date_to}, source={src}.",
+                        "success",
+                    )
+                else:
+                    flash(sync.get("reason") or "Injection budget CPC impossible.", "danger")
+            except Exception as e:
+                flash(f"Injection budget CPC : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
+
         if action == "run_report":
             try:
                 aid = int(request.form.get("analytic_account_id") or "0")
@@ -1091,6 +1193,9 @@ def pl_analytic_project_report():
     reports: list = []
     report_open_urls: dict[int, str] = {}
     prefill_report_name = ""
+    financial_budgets: list[dict[str, Any]] = []
+    report_budget_item_model = False
+    cpc_budget_report_id = 0
     if selected:
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
@@ -1101,6 +1206,16 @@ def pl_analytic_project_report():
                 analytic_accounts = search_analytic_accounts_for_select(
                     models, db, uid, pwd, analytic_q
                 )
+                try:
+                    report_budget_item_model = cpc_account_report_budget_item_available(
+                        models, db, uid, pwd
+                    )
+                    financial_budgets = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
+                    cpc_budget_report_id = _staff_resolve_cpc_budget_report_id(models, db, uid, pwd)
+                except Exception:
+                    report_budget_item_model = False
+                    financial_budgets = []
+                    cpc_budget_report_id = 0
                 try:
                     reports = search_account_reports(models, db, uid, pwd, filter_q)
                 except Exception:
@@ -1187,6 +1302,9 @@ def pl_analytic_project_report():
         form_full_line=False,
         form_currency_mode="company",
         add_base_only=add_base_only,
+        financial_budgets=financial_budgets,
+        report_budget_item_model=report_budget_item_model,
+        cpc_budget_report_id=cpc_budget_report_id,
     )
 
 

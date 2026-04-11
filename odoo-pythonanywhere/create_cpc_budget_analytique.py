@@ -8,8 +8,11 @@ Compatible avec les fonctions execute_kw de personalize_syscohada_detail.py.
 Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
 Stratégie colonne Budget (données 100 % Odoo) :
-  - Colonne Budget : engine ``budget`` si le modèle Odoo l'expose ; sinon ``account_codes`` avec la
-    même formule que le réalisé (fallback Odoo 19+ SaaS : pas de moteur ``budget`` sur les expressions).
+  - Colonne Budget : engine ``budget`` si la sélection ``engine`` l'expose ; sinon, si le modèle
+    ``account.report.budget.item`` existe (budgets financiers saisis depuis le rapport, ex. P&L),
+    engine ``external`` et injection depuis ces lignes ; sinon si ``crossovered.budget.lines``
+    existe, même moteur ``external`` avec injection depuis les lignes analytiques crossovered ;
+    sinon repli ``account_codes`` (même formule que le réalisé — peu utile).
   - Après création du rapport : activation de ``filter_budgets`` ou ``filter_budget`` sur la
     fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
     Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
@@ -217,7 +220,15 @@ def _create_expression_safe(
         safe = {
             k: v
             for k, v in expr_vals.items()
-            if k in ("report_line_id", "label", "engine", "formula", "date_scope")
+            if k in (
+                "report_line_id",
+                "label",
+                "engine",
+                "formula",
+                "date_scope",
+                "subformula",
+                "figure_type",
+            )
         }
         try:
             return (
@@ -237,6 +248,46 @@ def _expr_formula_for_engine(expr_vals: dict) -> dict:
     return out
 
 
+def cpc_crossovered_budget_available(models: Any, db: str, uid: int, password: str) -> bool:
+    """True si le modèle ``crossovered.budget.lines`` est présent (budget analytique classique)."""
+    try:
+        n = int(
+            _ek(
+                models,
+                db,
+                uid,
+                password,
+                "ir.model",
+                "search_count",
+                [[["model", "=", "crossovered.budget.lines"]]],
+            )
+            or 0
+        )
+        return n > 0
+    except Exception:
+        return False
+
+
+def cpc_account_report_budget_item_available(models: Any, db: str, uid: int, password: str) -> bool:
+    """True si le modèle ``account.report.budget.item`` est présent (budgets financiers liés au reporting)."""
+    try:
+        n = int(
+            _ek(
+                models,
+                db,
+                uid,
+                password,
+                "ir.model",
+                "search_count",
+                [[["model", "=", "account.report.budget.item"]]],
+            )
+            or 0
+        )
+        return n > 0
+    except Exception:
+        return False
+
+
 def expression_engine_keys(models: Any, db: str, uid: int, password: str) -> frozenset[str]:
     """Valeurs autoris\u00e9es pour ``account.report.expression.engine`` sur cette base."""
     try:
@@ -251,13 +302,13 @@ def expression_engine_keys(models: Any, db: str, uid: int, password: str) -> fro
         return frozenset()
 
 
-def cpc_budget_pct_aggregation_formula(line_code: str, *, budget_engine_native: bool) -> str:
+def cpc_budget_pct_aggregation_formula(line_code: str, *, budget_pct_meaningful: bool) -> str:
     """
     Formule moteur ``aggregation`` pour la colonne %.
     Odoo 19 : ``if_other_is_zero(...)`` n'est plus accept\u00e9 par la regex de validation.
-    Sans moteur ``budget``, on neutralise \u00e0 0 (sinon % = 100 % partout si budget = r\u00e9alis\u00e9).
+    Si la colonne budget n'est pas fiable (même GL que le r\u00e9alis\u00e9), retourner ``0``.
     """
-    if not budget_engine_native:
+    if not budget_pct_meaningful:
         return "0"
     c = line_code
     return f"{c}.balance/{c}.budget*100"
@@ -333,8 +384,10 @@ def create_toolbox_cpc_budget_analytique(
       column_errors : messages si une colonne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
       line_errors   : messages si une ligne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
       expression_errors : \u00e9checs cr\u00e9ation account.report.expression
-      budget_engine_used : moteur utilis\u00e9 pour l'expression ``budget`` (``budget`` ou ``account_codes``)
-      budget_engine_native : True si le moteur ``budget`` existe sur cette base
+      budget_mode : ``native`` | ``external`` | ``fallback_gl``
+      budget_external_source : ``report_budget_item`` | ``crossovered`` | None
+      budget_engine_used : moteur de l'expression ``budget`` sur les lignes d\u00e9tail
+      budget_pct_meaningful : True si % et \u00e9cart peuvent s'appuyer sur une colonne budget r\u00e9elle
       creation_warnings : avertissements (ex. fallback sans moteur budget)
       verification  : r\u00e9sultat de verify_cpc_budget_analytique_report (contr\u00f4le auto)
     """
@@ -392,15 +445,43 @@ def create_toolbox_cpc_budget_analytique(
     line_errors: list[str] = []
     expression_errors: list[str] = []
     eng_keys = expression_engine_keys(models, db, uid, password)
-    budget_engine_native = "budget" in eng_keys
-    budget_engine = "budget" if budget_engine_native else "account_codes"
+    report_budget_item_ok = cpc_account_report_budget_item_available(models, db, uid, password)
+    crossovered_ok = cpc_crossovered_budget_available(models, db, uid, password)
+    budget_external_source: str | None = None
+    if "budget" in eng_keys:
+        budget_mode = "native"
+        budget_engine_used = "budget"
+    elif report_budget_item_ok:
+        budget_mode = "external"
+        budget_engine_used = "external"
+        budget_external_source = "report_budget_item"
+    elif crossovered_ok:
+        budget_mode = "external"
+        budget_engine_used = "external"
+        budget_external_source = "crossovered"
+    else:
+        budget_mode = "fallback_gl"
+        budget_engine_used = "account_codes"
+    budget_pct_meaningful = budget_mode != "fallback_gl"
     creation_warnings: list[str] = []
-    if not budget_engine_native:
+    if budget_mode == "fallback_gl":
         creation_warnings.append(
-            "Cette instance Odoo n'expose pas le moteur « budget » sur account.report.expression "
-            "(Odoo 19+ / SaaS). La colonne Budget réutilise account_codes comme le Réalisé ; "
-            "l'écart reste 0 et le % à 0. Avec le moteur budget (autre build / module), "
-            "recréer le rapport pour des montants budgétaires réels."
+            "Cette instance Odoo n'a ni moteur « budget » sur les expressions, ni modèle "
+            "account.report.budget.item, ni crossovered.budget.lines : la colonne Budget reprend "
+            "le réalisé (inutile pour l'analyse)."
+        )
+    elif budget_mode == "external" and budget_external_source == "report_budget_item":
+        creation_warnings.append(
+            "Colonne Budget = moteur « external » (données ``account.report.budget.item``). "
+            "Sur cette page : sélectionnez le budget financier créé depuis le rapport Odoo (ex. P&L), "
+            "puis « Injecter budget CPC dans Odoo » (période YTD). L'analytique filtre les lignes "
+            "d'item si le modèle le permet ; sinon le budget injecté reste par compte général."
+        )
+    elif budget_mode == "external":
+        creation_warnings.append(
+            "Colonne Budget = moteur « external » (lignes crossovered pour l'analytique). "
+            "Choisissez l'axe analytique puis « Injecter budget CPC dans Odoo » "
+            "(période YTD, comme le tableau API)."
         )
 
     def _push_expr(expr_vals: dict) -> None:
@@ -435,15 +516,36 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        formula_ac,
                 "date_scope":     "strict_range",
             })
-            # Budget : moteur ``budget`` si disponible, sinon account_codes (m\u00eame formule)
-            _push_expr({
-                "_line_code":     code,
-                "report_line_id": line_id,
-                "label":          "budget",
-                "engine":         budget_engine,
-                "formula":        formula_ac,
-                "date_scope":     "strict_range",
-            })
+            # Budget : natif, external (crossovered), ou repli GL
+            if budget_mode == "native":
+                _push_expr({
+                    "_line_code":     code,
+                    "report_line_id": line_id,
+                    "label":          "budget",
+                    "engine":         "budget",
+                    "formula":        formula_ac,
+                    "date_scope":     "strict_range",
+                })
+            elif budget_mode == "external":
+                _push_expr({
+                    "_line_code":     code,
+                    "report_line_id": line_id,
+                    "label":          "budget",
+                    "engine":         "external",
+                    "formula":        "sum",
+                    "subformula":     "editable",
+                    "figure_type":    "monetary",
+                    "date_scope":     "strict_range",
+                })
+            else:
+                _push_expr({
+                    "_line_code":     code,
+                    "report_line_id": line_id,
+                    "label":          "budget",
+                    "engine":         "account_codes",
+                    "formula":        formula_ac,
+                    "date_scope":     "strict_range",
+                })
             # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9
             _push_expr({
                 "_line_code":     code,
@@ -459,7 +561,9 @@ def create_toolbox_cpc_budget_analytique(
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
-                "formula":        cpc_budget_pct_aggregation_formula(code, budget_engine_native=budget_engine_native),
+                "formula":        cpc_budget_pct_aggregation_formula(
+                    code, budget_pct_meaningful=budget_pct_meaningful
+                ),
                 "date_scope":     "strict_range",
             })
 
@@ -497,7 +601,9 @@ def create_toolbox_cpc_budget_analytique(
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
-                "formula":        cpc_budget_pct_aggregation_formula(code, budget_engine_native=budget_engine_native),
+                "formula":        cpc_budget_pct_aggregation_formula(
+                    code, budget_pct_meaningful=budget_pct_meaningful
+                ),
                 "date_scope":     "strict_range",
             })
 
@@ -526,8 +632,10 @@ def create_toolbox_cpc_budget_analytique(
         "column_errors": column_errors,
         "line_errors":   line_errors,
         "expression_errors": expression_errors,
-        "budget_engine_used": budget_engine,
-        "budget_engine_native": budget_engine_native,
+        "budget_mode":        budget_mode,
+        "budget_external_source": budget_external_source,
+        "budget_engine_used": budget_engine_used,
+        "budget_pct_meaningful": budget_pct_meaningful,
         "creation_warnings": creation_warnings,
         "verification":  verification,
     }

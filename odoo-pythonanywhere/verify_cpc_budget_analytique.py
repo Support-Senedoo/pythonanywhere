@@ -36,7 +36,9 @@ from create_cpc_budget_analytique import (
     CPC_BUDGET_ANALYTIQUE_NAME,
     CPC_BUDGET_STRUCTURE,
     _agg_formula_with_suffix,
+    cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
+    cpc_crossovered_budget_available,
     expression_engine_keys,
     normalize_cpc_account_codes_formula,
 )
@@ -240,7 +242,7 @@ def verify_cpc_budget_analytique_report(
                 "account.report.expression",
                 "search_read",
                 [[["report_line_id", "in", line_ids]]],
-                {"fields": ["report_line_id", "label", "engine", "formula"]},
+                {"fields": ["report_line_id", "label", "engine", "formula", "subformula", "figure_type"]},
             )
             or []
         )
@@ -253,7 +255,19 @@ def verify_cpc_budget_analytique_report(
 
     line_checks: list[dict[str, Any]] = []
     fallback_budget_account_codes = False
-    budget_native = "budget" in expression_engine_keys(models, db, uid, password)
+    eng_keys = expression_engine_keys(models, db, uid, password)
+    budget_native = "budget" in eng_keys
+    report_budget_item_ok = cpc_account_report_budget_item_available(models, db, uid, password)
+    crossovered_ok = cpc_crossovered_budget_available(models, db, uid, password)
+    if budget_native:
+        expected_budget_mode = "native"
+    elif report_budget_item_ok:
+        expected_budget_mode = "external"
+    elif crossovered_ok:
+        expected_budget_mode = "external"
+    else:
+        expected_budget_mode = "fallback_gl"
+    budget_pct_meaningful = expected_budget_mode != "fallback_gl"
     for ln in sorted(lines, key=lambda x: str(x.get("code") or "")):
         code = str(ln.get("code") or "")
         lid = int(ln["id"])
@@ -292,7 +306,7 @@ def verify_cpc_budget_analytique_report(
                         lc_errors.append(f"ecart: formule « {ec_g} » ≠ attendue « {ec_e} »")
                     pct_e = _norm(
                         cpc_budget_pct_aggregation_formula(
-                            code, budget_engine_native=budget_native
+                            code, budget_pct_meaningful=budget_pct_meaningful
                         )
                     )
                     pct_g = _norm(ex["pct"].get("formula"))
@@ -303,12 +317,24 @@ def verify_cpc_budget_analytique_report(
                 if b_eng != "account_codes":
                     lc_errors.append(f"balance: engine={b_eng!r}, attendu account_codes")
                 bud_eng = (ex["budget"].get("engine") or "").strip()
-                if bud_eng not in ("budget", "account_codes"):
+                if bud_eng not in ("budget", "account_codes", "external"):
                     lc_errors.append(
-                        f"budget: engine={bud_eng!r}, attendu budget ou account_codes"
+                        f"budget: engine={bud_eng!r}, attendu budget, external ou account_codes"
                     )
                 if bud_eng == "account_codes" and not code.startswith("X"):
                     fallback_budget_account_codes = True
+                if expected_budget_mode == "native" and bud_eng != "budget":
+                    lc_errors.append(
+                        f"budget: engine={bud_eng!r}, attendu budget (moteur natif sur cette base)"
+                    )
+                if expected_budget_mode == "external" and bud_eng != "external":
+                    lc_errors.append(
+                        f"budget: engine={bud_eng!r}, attendu external (recréer le rapport toolbox)"
+                    )
+                if expected_budget_mode == "fallback_gl" and bud_eng != "account_codes":
+                    lc_errors.append(
+                        f"budget: engine={bud_eng!r}, attendu account_codes (repli GL)"
+                    )
                 for lab in ("ecart", "pct"):
                     eng = (ex[lab].get("engine") or "").strip()
                     if eng != "aggregation":
@@ -316,7 +342,7 @@ def verify_cpc_budget_analytique_report(
 
                 pct_got = (ex["pct"].get("formula") or "").replace(" ", "")
                 pct_exp = cpc_budget_pct_aggregation_formula(
-                    code, budget_engine_native=budget_native
+                    code, budget_pct_meaningful=budget_pct_meaningful
                 ).replace(" ", "")
                 if pct_got != pct_exp:
                     lc_errors.append(f"pct: formule « {pct_got} » ≠ attendue « {pct_exp} »")
@@ -333,6 +359,16 @@ def verify_cpc_budget_analytique_report(
                         lc_errors.append(
                             f"formule budget « {f_bud} » ≠ attendue (normalisée) « {f_exp} »"
                         )
+                    if bud_eng == "external":
+                        f_raw = (ex["budget"].get("formula") or "").strip()
+                        if f_raw != "sum":
+                            lc_errors.append(f"budget external: formule « {f_raw!r} » ≠ attendue « sum »")
+                        sub = (ex["budget"].get("subformula") or "").strip().lower()
+                        if sub and sub != "editable":
+                            lc_errors.append(
+                                f"budget external: subformula « {ex['budget'].get('subformula')!r} » "
+                                "≠ attendue « editable »"
+                            )
                     if bud_eng == "account_codes" and f_bud != f_bal:
                         lc_errors.append(
                             f"formule budget « {f_bud} » ≠ balance « {f_bal} » (fallback attendu)"
@@ -351,10 +387,21 @@ def verify_cpc_budget_analytique_report(
 
     if fallback_budget_account_codes:
         warnings.append(
-            "Moteur « budget » absent sur account.report.expression : la colonne Budget reprend "
-            "account_codes (comme le Réalisé) ; écart 0 et % 0 sur les lignes détail — typique "
-            "d'Odoo 19+ SaaS sans moteur budget sur les expressions."
+            "Colonne Budget en repli account_codes (comme le Réalisé) : écart 0 et % inutiles sur "
+            "les lignes détail — pas de moteur budget natif ni account.report.budget.item ni crossovered."
         )
+    if expected_budget_mode == "external":
+        if report_budget_item_ok:
+            warnings.append(
+                "Budget des lignes détail = moteur external : injecter depuis la toolbox "
+                "(budget financier account.report.budget et/ou analytique pour crossovered), "
+                "période YTD, sinon la colonne Budget reste vide en Odoo."
+            )
+        else:
+            warnings.append(
+                "Budget des lignes détail = moteur external : injecter depuis la toolbox "
+                "avec l'analytique (crossovered), période YTD, sinon la colonne Budget reste vide en Odoo."
+            )
 
     ok = len(errors) == 0
     return {
