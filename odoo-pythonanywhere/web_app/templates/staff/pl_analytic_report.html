@@ -65,7 +65,7 @@
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
     <strong>Version :</strong> {{ utility_version }} ·
-    <strong>Date :</strong> {{ utility_date }}
+    <strong>Date :</strong> {{ utility_date }} {{ toolbox_app_time }}
     · <strong>Révision dépôt :</strong> <code>{{ toolbox_git_revision }}</code>
   </p>
 </details>
@@ -235,6 +235,42 @@
     <p class="sn-muted" style="font-size:0.85rem;margin:0 0 0.5rem;">Libellé de la copie : source + « — copie Senedoo (analytique budget) ».</p>
     <button type="submit" {% if not prefill_report_id %}disabled{% endif %}>Créer la copie (détail + analytique / budget)</button>
   </form>
+</div>
+
+<div class="sn-card">
+  <h2 style="margin-top:0;font-size:1.05rem;">CPC SYSCOHADA — Budget Analytique (rapport neuf)</h2>
+  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
+    Crée un rapport <code>account.report</code> complet depuis zéro : structure CPC SYSCOHADA,
+    <strong>4 colonnes</strong> (Réalisé / Budget / Écart / % Réalisation), filtre analytique activé.
+    Toute instance Senedoo existante est supprimée avant la création.
+  </p>
+  <details class="sn-muted" style="margin:0 0 0.85rem;font-size:0.85rem;line-height:1.4;">
+    <summary style="cursor:pointer;">Limitation connue (Odoo SaaS v16-v19)</summary>
+    <p style="margin:0.4rem 0 0;">
+      La colonne <strong>Budget</strong> peut rester vide lorsque le filtre analytique est actif.
+      Odoo masque les expressions <code>engine='budget'</code> en présence de <code>analytic_account_ids</code>.
+      Contournement avancé disponible en CLI (<code>odoo_cpc_budget_analytique.py</code>, étape 6 —
+      <code>account.report.external.value</code>).
+    </p>
+  </details>
+  <div class="sn-report-btn-row">
+    <form id="form-create-cpc-budget" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="create_cpc_budget_analytique">
+      <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Créer / recréer le CPC Budget Analytique</button>
+    </form>
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="delete_cpc_budget_analytique">
+      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
+    </form>
+  </div>
 </div>
 
 <div class="sn-card">

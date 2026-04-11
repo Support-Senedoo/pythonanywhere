@@ -62,6 +62,11 @@ from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
     probe_financial_budget_analytic_summary,
 )
+from create_cpc_budget_analytique import (
+    CPC_BUDGET_ANALYTIQUE_NAME,
+    create_toolbox_cpc_budget_analytique,
+    purge_cpc_budget_analytique_instances,
+)
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import personalize_fix_detail_complete
 from project_pl_analytic_report import (
@@ -658,6 +663,79 @@ def pl_analytic_project_report():
                 flash(f"Sonde budget / analytique : {msg}", "info")
             except Exception as e:
                 flash(f"Sonde : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
+
+        if action == "create_cpc_budget_analytique":
+            try:
+                result = create_toolbox_cpc_budget_analytique(models, db, uid, pwd)
+                rid = result["report_id"]
+                prior = result["prior_ids"]
+                rlabel = read_account_report_label(models, db, uid, pwd, rid) or CPC_BUDGET_ANALYTIQUE_NAME
+                msg = (
+                    f"Rapport « {rlabel} » créé (account.report id={rid}) — "
+                    f"{result['col_count']} colonnes, {result['line_count']} lignes CPC SYSCOHADA."
+                )
+                if prior:
+                    msg += (
+                        f" Instance(s) précédente(s) retirée(s) (anciens id : {', '.join(str(x) for x in prior)})."
+                    )
+                msg += (
+                    " Note : la colonne Budget peut rester vide si le filtre analytique est actif"
+                    " (limitation Odoo SaaS — voir DEPLOY_PYTHONANYWHERE.md)."
+                )
+                try:
+                    _ba, menu_mid = ensure_account_report_reporting_menu(
+                        models, db, uid, pwd, rid,
+                        rlabel.strip()[:240] or CPC_BUDGET_ANALYTIQUE_NAME,
+                        under_trial_balance=False,
+                    )
+                    if menu_mid:
+                        msg += " Entrée de menu ajoutée sous Rapports comptables."
+                except Exception:
+                    pass
+                flash(msg, "success")
+                _pl_analytic_prefs_merge_save(
+                    client_id=cid,
+                    filter_host=fl_save,
+                    filter_q=filter_q_post,
+                    analytic_q=analytic_q_post,
+                    last_created_report_id=rid,
+                    last_created_client_id=cid,
+                )
+            except Exception as e:
+                flash(f"Échec création CPC Budget Analytique : {e!s}", "danger")
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
+
+        if action == "delete_cpc_budget_analytique":
+            try:
+                prior = purge_cpc_budget_analytique_instances(models, db, uid, pwd)
+                if prior:
+                    flash(
+                        f"Rapport(s) CPC Budget Analytique supprimé(s) (id : {', '.join(str(x) for x in prior)}).",
+                        "success",
+                    )
+                else:
+                    flash("Aucun rapport CPC Budget Analytique toolbox trouvé sur cette base.", "info")
+            except Exception as e:
+                flash(f"Échec suppression CPC Budget Analytique : {e!s}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(

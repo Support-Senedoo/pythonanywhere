@@ -41,14 +41,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    load_dotenv(_SCRIPT_DIR / ".env")
 except ImportError:
     pass
 
-_SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
@@ -185,80 +186,15 @@ def _compare_api_vs_ui(
     }
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Assemble API build_report + capture UI pour debug (un JSON à joindre au chat)."
-    )
-    p.add_argument("--analytic-id", type=int, default=None, help="ID account.analytic.account (si connu).")
-    p.add_argument(
-        "--analytic-name",
-        default=None,
-        help="Nom ou code du compte analytique (recherche Odoo), si vous ne connaissez pas l’id.",
-    )
-    p.add_argument("--date-from", default=None, help="YYYY-MM-DD (ou avec --dates-ytd)")
-    p.add_argument("--date-to", default=None, help="YYYY-MM-DD (ou avec --dates-ytd)")
-    p.add_argument(
-        "--dates-ytd",
-        action="store_true",
-        help="Période : 1er janvier année en cours → aujourd’hui (comme la toolbox).",
-    )
-    p.add_argument("--capture-json", type=Path, default=_DEFAULT_CAPTURE, help="Sortie de capture_odoo_report_view.py")
-    p.add_argument("--out", type=Path, default=_DEFAULT_OUT, help="Fichier bundle JSON")
-    p.add_argument("--url", default=os.environ.get("ODOO_URL", "").strip() or None)
-    p.add_argument("--db", default=os.environ.get("ODOO_DB", "").strip() or None)
-    p.add_argument("-u", "--user", default=os.environ.get("ODOO_USER", "").strip() or None)
-    p.add_argument("-p", "--password", default=os.environ.get("ODOO_PASSWORD", "").strip() or None)
-    p.add_argument("--full-line-balance", action="store_true")
-    p.add_argument("--currency", choices=("company", "transaction"), default="company")
-    p.add_argument(
-        "--emit-capture-meta",
-        type=Path,
-        default=None,
-        help="Écrit un JSON (analytic_id, dates) pour --meta-json de capture_odoo_report_view.py.",
-    )
-    args = p.parse_args()
-
-    if args.dates_ytd:
-        args.date_from, args.date_to = default_period_ytd()
-    elif not (args.date_from and args.date_to):
-        print(
-            "Indiquez --date-from et --date-to, ou bien --dates-ytd.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    has_id = args.analytic_id is not None
-    has_name = bool((args.analytic_name or "").strip())
-    if has_id == has_name:
-        print(
-            "Indiquez exactement l’un des deux : --analytic-id … ou --analytic-name « … ».",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if has_id and args.analytic_id is not None and args.analytic_id <= 0:
-        print("--analytic-id doit être > 0.", file=sys.stderr)
-        sys.exit(1)
-
-    missing = [
-        n
-        for n, v in [
-            ("ODOO_URL", args.url),
-            ("ODOO_DB", args.db),
-            ("ODOO_USER", args.user),
-            ("ODOO_PASSWORD", args.password),
-        ]
-        if not v
-    ]
-    if missing:
-        print("Variables manquantes :", ", ".join(missing), file=sys.stderr)
-        sys.exit(1)
-
+def _execute_bundle(args: argparse.Namespace) -> None:
+    """Connexion Odoo, calcul rapport, écriture JSON (arguments déjà validés)."""
     models, uid, db, pwd = connect(args.url, args.db, args.user, args.password)
 
     analytic_id: int
     analytic_label_resolved: str | None = None
     resolution_warning: str | None = None
     name_query: str | None = (args.analytic_name or "").strip() or None
+    has_name = args.analytic_id is None
 
     if has_name:
         assert name_query is not None
@@ -348,6 +284,88 @@ def main() -> None:
     args.out.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"OK — bundle écrit : {args.out.resolve()}")
     print("Joignez ce fichier à une conversation (vérifiez qu’il ne part pas sur un dépôt public).")
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="Assemble API build_report + capture UI pour debug (un JSON à joindre au chat)."
+    )
+    p.add_argument("--analytic-id", type=int, default=None, help="ID account.analytic.account (si connu).")
+    p.add_argument(
+        "--analytic-name",
+        default=None,
+        help="Nom ou code du compte analytique (recherche Odoo), si vous ne connaissez pas l’id.",
+    )
+    p.add_argument("--date-from", default=None, help="YYYY-MM-DD (ou avec --dates-ytd)")
+    p.add_argument("--date-to", default=None, help="YYYY-MM-DD (ou avec --dates-ytd)")
+    p.add_argument(
+        "--dates-ytd",
+        action="store_true",
+        help="Période : 1er janvier année en cours → aujourd’hui (comme la toolbox).",
+    )
+    p.add_argument("--capture-json", type=Path, default=_DEFAULT_CAPTURE, help="Sortie de capture_odoo_report_view.py")
+    p.add_argument("--out", type=Path, default=_DEFAULT_OUT, help="Fichier bundle JSON")
+    p.add_argument("--url", default=os.environ.get("ODOO_URL", "").strip() or None)
+    p.add_argument("--db", default=os.environ.get("ODOO_DB", "").strip() or None)
+    p.add_argument("-u", "--user", default=os.environ.get("ODOO_USER", "").strip() or None)
+    p.add_argument("-p", "--password", default=os.environ.get("ODOO_PASSWORD", "").strip() or None)
+    p.add_argument("--full-line-balance", action="store_true")
+    p.add_argument("--currency", choices=("company", "transaction"), default="company")
+    p.add_argument(
+        "--emit-capture-meta",
+        type=Path,
+        default=None,
+        help="Écrit un JSON (analytic_id, dates) pour --meta-json de capture_odoo_report_view.py.",
+    )
+    args = p.parse_args()
+
+    if args.dates_ytd:
+        args.date_from, args.date_to = default_period_ytd()
+    elif not (args.date_from and args.date_to):
+        print(
+            "Indiquez --date-from et --date-to, ou bien --dates-ytd.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    has_id = args.analytic_id is not None
+    has_name = bool((args.analytic_name or "").strip())
+    if has_id == has_name:
+        print(
+            "Indiquez exactement l’un des deux : --analytic-id … ou --analytic-name « … ».",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if has_id and args.analytic_id is not None and args.analytic_id <= 0:
+        print("--analytic-id doit être > 0.", file=sys.stderr)
+        sys.exit(1)
+
+    missing = [
+        n
+        for n, v in [
+            ("ODOO_URL", args.url),
+            ("ODOO_DB", args.db),
+            ("ODOO_USER", args.user),
+            ("ODOO_PASSWORD", args.password),
+        ]
+        if not v
+    ]
+    if missing:
+        print("Variables manquantes :", ", ".join(missing), file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        _execute_bundle(args)
+    except Exception as e:
+        payload: dict[str, Any] = {
+            "bundle_fatal_error": True,
+            "error_message": str(e),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "hint": "Vérifiez le réseau, les identifiants .env, et que le compte analytique existe.",
+        }
+        args.out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Échec — détails écrits dans {args.out.resolve()}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

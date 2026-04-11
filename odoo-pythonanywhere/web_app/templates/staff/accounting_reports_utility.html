@@ -88,7 +88,7 @@
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
     <strong>Version :</strong> {{ utility_version }} ·
-    <strong>Date :</strong> {{ utility_date }}
+    <strong>Date :</strong> {{ utility_date }} {{ toolbox_app_time }}
     · <strong>Révision dépôt :</strong> <code>{{ toolbox_git_revision }}</code>
   </p>
 </details>
@@ -104,7 +104,7 @@
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
     <strong>Version :</strong> {{ utility_version }} ·
-    <strong>Date :</strong> {{ utility_date }}
+    <strong>Date :</strong> {{ utility_date }} {{ toolbox_app_time }}
     · <strong>Révision dépôt :</strong> <code>{{ toolbox_git_revision }}</code>
   </p>
 </details>
@@ -148,7 +148,7 @@
     <p class="sn-muted" style="margin:0.45rem 0 0;font-size:0.8rem;">Import XML en deux temps si Studio échoue. Détails : <code>DEPLOY_PYTHONANYWHERE.md</code>.</p>
   </details>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
-    {{ utility_author }} · v{{ utility_version }} · {{ utility_date }}
+    {{ utility_author }} · v{{ utility_version }} · {{ utility_date }} {{ toolbox_app_time }}
   </p>
 </details>
 {% endif %}

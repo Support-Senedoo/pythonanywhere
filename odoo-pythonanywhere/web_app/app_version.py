@@ -9,8 +9,9 @@ from pathlib import Path
 #   - patch (1.3.x → 1.3.y) : correctifs sans changement de comportement visible ;
 #   - minor (1.3.x → 1.4.0) : nouvelle fonctionnalité ou évolution d’écran / API toolbox ;
 #   - adapter _DEFAULT_DATE au jour de la livraison (YYYY-MM-DD).
-_DEFAULT_VERSION = "1.5.64"
+_DEFAULT_VERSION = "1.5.65"
 _DEFAULT_DATE = "2026-04-11"
+_DEFAULT_TIME = "14:57"
 
 # Valeurs souvent mises par erreur dans l’onglet Web PA (ne reflètent pas la livraison réelle).
 _IGNORE_TOOLBOX_APP_VERSION = frozenset({"1", "1.0", "1.0.0"})
@@ -30,6 +31,7 @@ def _version_from_env(raw: str | None, default: str) -> str:
 
 TOOLBOX_APP_VERSION = _version_from_env(os.environ.get("TOOLBOX_APP_VERSION"), _DEFAULT_VERSION)
 TOOLBOX_APP_DATE = (os.environ.get("TOOLBOX_APP_DATE") or _DEFAULT_DATE).strip() or _DEFAULT_DATE
+TOOLBOX_APP_TIME = (os.environ.get("TOOLBOX_APP_TIME") or _DEFAULT_TIME).strip() or _DEFAULT_TIME
 TOOLBOX_APP_LABEL = (os.environ.get("TOOLBOX_APP_LABEL") or "Toolbox Senedoo").strip() or "Toolbox Senedoo"
 TOOLBOX_APP_AUTHOR = (os.environ.get("TOOLBOX_APP_AUTHOR") or "Senedoo").strip() or "Senedoo"
 
