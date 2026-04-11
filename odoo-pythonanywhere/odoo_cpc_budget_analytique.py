@@ -19,8 +19,8 @@
   ARCHITECTURE TECHNIQUE :
     - Les expressions "réalisé" utilisent l'engine account_codes
       avec date_scope = strict_range (respecte le filtre analytique)
-    - Les expressions "budget" utilisent l'engine budget (données
-      crossovered.budget.lines). Le rapport active filter_budgets /
+    - Les expressions "budget" utilisent l'engine budget si la base l'expose ; sinon
+      account_codes (même formule que le réalisé, Odoo 19+ SaaS). Le rapport active filter_budgets /
       filter_budget lorsque le modèle Odoo les expose (comme le P&L Senedoo).
     - Les expressions "%" utilisent l'engine aggregation
 
@@ -39,7 +39,10 @@ import re
 from datetime import date, datetime
 
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
-from create_cpc_budget_analytique import normalize_cpc_account_codes_formula
+from create_cpc_budget_analytique import (
+    cpc_budget_pct_aggregation_formula,
+    normalize_cpc_account_codes_formula,
+)
 
 # =============================================================================
 # 🔧 CONFIGURATION — À ADAPTER
@@ -406,6 +409,16 @@ CPC_STRUCTURE = [
 ]
 
 
+def _expression_engine_keys_local(models, uid):
+    fg = rpc(models, uid, "account.report.expression", "fields_get", [], {})
+    sel = fg.get("engine", {}).get("selection") or []
+    return frozenset(
+        str(x[0])
+        for x in sel
+        if isinstance(x, (list, tuple)) and len(x) >= 1 and x[0] is not False
+    )
+
+
 def create_expression_safe(models, uid, expr_vals):
     """Crée une expression avec fallback si champ non supporté."""
     ev = dict(expr_vals)
@@ -430,6 +443,15 @@ def create_report_lines(models, uid, report_id):
     print(f"{'═'*64}")
     print("  ÉTAPE 5 — LIGNES CPC SYSCOHADA + EXPRESSIONS")
     print(f"{'═'*64}\n")
+
+    eng_keys = _expression_engine_keys_local(models, uid)
+    budget_engine_native = "budget" in eng_keys
+    budget_engine = "budget" if budget_engine_native else "account_codes"
+    if not budget_engine_native:
+        print(
+            "  ⚠️  Moteur « budget » absent sur account.report.expression (Odoo 19+ / SaaS) : "
+            "colonne Budget = account_codes comme le Réalisé ; % et écart neutralisés sur détail.\n"
+        )
 
     # Nettoyage
     old_lines = rpc(models, uid, "account.report.line", "search",
@@ -492,7 +514,7 @@ def create_report_lines(models, uid, report_id):
                 create_expression_safe(models, uid, {
                     "report_line_id" : line_id,
                     "label"          : "budget",
-                    "engine"         : "budget",
+                    "engine"         : budget_engine,
                     "formula"        : formula_ac,
                     "date_scope"     : "strict_range",
                 })
@@ -512,7 +534,9 @@ def create_report_lines(models, uid, report_id):
                     "report_line_id" : line_id,
                     "label"          : "pct",
                     "engine"         : "aggregation",
-                    "formula"        : f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
+                    "formula"        : cpc_budget_pct_aggregation_formula(
+                        code, budget_engine_native=budget_engine_native
+                    ),
                     "date_scope"     : "strict_range",
                 })
 
@@ -542,9 +566,8 @@ def create_report_lines(models, uid, report_id):
                     "report_line_id": line_id,
                     "label":          "pct",
                     "engine":         "aggregation",
-                    "formula":        (
-                        f"if_other_is_zero({code}.budget, 0, "
-                        f"{code}.balance / {code}.budget * 100)"
+                    "formula":        cpc_budget_pct_aggregation_formula(
+                        code, budget_engine_native=budget_engine_native
                     ),
                     "date_scope":     "strict_range",
                 })

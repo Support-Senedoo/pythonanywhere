@@ -8,8 +8,8 @@ Compatible avec les fonctions execute_kw de personalize_syscohada_detail.py.
 Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
 Stratégie colonne Budget (données 100 % Odoo) :
-  - Colonne Budget : engine ``budget`` avec la même formule ``account_codes`` que le réalisé
-    (positions budgétaires / ``crossovered.budget.lines``).
+  - Colonne Budget : engine ``budget`` si le modèle Odoo l'expose ; sinon ``account_codes`` avec la
+    même formule que le réalisé (fallback Odoo 19+ SaaS : pas de moteur ``budget`` sur les expressions).
   - Après création du rapport : activation de ``filter_budgets`` ou ``filter_budget`` sur la
     fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
     Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
@@ -237,6 +237,32 @@ def _expr_formula_for_engine(expr_vals: dict) -> dict:
     return out
 
 
+def expression_engine_keys(models: Any, db: str, uid: int, password: str) -> frozenset[str]:
+    """Valeurs autoris\u00e9es pour ``account.report.expression.engine`` sur cette base."""
+    try:
+        fg = _ek(models, db, uid, password, "account.report.expression", "fields_get", [], {})
+        sel = fg.get("engine", {}).get("selection") or []
+        return frozenset(
+            str(x[0])
+            for x in sel
+            if isinstance(x, (list, tuple)) and len(x) >= 1 and x[0] is not False
+        )
+    except Exception:
+        return frozenset()
+
+
+def cpc_budget_pct_aggregation_formula(line_code: str, *, budget_engine_native: bool) -> str:
+    """
+    Formule moteur ``aggregation`` pour la colonne %.
+    Odoo 19 : ``if_other_is_zero(...)`` n'est plus accept\u00e9 par la regex de validation.
+    Sans moteur ``budget``, on neutralise \u00e0 0 (sinon % = 100 % partout si budget = r\u00e9alis\u00e9).
+    """
+    if not budget_engine_native:
+        return "0"
+    c = line_code
+    return f"{c}.balance/{c}.budget*100"
+
+
 # ---------------------------------------------------------------------------
 # API publique
 # ---------------------------------------------------------------------------
@@ -307,6 +333,9 @@ def create_toolbox_cpc_budget_analytique(
       column_errors : messages si une colonne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
       line_errors   : messages si une ligne n\u2019a pas pu \u00eatre cr\u00e9\u00e9e
       expression_errors : \u00e9checs cr\u00e9ation account.report.expression
+      budget_engine_used : moteur utilis\u00e9 pour l'expression ``budget`` (``budget`` ou ``account_codes``)
+      budget_engine_native : True si le moteur ``budget`` existe sur cette base
+      creation_warnings : avertissements (ex. fallback sans moteur budget)
       verification  : r\u00e9sultat de verify_cpc_budget_analytique_report (contr\u00f4le auto)
     """
     # \u00c9tape 1 \u2014 nettoyage
@@ -362,6 +391,17 @@ def create_toolbox_cpc_budget_analytique(
     line_count = 0
     line_errors: list[str] = []
     expression_errors: list[str] = []
+    eng_keys = expression_engine_keys(models, db, uid, password)
+    budget_engine_native = "budget" in eng_keys
+    budget_engine = "budget" if budget_engine_native else "account_codes"
+    creation_warnings: list[str] = []
+    if not budget_engine_native:
+        creation_warnings.append(
+            "Cette instance Odoo n'expose pas le moteur « budget » sur account.report.expression "
+            "(Odoo 19+ / SaaS). La colonne Budget réutilise account_codes comme le Réalisé ; "
+            "l'écart reste 0 et le % à 0. Avec le moteur budget (autre build / module), "
+            "recréer le rapport pour des montants budgétaires réels."
+        )
 
     def _push_expr(expr_vals: dict) -> None:
         c = expr_vals.get("_line_code") or "?"
@@ -395,12 +435,12 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        formula_ac,
                 "date_scope":     "strict_range",
             })
-            # Budget : engine budget (crossovered.budget.lines), m\u00eame mapping comptes
+            # Budget : moteur ``budget`` si disponible, sinon account_codes (m\u00eame formule)
             _push_expr({
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "budget",
-                "engine":         "budget",
+                "engine":         budget_engine,
                 "formula":        formula_ac,
                 "date_scope":     "strict_range",
             })
@@ -419,7 +459,7 @@ def create_toolbox_cpc_budget_analytique(
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
-                "formula":        f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
+                "formula":        cpc_budget_pct_aggregation_formula(code, budget_engine_native=budget_engine_native),
                 "date_scope":     "strict_range",
             })
 
@@ -457,7 +497,7 @@ def create_toolbox_cpc_budget_analytique(
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
-                "formula":        f"if_other_is_zero({code}.budget, 0, {code}.balance / {code}.budget * 100)",
+                "formula":        cpc_budget_pct_aggregation_formula(code, budget_engine_native=budget_engine_native),
                 "date_scope":     "strict_range",
             })
 
@@ -486,5 +526,8 @@ def create_toolbox_cpc_budget_analytique(
         "column_errors": column_errors,
         "line_errors":   line_errors,
         "expression_errors": expression_errors,
+        "budget_engine_used": budget_engine,
+        "budget_engine_native": budget_engine_native,
+        "creation_warnings": creation_warnings,
         "verification":  verification,
     }

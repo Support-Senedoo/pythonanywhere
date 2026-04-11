@@ -35,6 +35,8 @@ except ImportError:
 from create_cpc_budget_analytique import (
     CPC_BUDGET_ANALYTIQUE_NAME,
     CPC_BUDGET_STRUCTURE,
+    cpc_budget_pct_aggregation_formula,
+    expression_engine_keys,
     normalize_cpc_account_codes_formula,
 )
 from personalize_syscohada_detail import connect, execute_kw
@@ -249,6 +251,8 @@ def verify_cpc_budget_analytique_report(
         by_line.setdefault(lid, {})[e.get("label") or ""] = e
 
     line_checks: list[dict[str, Any]] = []
+    fallback_budget_account_codes = False
+    budget_native = "budget" in expression_engine_keys(models, db, uid, password)
     for ln in sorted(lines, key=lambda x: str(x.get("code") or "")):
         code = str(ln.get("code") or "")
         lid = int(ln["id"])
@@ -271,12 +275,23 @@ def verify_cpc_budget_analytique_report(
                 if b_eng != "account_codes":
                     lc_errors.append(f"balance: engine={b_eng!r}, attendu account_codes")
                 bud_eng = (ex["budget"].get("engine") or "").strip()
-                if bud_eng != "budget":
-                    lc_errors.append(f"budget: engine={bud_eng!r}, attendu budget")
+                if bud_eng not in ("budget", "account_codes"):
+                    lc_errors.append(
+                        f"budget: engine={bud_eng!r}, attendu budget ou account_codes"
+                    )
+                if bud_eng == "account_codes" and not code.startswith("X"):
+                    fallback_budget_account_codes = True
                 for lab in ("ecart", "pct"):
                     eng = (ex[lab].get("engine") or "").strip()
                     if eng != "aggregation":
                         lc_errors.append(f"{lab}: engine={eng!r}, attendu aggregation")
+
+                pct_got = (ex["pct"].get("formula") or "").replace(" ", "")
+                pct_exp = cpc_budget_pct_aggregation_formula(
+                    code, budget_engine_native=budget_native
+                ).replace(" ", "")
+                if pct_got != pct_exp:
+                    lc_errors.append(f"pct: formule « {pct_got} » ≠ attendue « {pct_exp} »")
 
                 if row_spec and row_spec[2] == "account" and row_spec[3]:
                     f_bal = normalize_cpc_account_codes_formula(ex["balance"].get("formula"))
@@ -286,9 +301,13 @@ def verify_cpc_budget_analytique_report(
                             f"formule balance « {f_bal} » ≠ attendue (normalisée) « {f_exp} »"
                         )
                     f_bud = normalize_cpc_account_codes_formula(ex["budget"].get("formula"))
-                    if f_bud != f_exp:
+                    if bud_eng == "budget" and f_bud != f_exp:
                         lc_errors.append(
                             f"formule budget « {f_bud} » ≠ attendue (normalisée) « {f_exp} »"
+                        )
+                    if bud_eng == "account_codes" and f_bud != f_bal:
+                        lc_errors.append(
+                            f"formule budget « {f_bud} » ≠ balance « {f_bal} » (fallback attendu)"
                         )
 
         line_checks.append(
@@ -301,6 +320,13 @@ def verify_cpc_budget_analytique_report(
         )
         for msg in lc_errors:
             errors.append(f"Ligne {code}: {msg}")
+
+    if fallback_budget_account_codes:
+        warnings.append(
+            "Moteur « budget » absent sur account.report.expression : la colonne Budget reprend "
+            "account_codes (comme le Réalisé) ; écart 0 et % 0 sur les lignes détail — typique "
+            "d'Odoo 19+ SaaS sans moteur budget sur les expressions."
+        )
 
     ok = len(errors) == 0
     return {

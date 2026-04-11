@@ -685,6 +685,7 @@ def pl_analytic_project_report():
                 cerr = result.get("column_errors") or []
                 lerr = result.get("line_errors") or []
                 xerr = result.get("expression_errors") or []
+                cw = result.get("creation_warnings") or []
                 verif = result.get("verification") or {}
                 ver_ok = bool(verif.get("ok"))
                 expected_lines = len(CPC_BUDGET_STRUCTURE)
@@ -693,13 +694,22 @@ def pl_analytic_project_report():
                     f"Rapport « {rlabel} » créé (account.report id={rid}) — "
                     f"{cc} colonne(s), {lc} lignes CPC SYSCOHADA."
                 )
+                if cw:
+                    msg += " " + " ".join(str(x) for x in cw[:2])
+                    if len(cw) > 2:
+                        msg += " …"
                 if verif:
                     vtag = "OK" if ver_ok else "à contrôler"
                     msg += f" Vérification automatique : {vtag}."
                     ver_errs = verif.get("errors") or []
                     if ver_errs:
                         msg += " " + " | ".join(str(x) for x in ver_errs[:3])
-                        if len(ver_errs) > 3:
+                    if len(ver_errs) > 3:
+                        msg += " …"
+                    ver_warn = verif.get("warnings") or []
+                    if ver_ok and ver_warn:
+                        msg += " Avertissements : " + " | ".join(str(x) for x in ver_warn[:2])
+                        if len(ver_warn) > 2:
                             msg += " …"
                 if prior:
                     msg += (
