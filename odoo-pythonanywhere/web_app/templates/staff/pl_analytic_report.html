@@ -301,15 +301,15 @@
   </div>
   {% if conn_status == 'ok' and cpc_budget_report_id %}
   <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Injecter le budget dans le CPC (Odoo)</h3>
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Test d’injection CPC (intégrateur uniquement)</h3>
     <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
-      Remplit la colonne Budget du rapport toolbox (id {{ cpc_budget_report_id }}) via
-      <code>account.report.external.value</code>. Période : année en cours jusqu’à aujourd’hui (YTD),
-      comme le tableau API.
-      {% if report_budget_item_model %}Priorité : budget financier
-      (<code>account.report.budget</code> / lignes <code>account.report.budget.item</code>) si vous en choisissez un ;
-      sinon budget crossovered pour l’analytique sélectionné.{% else %}Source :
-      lignes crossovered pour l’analytique sélectionné (obligatoire).{% endif %}
+      Les **utilisateurs Odoo** ne passent pas par cet écran : ils choisissent période, analytique et
+      budget dans **l’interface Odoo**. Ce bloc sert à **essayer** l’écriture des
+      <code>account.report.external.value</code> sur le rapport id {{ cpc_budget_report_id }} (YTD) ;
+      en production, reproduire la même logique en **action planifiée / module sur le serveur Odoo**.
+      {% if report_budget_item_model %}Priorité test : budget financier
+      (<code>account.report.budget</code> / <code>account.report.budget.item</code>) si sélectionné ;
+      sinon crossovered pour l’analytique.{% else %}Source test : crossovered + analytique (obligatoire).{% endif %}
     </p>
     <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic" style="margin:0;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
@@ -334,7 +334,7 @@
         {% endfor %}
       </select>
       <div style="margin-top:0.65rem;">
-        <button type="submit" {% if not selected_client %}disabled{% endif %}>Injecter budget CPC dans Odoo</button>
+        <button type="submit" {% if not selected_client %}disabled{% endif %}>Lancer injection test (CPC)</button>
       </div>
     </form>
   </div>
@@ -345,12 +345,12 @@
   <h2 style="margin-top:0;font-size:1.05rem;">CR analytique budgété (rapport Odoo pour utilisateurs)</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
     Rapport <code>account.report</code> distinct du CPC : <strong>Réalisé</strong> (écritures sur la période,
-    ventilées sur l’analytique choisi dans Odoo), <strong>Budget analytique</strong> (crossovered),
-    et si la base le permet une colonne <strong>Budget financier</strong> pilotée par le filtre budgets
-    natif du rapport (comme sur le compte de résultat). Les utilisateurs n’ont pas besoin de la toolbox :
-    période, analytique et budget financier se règlent dans Odoo. L’injection ci-dessous (staff) sert
-    uniquement à alimenter la colonne budget analytique lorsque le moteur <code>external</code> est utilisé
-    (ex. Odoo 19 sans moteur budget sur les expressions) ; une action planifiée Odoo peut reprendre la même API.
+    ventilées sur l’analytique choisi **dans Odoo**), <strong>Budget analytique</strong> (crossovered),
+    et si la base le permet une colonne <strong>Budget financier</strong> pilotée par le **filtre budgets
+    natif** du rapport (comme sur le compte de résultat). Les **utilisateurs finaux** n’utilisent que l’UI Odoo.
+    Si la colonne budget analytique est en moteur <code>external</code>, son contenu doit être alimenté
+    **sur le serveur Odoo** (cron, module, action serveur) — le bloc « test d’injection » ci-dessous est
+    réservé à l’intégrateur Senedoo (mise au point), pas au métier au quotidien.
   </p>
   <div class="sn-report-btn-row">
     <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
@@ -372,10 +372,10 @@
   </div>
   {% if conn_status == 'ok' and cr_budget_report_id %}
   <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Injecter le budget analytique (colonne budget_analytic)</h3>
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Test d’injection budget analytique (intégrateur uniquement)</h3>
     <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
-      Rapport id {{ cr_budget_report_id }} — période YTD. Réservé staff / automatisation ; les utilisateurs
-      choisissent l’analytique dans Odoo après injection.
+      Rapport id {{ cr_budget_report_id }}, période YTD. Les **utilisateurs Odoo** filtrent déjà l’analytique
+      dans le rapport ; ce formulaire ne remplace **pas** une automatisation Odoo en production.
     </p>
     <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic" style="margin:0;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
@@ -391,7 +391,7 @@
         {% endfor %}
       </select>
       <div style="margin-top:0.65rem;">
-        <button type="submit" {% if not selected_client %}disabled{% endif %}>Injecter budget analytique (CR)</button>
+        <button type="submit" {% if not selected_client %}disabled{% endif %}>Lancer injection test (CR)</button>
       </div>
     </form>
   </div>

@@ -111,7 +111,7 @@ def verify_cpc_budget_analytique_report(
         if not ids:
             errors.append(
                 f"Aucun rapport trouvé pour le nom exact « {name} ». "
-                "Créez-le depuis la toolbox (Créer / recréer le CPC Budget Analytique) "
+                "Créez-le via l’outillage d’intégration (ex. « Créer / recréer le CPC Budget Analytique ») "
                 "ou passez --report-id."
             )
             return {
@@ -329,7 +329,7 @@ def verify_cpc_budget_analytique_report(
                     )
                 if expected_budget_mode == "external" and bud_eng != "external":
                     lc_errors.append(
-                        f"budget: engine={bud_eng!r}, attendu external (recréer le rapport toolbox)"
+                        f"budget: engine={bud_eng!r}, attendu external (recréer le rapport via l’intégration)"
                     )
                 if expected_budget_mode == "fallback_gl" and bud_eng != "account_codes":
                     lc_errors.append(
@@ -393,14 +393,14 @@ def verify_cpc_budget_analytique_report(
     if expected_budget_mode == "external":
         if report_budget_item_ok:
             warnings.append(
-                "Budget des lignes détail = moteur external : injecter depuis la toolbox "
-                "(budget financier account.report.budget et/ou analytique pour crossovered), "
-                "période YTD, sinon la colonne Budget reste vide en Odoo."
+                "Budget des lignes détail = moteur external : sans alimentation des "
+                "``account.report.external.value`` (cron / module Odoo, ou phase de test intégrateur), "
+                "la colonne Budget reste vide pour les utilisateurs qui ne font que filtrer dans Odoo."
             )
         else:
             warnings.append(
-                "Budget des lignes détail = moteur external : injecter depuis la toolbox "
-                "avec l'analytique (crossovered), période YTD, sinon la colonne Budget reste vide en Odoo."
+                "Budget des lignes détail = moteur external : prévoir une alimentation côté Odoo "
+                "(crossovered + analytique) ou phase de test intégrateur ; sinon colonne Budget vide."
             )
 
     ok = len(errors) == 0
@@ -420,7 +420,7 @@ def verify_cpc_budget_analytique_report(
         "exit_hint": (
             "Contrôle OK."
             if ok
-            else "Corriger les erreurs ci-dessus ou recréer le rapport depuis la toolbox."
+            else "Corriger les erreurs ci-dessus ou recréer le rapport (outillage d’intégration)."
         ),
     }
 

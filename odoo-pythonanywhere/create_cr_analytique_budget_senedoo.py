@@ -6,8 +6,10 @@ Objectif :
   - **Réalisé** : soldes sur la période choisie, ventilés sur le **compte analytique** sélectionné
     dans les filtres du rapport (``filter_analytic`` + moteur ``account_codes``).
   - **Budget analytique** : montants issus des lignes **crossovered** (``crossovered.budget.lines``)
-    pour le même axe analytique ; moteur ``external`` + valeurs injectées (API / action serveur),
-    car l’utilisateur final n’a pas accès à la toolbox.
+    pour l’axe analytique choisi **dans Odoo**. Si la base n’expose pas de moteur natif adapté,
+    la colonne utilise ``external`` : les ``account.report.external.value`` doivent alors être
+    **remplis côté Odoo** (action planifiée, module personnalisé, serveur métier) — ce n’est **pas**
+    une action des utilisateurs finaux dans l’interface comptable.
   - **Budget financier** (optionnel) : si la base expose le moteur ``budget`` sur les expressions,
     une colonne supplémentaire ``budget`` permet le choix du **budget financier** via le filtre
     natif ``filter_budgets`` / ``filter_budget`` du rapport (comme sur le compte de résultat).

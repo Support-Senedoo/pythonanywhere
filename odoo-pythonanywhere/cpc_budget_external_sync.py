@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Alimente la colonne Budget du rapport CPC toolbox (Odoo 19+ sans moteur ``budget`` sur
-``account.report.expression``) via ``account.report.external.value``.
+Alimente des colonnes en moteur ``external`` (``account.report.external.value``) pour des
+rapports ``account.report`` lorsque Odoo 19+ n’expose pas le moteur ``budget`` sur les expressions.
+
+À utiliser depuis un **mécanisme côté Odoo** (cron, action serveur, module) ou depuis l’**espace
+intégrateur** pour des tests — pas comme prérequis pour les utilisateurs finaux dans l’UI Odoo.
 
 Sources supportées (par priorité à l’injection) :
   - ``account.report.budget.item`` : budgets financiers (sélection d’un ``account.report.budget``) ;

@@ -928,14 +928,14 @@ def pl_analytic_project_report():
                 if sync.get("ok"):
                     src = sync.get("source") or "?"
                     flash(
-                        f"Injection budget CPC : {int(sync.get('written') or 0)} ligne(s) Odoo, "
+                        f"Injection test CPC (external) : {int(sync.get('written') or 0)} ligne(s), "
                         f"période {date_from} → {date_to}, source={src}.",
                         "success",
                     )
                 else:
-                    flash(sync.get("reason") or "Injection budget CPC impossible.", "danger")
+                    flash(sync.get("reason") or "Injection test CPC impossible.", "danger")
             except Exception as e:
-                flash(f"Injection budget CPC : {e!s}", "danger")
+                flash(f"Injection test CPC : {e!s}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
@@ -969,14 +969,14 @@ def pl_analytic_project_report():
                 )
                 if sync.get("ok"):
                     flash(
-                        f"Injection budget analytique (CR) : {int(sync.get('written') or 0)} "
+                        f"Injection test CR (budget_analytic) : {int(sync.get('written') or 0)} "
                         f"ligne(s), période {date_from} → {date_to}.",
                         "success",
                     )
                 else:
-                    flash(sync.get("reason") or "Injection CR impossible.", "danger")
+                    flash(sync.get("reason") or "Injection test CR impossible.", "danger")
             except Exception as e:
-                flash(f"Injection CR analytique budgété : {e!s}", "danger")
+                flash(f"Injection test CR : {e!s}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(

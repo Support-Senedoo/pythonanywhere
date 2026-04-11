@@ -7,12 +7,13 @@ Structure CPC SYSCOHADA complète (plan comptable OHADA / Sénégal).
 Compatible avec les fonctions execute_kw de personalize_syscohada_detail.py.
 Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
-Stratégie colonne Budget (données 100 % Odoo) :
-  - Colonne Budget : engine ``budget`` si la sélection ``engine`` l'expose ; sinon, si le modèle
-    ``account.report.budget.item`` existe (budgets financiers saisis depuis le rapport, ex. P&L),
-    engine ``external`` et injection depuis ces lignes ; sinon si ``crossovered.budget.lines``
-    existe, même moteur ``external`` avec injection depuis les lignes analytiques crossovered ;
-    sinon repli ``account_codes`` (même formule que le réalisé — peu utile).
+Stratégie colonne Budget (données 100 % Odoo pour les utilisateurs qui filtrent dans l’UI) :
+  - Engine ``budget`` si la sélection ``engine`` l’expose (filtre budgets natif Odoo).
+  - Sinon ``account.report.budget.item`` ou ``crossovered.budget.lines`` : engine ``external`` ;
+    les ``account.report.external.value`` doivent être **écrits côté Odoo** (cron, module, serveur)
+    ou en phase de **test** via l’outillage d’intégration — ce n’est pas une action des utilisateurs
+    finaux dans le rapport.
+  - Sinon repli ``account_codes`` (même formule que le réalisé — peu utile).
   - Après création du rapport : activation de ``filter_budgets`` ou ``filter_budget`` sur la
     fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
     Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
@@ -472,16 +473,17 @@ def create_toolbox_cpc_budget_analytique(
         )
     elif budget_mode == "external" and budget_external_source == "report_budget_item":
         creation_warnings.append(
-            "Colonne Budget = moteur « external » (données ``account.report.budget.item``). "
-            "Sur cette page : sélectionnez le budget financier créé depuis le rapport Odoo (ex. P&L), "
-            "puis « Injecter budget CPC dans Odoo » (période YTD). L'analytique filtre les lignes "
-            "d'item si le modèle le permet ; sinon le budget injecté reste par compte général."
+            "Colonne Budget = moteur « external » (``account.report.budget.item``). "
+            "Les utilisateurs Odoo choisissent période, analytique et budget financier **dans Odoo** ; "
+            "les ``account.report.external.value`` doivent être alimentés par un **mécanisme côté Odoo** "
+            "(cron, module, serveur) ou par l’outillage d’intégration **uniquement pour tests / mise en route**."
         )
     elif budget_mode == "external":
         creation_warnings.append(
-            "Colonne Budget = moteur « external » (lignes crossovered pour l'analytique). "
-            "Choisissez l'axe analytique puis « Injecter budget CPC dans Odoo » "
-            "(période YTD, comme le tableau API)."
+            "Colonne Budget = moteur « external » (crossovered). "
+            "Les utilisateurs Odoo ne font que filtrer dans Odoo ; pour afficher des montants, "
+            "prévoir une **alimentation technique sur le serveur Odoo** (cron, module, etc.) "
+            "vers ``account.report.external.value``, ou l’équivalent en zone d’intégration pour essais."
         )
 
     def _push_expr(expr_vals: dict) -> None:
