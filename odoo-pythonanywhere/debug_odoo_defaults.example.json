@@ -1,0 +1,9 @@
+{
+  "_readme": "Copiez ce fichier en debug_odoo_defaults.json (meme dossier). Renseignez report_url une fois (copie depuis la barre d'adresse Odoo). Ne commitez pas debug_odoo_defaults.json.",
+  "base_url": "https://la-ripaille-presences.odoo.com",
+  "report_url": "",
+  "analytic_name": "Aliments PP",
+  "dates_ytd": true,
+  "date_from": "",
+  "date_to": ""
+}
