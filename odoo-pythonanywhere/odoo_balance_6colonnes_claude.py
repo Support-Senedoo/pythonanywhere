@@ -18,6 +18,9 @@ tutoriels Odoo).
 Variables d’environnement (ou ``.env`` à côté du script) : ``ODOO_URL``, ``ODOO_DB``,
 ``ODOO_USER``, ``ODOO_PASSWORD``.
 
+**Retour terrain :** exécution jugée satisfaisante sur Odoo **18.3** et **19** (XML-RPC,
+création rapport + colonnes + lignes + menu selon droits).
+
 Usage :
   python odoo_balance_6colonnes_claude.py
   python odoo_balance_6colonnes_claude.py --report-name-fr "Ma balance 6 col."
