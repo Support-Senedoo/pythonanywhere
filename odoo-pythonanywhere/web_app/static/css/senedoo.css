@@ -483,6 +483,43 @@ pre,
   margin: 0.5rem 0 0;
   padding-left: 1.2rem;
 }
+
+.sn-doc--nav {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+}
+
+/* Barre d’actions rapports (staff — balance / liste account.report) */
+.sn-report-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.sn-report-btn-row--wrap {
+  align-items: flex-start;
+}
+.sn-report-btn-row .sn-btn,
+.sn-report-btn-row form {
+  margin: 0;
+}
+.sn-report-btn-row--compact {
+  gap: 0.3rem;
+}
+
+details.sn-card > summary {
+  list-style: none;
+}
+details.sn-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sn-table td details > summary.sn-btn::-webkit-details-marker {
+  display: none;
+}
+.sn-table td details > summary.sn-btn::marker {
+  content: "";
+}
 .sn-meta-line {
   font-size: 0.85rem;
   color: var(--sn-muted);

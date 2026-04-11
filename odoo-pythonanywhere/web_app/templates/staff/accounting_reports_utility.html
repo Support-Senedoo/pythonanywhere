@@ -59,20 +59,22 @@
 </script>
 {% else %}
 <h1>{{ utility_title }}</h1>
-<p class="sn-muted" style="margin:-0.35rem 0 0.85rem;display:flex;flex-wrap:wrap;gap:0.35rem 0.75rem;align-items:center;">
-  <span>Autres personnalisations :</span>
-  <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L personnalisé (SYSCOHADA)</a>
-  <span class="sn-muted">·</span>
-  <a href="{{ url_for('staff.rapports_balance') }}">Balance OHADA</a>
-  <span class="sn-muted">·</span>
-  <a href="{{ url_for('staff.pl_analytic_project_report') }}">P&amp;L analytique (réalisé / budget / %)</a>
-  <span class="sn-muted">·</span>
-  <a href="{{ url_for('staff.utilities_home') }}">← Tous les utilitaires</a>
-</p>
+<details class="sn-doc sn-doc--nav" style="margin:-0.35rem 0 0.85rem;">
+  <summary>Navigation — autres utilitaires</summary>
+  <p class="sn-muted" style="margin:0.5rem 0 0;display:flex;flex-wrap:wrap;gap:0.35rem 0.75rem;align-items:center;">
+    <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L SYSCOHADA</a>
+    <span class="sn-muted">·</span>
+    <a href="{{ url_for('staff.rapports_balance') }}">Balance OHADA</a>
+    <span class="sn-muted">·</span>
+    <a href="{{ url_for('staff.pl_analytic_project_report') }}">P&amp;L analytique</a>
+    <span class="sn-muted">·</span>
+    <a href="{{ url_for('staff.utilities_home') }}">← Utilitaires</a>
+  </p>
+</details>
 
 {% if accounting_mode == 'pl_standard' %}
 <details class="sn-doc">
-  <summary>Descriptif &amp; mode d’emploi — compte de résultat personnalisé</summary>
+  <summary>Mode d’emploi — P&amp;L personnalisé (SYSCOHADA)</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
     <strong>But.</strong> Lister les <code>account.report</code>, puis créer une <strong>copie</strong> d’un compte de résultat (ou rapport de même famille) et appliquer la personnalisation Senedoo <strong>détail comptes / SYSCOHADA</strong> (notes « custom » retirées, regroupement par compte, hiérarchie des groupes, « tout déplier » désactivé). <strong>L’original n’est pas modifié.</strong>
   </p>
@@ -80,9 +82,8 @@
     Les bases sont identifiées par le <strong>nom technique Odoo (db)</strong> ; le filtre <strong>hôte d’URL</strong> regroupe les bases d’un même serveur.
   </p>
   <ul>
-    <li><strong>Personnaliser</strong> : id du rapport source, puis bouton — copie + script <code>personalize_syscohada_detail</code>.</li>
-    <li><strong>Liste</strong> : filtre texte sur le nom ; renommer / supprimer depuis chaque ligne.</li>
-    <li>Pour le <strong>budget analytique</strong> et le tableau réalisé / budget / %, utilisez l’utilitaire <a href="{{ url_for('staff.pl_analytic_project_report') }}">Compte de résultat analytique</a> (liste des bases).</li>
+    <li><strong>Liste</strong> : filtre, puis <strong>Personnaliser</strong> / <strong>Renommer</strong> / <strong>Supprimer</strong> par ligne.</li>
+    <li><strong>P&amp;L analytique / budget</strong> : <a href="{{ url_for('staff.pl_analytic_project_report') }}">utilitaire dédié</a>.</li>
   </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -93,18 +94,13 @@
 </details>
 {% elif accounting_mode == 'pl_budget' %}
 <details class="sn-doc">
-  <summary>Descriptif &amp; mode d’emploi — P&amp;L analytique et budget</summary>
+  <summary>Mode d’emploi — P&amp;L analytique et budget</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
     <strong>But.</strong> Même principe qu’un P&amp;L personnalisé, avec en plus l’activation de <code>filter_analytic</code> et du filtre budgets (<code>filter_budgets</code> sur Odoo 17+, ou <code>filter_budget</code> sur d’anciennes bases) sur la copie. Sans le bon filtre budgets sur la fiche du rapport, les colonnes <strong>budget</strong> et <strong>%</strong> peuvent rester vides ou ne plus suivre le comportement du P&amp;L d’origine lorsque le filtre analytique est actif.
   </p>
-  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    La <strong>sonde budget / analytique</strong> (lecture seule) indique si des lignes de budget portent un analytique — prérequis pour qu’un budget « par axe » ait du sens dans le rapport.
+  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.88rem;">
+    <strong>Sonde</strong> (lecture seule) : budget × analytique. Puis <strong>Créer la copie</strong> depuis la liste des rapports. Dépannage : fiche <code>account.report</code> dans Odoo (filtres analytique / budgets) — voir <code>DEPLOY_PYTHONANYWHERE.md</code>.
   </p>
-  <ul>
-    <li>Lancez d’abord la <strong>sonde</strong> si besoin, puis <strong>Créer la copie (détail + analytique / budget)</strong>.</li>
-    <li>Si le réalisé est bien filtré par analytique mais budget / % « disparaissent » : rouvrir la copie dans Odoo (fiche <code>account.report</code>) et vérifier les options <strong>filtre analytique</strong> et <strong>filtre budgets</strong> ; recréer la copie avec la toolbox actuelle si besoin.</li>
-    <li>Détails et limites du moteur Odoo : <code>DEPLOY_PYTHONANYWHERE.md</code> (checklist budget × analytique).</li>
-  </ul>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
     <strong>Version :</strong> {{ utility_version }} ·
@@ -114,113 +110,45 @@
 </details>
 {% elif accounting_mode == 'balance' %}
 <details class="sn-doc">
-  <summary>Descriptif &amp; mode d’emploi — Balance OHADA</summary>
+  <summary>Documentation Balance OHADA</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Créer sur la base un rapport comptable nommé <strong>Balance OHADA</strong> (six colonnes : débit/crédit initiaux, débit/crédit période, débit/crédit finaux), sans partir d’une copie d’un rapport existant. Une <strong>nouvelle création</strong> retire d’abord uniquement les rapports <strong>créés par cette toolbox</strong> (codes de ligne <code>bal_ohada</code> / <code>bal_ohada_section</code>), avec menus et actions client associés — pas un autre rapport nommé pareil dans Studio. Suppression seule avec confirmation possible.
+    Rapport <strong>Balance OHADA</strong> (6 colonnes, codes <code>bal_ohada</code> / <code>bal_ohada_section</code>).
+    Une recréation retire d’abord les instances <strong>toolbox</strong> (menus + actions client), pas les autres rapports Studio.
   </p>
-  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    Repère technique : ligne feuille <code>account.report.line</code> avec <code>code = bal_ohada</code>.
+  <p class="sn-muted" style="margin:0.5rem 0 0;line-height:1.45;font-size:0.88rem;">
+    Hors navigateur : <code>create_balance_6cols_via_api.py</code>,
+    <a href="{{ url_for('staff.download_balance_6col_example_xml') }}">XML</a>,
+    <a href="{{ url_for('staff.download_balance_ohada_module_zip') }}">ZIP module</a>.
   </p>
-  <p style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    <strong>Alternatives hors navigateur :</strong> script <code>create_balance_6cols_via_api.py</code>,
-    <a href="{{ url_for('staff.download_balance_6col_example_xml') }}">gabarit XML</a>,
-    ou procédure manuelle ci-dessous (Studio / v19).
-  </p>
-  <details class="sn-doc" style="margin:0.75rem 0 0;border:1px solid rgba(0,0,0,0.1);border-radius:6px;padding:0.5rem 0.65rem;background:rgba(0,80,120,0.04);">
-    <summary style="cursor:pointer;font-weight:600;">Procédure manuelle d’ajout des colonnes</summary>
-    <p class="sn-muted" style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
-      À utiliser sur la <strong>balance générale</strong> (pas la balance d’essai handler Enterprise) pour obtenir 6 colonnes OHADA, ou pour <strong>corriger</strong> une configuration erronée (montants à zéro, « expression inconnue », mauvaise ligne). Cette procédure sert aussi de <strong>référence</strong> pour l’assistance Senedoo / l’assistant afin d’aligner les conseils avec Odoo v19.
+  <details class="sn-doc" style="margin:0.65rem 0 0;border:1px solid var(--sn-border);border-radius:6px;padding:0.45rem 0.6rem;background:rgba(0,0,0,0.12);">
+    <summary style="cursor:pointer;font-weight:600;">Procédure manuelle Odoo (balance générale, v19)</summary>
+    <p class="sn-muted" style="margin:0.5rem 0 0;line-height:1.45;font-size:0.88rem;">
+      Balance <strong>générale</strong> (pas balance d’essai Enterprise). Moteur <code>aggregation</code> + <code>subformula</code> <code>positive</code> pour les soldes décomposés.
+      Toolbox : colonnes <code>ohada6_*</code> ; variables <code>TOOLBOX_OHADA6_*</code> ; boutons staff « brut » / « aggregation ».
     </p>
-    <ol style="margin:0.5rem 0 0;padding-left:1.25rem;line-height:1.5;font-size:0.92rem;">
-        <li style="margin:0.35rem 0;">
-          <strong>Ouvrir le bon rapport.</strong> <strong>Comptabilité</strong> → <strong>Rapports</strong> (ou <strong>Reporting</strong> selon la langue / version) → <strong>Balance générale</strong>. Icône <strong>engrenage</strong> ou menu <strong>Configuration</strong> → <strong>Modifier</strong> le rapport (selon les droits ; sinon mode développeur + <strong>Rapports comptables</strong>).
-        </li>
-        <li style="margin:0.35rem 0;">
-          <strong>Onglet Colonnes.</strong> Modèle souvent : Débit, Crédit, Solde initial, Solde final. <strong>Supprimer</strong> les colonnes <strong>Solde initial</strong> et <strong>Solde final</strong>. <strong>Ajouter</strong> quatre colonnes avec ces <strong>expression_label</strong> (identiques aux <strong>labels</strong> des expressions, étape suivante) :
-          <ul style="margin:0.35rem 0 0;padding-left:1.1rem;">
-            <li><strong>Débit initial</strong> — <code>debit_initial</code></li>
-            <li><strong>Crédit initial</strong> — <code>credit_initial</code></li>
-            <li><strong>Débit final</strong> — <code>debit_final</code></li>
-            <li><strong>Crédit final</strong> — <code>credit_final</code></li>
-          </ul>
-          Conserver les colonnes période <strong>Débit</strong> / <strong>Crédit</strong> (<code>debit</code> / <code>credit</code>) — ordre conseillé : initiaux à gauche, débit/crédit période au centre, finaux à droite (glisser-déposer si l’UI le permet).
-        </li>
-        <li style="margin:0.35rem 0;" class="sn-muted">
-          <strong>Balance OHADA (toolbox)</strong> : mêmes <code>expression_label</code> préfixés <code>ohada6_</code>
-          (<code>ohada6_open_deb</code>, … <code>ohada6_close_cre</code>). En <strong>v19</strong>, la création tente d’abord le moteur <strong>aggregation</strong> (<code>initial_debit</code> / <code>debit</code>, etc. + <code>subformula: positive</code> sur les colonnes décomposées) — ce qui évite le piège du moteur <strong>domain</strong> avec <code>[('debit','&gt;',0)]</code> (filtre d’écritures sans séparer correctement débit/crédit sur une ligne groupée). Si le serveur refuse <code>aggregation</code> sur <code>groupby</code>, repli automatique en <strong>domain</strong> (cumuls bruts sur les colonnes extérieures). Env <code>TOOLBOX_OHADA6_FORCE_DOMAIN=1</code> force ce repli ; <code>TOOLBOX_OHADA6_OUTER_NET=1</code> n’a d’effet qu’en mode domain. Rapport existant : boutons <strong>Colonnes extérieures → brut</strong> et <strong>Mode net OHADA — aggregation</strong> sur la page staff. La liste ci-dessus reste valable en configuration manuelle si les libellés sont cohérents partout.
-        </li>
-        <li style="margin:0.35rem 0;">
-          <strong>Onglet Lignes</strong> — ligne principale (souvent « Accounts », « Balance », etc.) avec <strong><code>groupby = account_id</code></strong>. Sous <strong>Expressions</strong>, créer ou vérifier <strong>une expression par colonne</strong> (label = expression_label de la colonne) :
-          <table style="width:100%;border-collapse:collapse;margin:0.4rem 0 0;font-size:0.86rem;">
-            <thead>
-              <tr style="text-align:left;border-bottom:1px solid #ccc;"><th style="padding:0.2rem 0.3rem;">Label</th><th style="padding:0.2rem 0.3rem;">Moteur</th><th style="padding:0.2rem 0.3rem;">Formule</th><th style="padding:0.2rem 0.3rem;">Subformula</th></tr>
-            </thead>
-            <tbody>
-              <tr><td style="padding:0.2rem 0.3rem;"><code>debit_initial</code></td><td style="padding:0.2rem 0.3rem;">aggregation</td><td style="padding:0.2rem 0.3rem;"><code>initial_debit - initial_credit</code></td><td style="padding:0.2rem 0.3rem;"><code>positive</code></td></tr>
-              <tr><td style="padding:0.2rem 0.3rem;"><code>credit_initial</code></td><td style="padding:0.2rem 0.3rem;">aggregation</td><td style="padding:0.2rem 0.3rem;"><code>initial_credit - initial_debit</code></td><td style="padding:0.2rem 0.3rem;"><code>positive</code></td></tr>
-              <tr><td style="padding:0.2rem 0.3rem;"><code>debit</code></td><td style="padding:0.2rem 0.3rem;">aggregation</td><td style="padding:0.2rem 0.3rem;"><code>debit</code></td><td style="padding:0.2rem 0.3rem;">—</td></tr>
-              <tr><td style="padding:0.2rem 0.3rem;"><code>credit</code></td><td style="padding:0.2rem 0.3rem;">aggregation</td><td style="padding:0.2rem 0.3rem;"><code>credit</code></td><td style="padding:0.2rem 0.3rem;">—</td></tr>
-              <tr><td style="padding:0.2rem 0.3rem;"><code>debit_final</code></td><td style="padding:0.2rem 0.3rem;">aggregation</td><td style="padding:0.2rem 0.3rem;"><code>(initial_debit + debit) - (initial_credit + credit)</code></td><td style="padding:0.2rem 0.3rem;"><code>positive</code></td></tr>
-              <tr><td style="padding:0.2rem 0.3rem;"><code>credit_final</code></td><td style="padding:0.2rem 0.3rem;">aggregation</td><td style="padding:0.2rem 0.3rem;"><code>(initial_credit + credit) - (initial_debit + debit)</code></td><td style="padding:0.2rem 0.3rem;"><code>positive</code></td></tr>
-            </tbody>
-          </table>
-        </li>
-        <li style="margin:0.35rem 0;">
-          <strong>Onglet Options du rapport :</strong> activer <strong>Inclure le solde initial</strong> (obligatoire sinon initiaux à 0) ; vérifier la <strong>période</strong> ; <strong>désactiver la comparaison</strong> de périodes si elle duplique les colonnes.
-        </li>
-        <li style="margin:0.35rem 0;">
-          <strong>Pièges fréquents :</strong> message « expression inconnue » → le <strong>label</strong> de l’expression doit être <strong>strictement égal</strong> à l’<strong>expression_label</strong> de la colonne. Initiaux à 0 → option solde initial. Tout à zéro → mauvaise ligne (il faut la ligne avec <code>groupby = account_id</code>).
-        </li>
-      </ol>
-    <p class="sn-muted" style="margin:0.45rem 0 0;line-height:1.45;font-size:0.85rem;">
-      <strong>Gabarit XML</strong> : le dépôt contient <code>examples/balance_generale_6_col_studio.example.xml</code>. Depuis cette page (connecté staff), vous pouvez le
-      <a href="{{ url_for('staff.download_balance_6col_example_xml') }}">télécharger ici</a>, puis l’importer dans Odoo via <strong>Studio → Import XML</strong> (ou un module). Alternative sans fichier : exécuter localement <code>python create_balance_6cols_via_api.py</code> (même contenu fonctionnel). La toolbox <strong>n’exécute pas</strong> l’import sur votre base depuis le navigateur : volontaire (droits, validation Odoo, risques). En cas d’échec Studio, importer en <strong>deux temps</strong> (colonnes puis ligne + rapport).
-    </p>
-  </details>
-  <details class="sn-doc" style="margin:0.75rem 0 0;border:1px solid rgba(0,0,0,0.08);border-radius:6px;padding:0.5rem 0.65rem;background:rgba(0,0,0,0.02);">
-    <summary style="cursor:pointer;font-weight:600;">Alternative manuelle — 6 colonnes (Odoo v19 / Studio)</summary>
-    <p style="margin:0.55rem 0 0;line-height:1.45;font-size:0.92rem;">
-      Pour une <strong>balance générale</strong> type OHADA (débit/crédit initiaux et finaux séparés), en <strong>v19</strong> : utiliser le moteur <strong><code>aggregation</code></strong> sur les expressions (pas une formule Python libre). Variables usuelles : <code>initial_debit</code>, <code>initial_credit</code>, <code>debit</code>, <code>credit</code>. Ce n’est pas le même schéma que la balance d’essai Enterprise « trial balance handler ». Le <strong>détail pas à pas</strong> (colonnes, lignes, options, pièges) est dans le bloc replié <strong>Procédure manuelle d’ajout des colonnes</strong> ci-dessus.
-    </p>
-    <p style="margin:0.45rem 0 0;line-height:1.45;font-size:0.92rem;"><strong>Subformules (v19)</strong> — à la place de <code>max(x, 0)</code> :</p>
-    <table style="width:100%;border-collapse:collapse;margin:0.35rem 0 0;font-size:0.88rem;">
+    <ol style="margin:0.5rem 0 0;padding-left:1.25rem;line-height:1.5;font-size:0.88rem;">
+      <li style="margin:0.3rem 0;"><strong>Rapport</strong> — Comptabilité → Rapports → Balance générale → modifier (droits ou mode développeur).</li>
+      <li style="margin:0.3rem 0;"><strong>Colonnes</strong> — retirer solde initial/final « tout en un » ; ajouter débit/crédit initiaux et finaux avec labels alignés sur les expressions (voir tableau).</li>
+      <li style="margin:0.3rem 0;"><strong>Ligne</strong> — <code>groupby = account_id</code> ; une expression par colonne (label = <code>expression_label</code>).</li>
+      <li style="margin:0.3rem 0;"><strong>Options</strong> — inclure le solde initial ; désactiver comparaison de périodes si doublons.</li>
+    </ol>
+    <table style="width:100%;border-collapse:collapse;margin:0.5rem 0 0;font-size:0.82rem;">
       <thead>
-        <tr style="text-align:left;border-bottom:1px solid #ccc;">
-          <th style="padding:0.25rem 0.35rem;"><code>subformula</code></th>
-          <th style="padding:0.25rem 0.35rem;">Effet</th>
-        </tr>
+        <tr style="text-align:left;border-bottom:1px solid var(--sn-border);"><th style="padding:0.2rem;">Label</th><th>Moteur</th><th>Formule</th><th>Subf.</th></tr>
       </thead>
       <tbody>
-        <tr><td style="padding:0.25rem 0.35rem;"><code>positive</code></td><td style="padding:0.25rem 0.35rem;">Garde uniquement les valeurs <strong>&gt; 0</strong> (côté débit affiché).</td></tr>
-        <tr><td style="padding:0.25rem 0.35rem;"><code>negative</code></td><td style="padding:0.25rem 0.35rem;">Garde uniquement les valeurs <strong>&lt; 0</strong> (utile pour certains découpages crédit).</td></tr>
+        <tr><td style="padding:0.2rem;"><code>debit_initial</code></td><td>aggregation</td><td><code>initial_debit - initial_credit</code></td><td>positive</td></tr>
+        <tr><td style="padding:0.2rem;"><code>credit_initial</code></td><td>aggregation</td><td><code>initial_credit - initial_debit</code></td><td>positive</td></tr>
+        <tr><td style="padding:0.2rem;"><code>debit</code></td><td>aggregation</td><td><code>debit</code></td><td>—</td></tr>
+        <tr><td style="padding:0.2rem;"><code>credit</code></td><td>aggregation</td><td><code>credit</code></td><td>—</td></tr>
+        <tr><td style="padding:0.2rem;"><code>debit_final</code></td><td>aggregation</td><td><code>(initial_debit + debit) - (initial_credit + credit)</code></td><td>positive</td></tr>
+        <tr><td style="padding:0.2rem;"><code>credit_final</code></td><td>aggregation</td><td><code>(initial_credit + credit) - (initial_debit + debit)</code></td><td>positive</td></tr>
       </tbody>
     </table>
-    <p style="margin:0.45rem 0 0;line-height:1.45;font-size:0.92rem;"><strong>Colonnes (6)</strong> — schéma type (formule d’agrégation + <code>positive</code> pour les soldes décomposés) :</p>
-    <table style="width:100%;border-collapse:collapse;margin:0.35rem 0 0;font-size:0.88rem;">
-      <thead>
-        <tr style="text-align:left;border-bottom:1px solid #ccc;">
-          <th style="padding:0.25rem 0.35rem;">Colonne</th>
-          <th style="padding:0.25rem 0.35rem;"><code>formula</code> (aggregation)</th>
-          <th style="padding:0.25rem 0.35rem;"><code>subformula</code></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td style="padding:0.25rem 0.35rem;">Débit initial</td><td style="padding:0.25rem 0.35rem;"><code>initial_debit - initial_credit</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
-        <tr><td style="padding:0.25rem 0.35rem;">Crédit initial</td><td style="padding:0.25rem 0.35rem;"><code>initial_credit - initial_debit</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
-        <tr><td style="padding:0.25rem 0.35rem;">Débit période</td><td style="padding:0.25rem 0.35rem;"><code>debit</code></td><td style="padding:0.25rem 0.35rem;">—</td></tr>
-        <tr><td style="padding:0.25rem 0.35rem;">Crédit période</td><td style="padding:0.25rem 0.35rem;"><code>credit</code></td><td style="padding:0.25rem 0.35rem;">—</td></tr>
-        <tr><td style="padding:0.25rem 0.35rem;">Débit final</td><td style="padding:0.25rem 0.35rem;"><code>(initial_debit + debit) - (initial_credit + credit)</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
-        <tr><td style="padding:0.25rem 0.35rem;">Crédit final</td><td style="padding:0.25rem 0.35rem;"><code>(initial_credit + credit) - (initial_debit + debit)</code></td><td style="padding:0.25rem 0.35rem;"><code>positive</code></td></tr>
-      </tbody>
-    </table>
-    <p class="sn-muted" style="margin:0.45rem 0 0;line-height:1.45;font-size:0.85rem;">
-      Rappels : libellés d’options selon la langue ; <strong>Studio SaaS</strong> : mode développeur → <strong>Import XML</strong>. Si <code>max()</code> n’est pas accepté : <code>(a) if a &gt; 0 else 0</code>. Pour des totaux par <strong>classe OHADA (1–7)</strong>, il faut en général des lignes d’agrégation ou de structure supplémentaires (hors de ce guide).
-    </p>
+    <p class="sn-muted" style="margin:0.45rem 0 0;font-size:0.8rem;">Import XML en deux temps si Studio échoue. Détails : <code>DEPLOY_PYTHONANYWHERE.md</code>.</p>
   </details>
   <p class="sn-meta-line" style="margin-top:0.65rem;">
-    <strong>Auteur :</strong> {{ utility_author }} ·
-    <strong>Version :</strong> {{ utility_version }} ·
-    <strong>Date :</strong> {{ utility_date }}
+    {{ utility_author }} · v{{ utility_version }} · {{ utility_date }}
   </p>
 </details>
 {% endif %}
@@ -236,9 +164,9 @@
       {% endfor %}
     </select>
     {% if accounting_mode == 'balance' %}
-    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Sans hôte : la liste des bases et le tableau de choix ci‑dessous couvrent <strong>toutes les bases enregistrées</strong> après « Actualiser ». Avec un hôte : uniquement les bases de ce serveur.</p>
+    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.82rem;line-height:1.35;">Filtre optionnel par serveur ; « Actualiser » recharge la liste.</p>
     {% else %}
-    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.85rem;line-height:1.4;">Sans hôte : la liste déroulante et le tableau ci‑dessous montrent <strong>toutes les bases</strong> après « Actualiser ». Avec un hôte : seules les bases sur ce serveur.</p>
+    <p class="sn-muted" style="margin:0.35rem 0 0.75rem;font-size:0.82rem;line-height:1.35;">Filtre optionnel par serveur ; « Actualiser la liste » recharge bases et rapports.</p>
     {% endif %}
 
     <label for="client_id">Base à utiliser (nom technique db)</label>
@@ -256,7 +184,6 @@
     <input type="text" id="q" name="q" value="{{ filter_q }}" placeholder="ex. compte, bilan, SYSCOHADA…">
     {% else %}
     <input type="hidden" name="q" value="">
-    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;font-size:0.88rem;">Sur cet utilitaire, la liste des rapports n’est pas affichée : création / suppression de <strong>Balance OHADA</strong> uniquement.</p>
     {% endif %}
 
     <div id="ajouter-base-odoo" class="sn-rapports-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);scroll-margin-top:1rem;">
@@ -301,45 +228,42 @@
 </div>
 
 {% if balance_show_links %}
-<div class="sn-card sn-card--accent" style="margin-bottom:0.85rem;border-left:4px solid var(--sn-primary-bright);">
-  <p style="margin:0 0 0.65rem;line-height:1.45;"><strong>Balance OHADA</strong> sur cette base (rapport autonome, sans <code>root_report_id</code>). Id <code>{{ prefill_report_id or balance_ohada_report_id }}</code>{% if prefill_report_name %} — « {{ prefill_report_name }} »{% endif %}.</p>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;"><strong>Lancer le rapport :</strong> lien d’analyse ci‑dessous si l’API a pu créer l’action / menu ; sinon menu Comptabilité › Reporting, ou liste des rapports, ou fiche technique.</p>
-  {% if balance_menu_id %}
-  <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.88rem;line-height:1.4;">Entrée de menu Odoo créée ou détectée (id <code>{{ balance_menu_id }}</code>) — le lien ci‑dessous inclut <code>menu_id</code> pour un chargement fiable du client web.</p>
-  {% endif %}
-  {% if balance_exec_url %}
-  <p style="margin:0 0 0.5rem;line-height:1.45;">Lien vers l’<strong>écran d’analyse</strong> (grille du rapport) :</p>
-  <p style="margin:0 0 0.65rem;">
-    <a class="sn-btn" href="{{ balance_exec_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le rapport (analyse)</a>
+<div class="sn-card sn-card--accent sn-card--report-links" style="margin-bottom:0.85rem;border-left:4px solid var(--sn-primary-bright);">
+  <h2 class="sn-card__title-sm" style="margin:0 0 0.5rem;font-size:1.02rem;">Rapport Balance OHADA — accès Odoo</h2>
+  <p class="sn-muted" style="margin:0 0 0.65rem;font-size:0.88rem;">
+    <code>account.report</code> id <strong>{{ prefill_report_id or balance_ohada_report_id }}</strong>
+    {% if prefill_report_name %} — « {{ prefill_report_name }} »{% endif %}
+    {% if balance_menu_id %} · menu <code>{{ balance_menu_id }}</code>{% endif %}
   </p>
-  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL (copier-coller) :</p>
-  <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_exec_url }}</code></p>
-  {% else %}
-  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;">L’API n’a pas pu créer l’action / menu (droits utilisateur Odoo insuffisants sur <code>ir.actions.client</code> ou <code>ir.ui.menu</code>). Utilisez le menu Reporting ou la liste des rapports.</p>
+  <div class="sn-report-btn-row">
+    {% if balance_exec_url %}
+    <a class="sn-btn" href="{{ balance_exec_url }}" target="_blank" rel="noopener noreferrer">Ouvrir l’analyse</a>
+    {% else %}
+    <span class="sn-btn sn-btn--ghost" style="opacity:0.65;cursor:not-allowed;" title="Action/menu non créés par l’API (droits Odoo)">Analyse indisponible</span>
+    {% endif %}
+    {% if balance_list_url %}
+    <a class="sn-btn sn-btn--ghost" href="{{ balance_list_url }}" target="_blank" rel="noopener noreferrer">Liste des rapports</a>
+    {% endif %}
+    <a class="sn-btn sn-btn--ghost" href="{{ balance_form_url }}" target="_blank" rel="noopener noreferrer">Fiche technique</a>
+  </div>
+  {% if not balance_exec_url %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.82rem;">Ouvrez le rapport depuis Odoo (Reporting / rapports comptables) si l’API n’a pas pu créer l’action client.</p>
   {% endif %}
-  {% if balance_list_url %}
-  <hr style="margin:0.85rem 0;border:none;border-top:1px solid var(--sn-border);">
-  <p style="margin:0 0 0.5rem;line-height:1.45;">Liste backend des <code>account.report</code> (recherche par nom, ouverture depuis Odoo) :</p>
-  <p style="margin:0 0 0.65rem;">
-    <a class="sn-btn sn-btn--ghost" href="{{ balance_list_url }}" target="_blank" rel="noopener noreferrer">Ouvrir la liste des rapports</a>
-  </p>
-  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL (copier-coller) :</p>
-  <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_list_url }}</code></p>
-  {% endif %}
-  <hr style="margin:0.85rem 0;border:none;border-top:1px solid var(--sn-border);">
-  <p style="margin:0 0 0.5rem;line-height:1.45;" class="sn-muted">Fiche technique (configuration <code>account.report</code>, admin / Studio) :</p>
-  <p style="margin:0 0 0.65rem;">
-    <a class="sn-btn sn-btn--ghost" href="{{ balance_form_url }}" target="_blank" rel="noopener noreferrer">Ouvrir la fiche technique</a>
-  </p>
-  <p class="sn-muted" style="margin:0;font-size:0.88rem;line-height:1.4;">URL (copier-coller) :</p>
-  <p style="margin:0.35rem 0 0;word-break:break-all;font-size:0.88rem;line-height:1.45;"><code>{{ balance_form_url }}</code></p>
+  <details class="sn-muted" style="margin:0.75rem 0 0;font-size:0.82rem;">
+    <summary style="cursor:pointer;">Copier les URL complètes</summary>
+    <dl style="margin:0.5rem 0 0;display:grid;gap:0.35rem;">
+      {% if balance_exec_url %}<dt>Analyse</dt><dd style="margin:0;word-break:break-all;"><code>{{ balance_exec_url }}</code></dd>{% endif %}
+      {% if balance_list_url %}<dt>Liste</dt><dd style="margin:0;word-break:break-all;"><code>{{ balance_list_url }}</code></dd>{% endif %}
+      <dt>Fiche</dt><dd style="margin:0;word-break:break-all;"><code>{{ balance_form_url }}</code></dd>
+    </dl>
+  </details>
 </div>
 {% endif %}
 
 {% if not selected_client and label_picker_rows %}
 <div class="sn-card">
-  <h2 style="margin-top:0;font-size:1.05rem;">{% if filter_host %}Bases sur « {{ filter_host }} »{% else %}Toutes les bases du registre{% endif %}</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">État de connexion à l’API comptable (<code>account.report</code>) — cliquez sur <strong>Utiliser cette base</strong> pour la sélectionner.</p>
+  <h2 style="margin-top:0;font-size:1.05rem;">{% if filter_host %}Bases sur « {{ filter_host }} »{% else %}Bases du registre{% endif %}</h2>
+  <p class="sn-muted" style="margin:0 0 0.6rem;line-height:1.4;font-size:0.85rem;">Connexion <code>account.report</code> — <strong>Utiliser cette base</strong> pour sélectionner.</p>
   <div class="sn-scroll-x">
   <table class="sn-table">
     <thead>
@@ -398,8 +322,9 @@
   </div>
 
   {% if sibling_rows %}
-  <h3 style="font-size:0.98rem;margin:1rem 0 0.5rem;">Autres bases sur le même serveur ({{ filter_host or '—' }})</h3>
-  <div class="sn-scroll-x">
+  <details style="margin:1rem 0 0;">
+    <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;">Autres bases sur ce serveur ({{ filter_host or '—' }})</summary>
+  <div class="sn-scroll-x" style="margin-top:0.5rem;">
   <table class="sn-table" style="font-size:0.9rem;">
     <thead>
       <tr>
@@ -429,6 +354,7 @@
     </tbody>
   </table>
   </div>
+  </details>
   {% endif %}
 
   {% if conn_status == 'ok' and instance_meta_rows %}
@@ -440,17 +366,17 @@
       <dd style="margin:0;">{{ mv }}</dd>
       {% endfor %}
     </dl>
-    <p class="sn-muted" style="margin:0.65rem 0 0;font-size:0.8rem;line-height:1.4;">Données fournies par Odoo : <code>common.version</code> (chaîne + <code>server_version_info</code>), <code>ir.module.module</code> sur <strong>base</strong> / <strong>web_enterprise</strong> (version installée en base, <code>published_version</code> si présent), <code>ir.config_parameter</code>. La ligne « Version Odoo (module base, installée en base) » correspond à la métadonnée officielle de la base ; selon les droits du compte API certaines valeurs peuvent manquer.</p>
+    <details class="sn-muted" style="margin:0.5rem 0 0;font-size:0.78rem;">
+      <summary style="cursor:pointer;">Source des champs</summary>
+      <p style="margin:0.4rem 0 0;line-height:1.4;"><code>common.version</code>, modules <code>base</code> / <code>web_enterprise</code>, <code>ir.config_parameter</code> — selon droits API certaines valeurs peuvent manquer.</p>
+    </details>
   </details>
   {% endif %}
 
   {% if conn_status == 'ok' and accounting_mode != 'balance' %}
-  <details id="sn-reports-list" class="sn-reports-details" {% if not prefill_report_id %}open{% endif %} style="margin-top:1rem;">
-    <summary style="cursor:pointer;font-weight:600;font-size:1.05rem;">
-      Rapports ({{ reports|length }} affiché(s), max 400)
-      {% if prefill_report_id %}
-      <span class="sn-muted" style="font-weight:normal;font-size:0.9rem;"> — liste repliée (rapport id={{ prefill_report_id }} présélectionné pour la personnalisation)</span>
-      {% endif %}
+  <details id="sn-reports-list" class="sn-reports-details" style="margin-top:1rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:1.02rem;">
+      Liste des rapports ({{ reports|length }}{% if prefill_report_id %} · id {{ prefill_report_id }} sélectionné{% endif %})
     </summary>
     <div style="margin-top:0.75rem;">
   {% if not reports %}
@@ -463,7 +389,7 @@
         <th>Id</th>
         <th>Nom</th>
         <th>Odoo</th>
-        <th>Actions</th>
+        <th style="min-width:12rem;">Gestion</th>
       </tr>
     </thead>
     <tbody>
@@ -479,16 +405,17 @@
           {% endif %}
         </td>
         <td>
+          <div class="sn-report-btn-row sn-report-btn-row--compact" style="flex-wrap:wrap;gap:0.35rem;">
           <form method="post" action="{{ request.path }}" style="display:inline;margin:0;">
             <input type="hidden" name="client_id" value="{{ selected_client }}">
             <input type="hidden" name="filter_q" value="{{ filter_q }}">
             <input type="hidden" name="filter_host" value="{{ filter_host }}">
             <input type="hidden" name="action" value="prefill">
             <input type="hidden" name="report_id" value="{{ r.id }}">
-            <button type="submit" class="sn-btn" style="margin-top:0;padding:0.35rem 0.75rem;font-size:0.85rem;">{% if accounting_mode == 'pl_budget' %}Préparer (budget){% else %}Personnaliser{% endif %}</button>
+            <button type="submit" class="sn-btn" style="margin:0;padding:0.32rem 0.65rem;font-size:0.82rem;">{% if accounting_mode == 'pl_budget' %}Préparer{% else %}Personnaliser{% endif %}</button>
           </form>
-          <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
-            <summary style="cursor:pointer;font-size:0.88rem;">Renommer…</summary>
+          <details style="display:inline-block;vertical-align:middle;">
+            <summary class="sn-btn sn-btn--ghost" style="display:inline-block;list-style:none;padding:0.32rem 0.55rem;font-size:0.82rem;cursor:pointer;border-radius:var(--sn-radius-btn);">Renommer</summary>
             <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
               <form method="post" action="{{ request.path }}" novalidate>
                 <input type="hidden" name="client_id" value="{{ selected_client }}">
@@ -502,8 +429,8 @@
               </form>
             </div>
           </details>
-          <details style="display:inline-block;margin-left:0.35rem;vertical-align:middle;">
-            <summary style="cursor:pointer;color:var(--sn-danger);font-size:0.88rem;">Supprimer…</summary>
+          <details style="display:inline-block;vertical-align:middle;">
+            <summary class="sn-btn sn-btn--ghost" style="display:inline-block;list-style:none;padding:0.32rem 0.55rem;font-size:0.82rem;cursor:pointer;color:var(--sn-danger);border-radius:var(--sn-radius-btn);">Supprimer</summary>
             <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
               <form method="post" action="{{ request.path }}" novalidate>
                 <input type="hidden" name="client_id" value="{{ selected_client }}">
@@ -518,6 +445,7 @@
               </form>
             </div>
           </details>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -532,90 +460,85 @@
 
 <div class="sn-card" id="personalize">
   {% if accounting_mode == 'balance' %}
-  <h2 style="margin-top:0;font-size:1.1rem;">Balance OHADA</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">
-    Crée un <code>account.report</code> « Balance OHADA » (six colonnes, ligne <code>bal_ohada</code>). Si une <strong>instance toolbox</strong> existe déjà (même repère technique), elle est <strong>d’abord supprimée</strong> (menus / actions liés à ce rapport uniquement), puis recréée. Autres rapports comptables inchangés.
+  <h2 style="margin-top:0;font-size:1.1rem;">Gestion du rapport Balance OHADA</h2>
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.4;font-size:0.88rem;">
+    Création / correctifs / suppression sur la base sélectionnée (repère <code>bal_ohada</code>). Recréation = suppression de l’ancienne instance toolbox puis nouveau rapport.
   </p>
   {% if balance_import_guide %}
-  <div class="sn-card" style="margin:0 0 1rem;padding:0.85rem;background:rgba(0,80,120,0.06);border:1px solid var(--sn-border);border-radius:8px;">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Création par API (sans import XML) — selon votre version</h3>
-    <p style="margin:0 0 0.5rem;line-height:1.45;font-size:0.92rem;">{{ balance_import_guide.summary_line }}</p>
-    <ul style="margin:0.35rem 0 0;padding-left:1.2rem;line-height:1.5;font-size:0.88rem;">
+  <details class="sn-card" style="margin:0 0 1rem;padding:0.65rem 0.85rem;background:rgba(0,80,120,0.06);border:1px solid var(--sn-border);border-radius:8px;">
+    <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;">Création API / import — selon la version Odoo</summary>
+    <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.88rem;">{{ balance_import_guide.summary_line }}</p>
+    <ul style="margin:0.35rem 0 0;padding-left:1.2rem;line-height:1.45;font-size:0.85rem;">
       {% for p in balance_import_guide.points %}
-      <li style="margin:0.25rem 0;">{{ p }}</li>
+      <li style="margin:0.2rem 0;">{{ p }}</li>
       {% endfor %}
     </ul>
-    <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.85rem;">
-      <strong>Secours</strong> (Studio / autre base) :
-      <a href="{{ url_for('staff.download_balance_6col_example_xml') }}">télécharger le gabarit XML</a>
-      ·
-      <a href="{{ url_for('staff.download_balance_ohada_module_zip') }}">télécharger le module ZIP</a>
-      (souvent Enterprise, dépendance <code>account_reports</code>).
+    <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.8rem;">
+      <a href="{{ url_for('staff.download_balance_6col_example_xml') }}">XML</a>
+      · <a href="{{ url_for('staff.download_balance_ohada_module_zip') }}">ZIP module</a>
+      {% if balance_import_guide.xml_hint %} — {{ balance_import_guide.xml_hint }}{% endif %}
     </p>
-    <p class="sn-muted" style="margin:0.45rem 0 0;line-height:1.45;font-size:0.82rem;">{{ balance_import_guide.xml_hint }}</p>
-  </div>
+  </details>
   {% endif %}
   {% if conn_status == 'ok' %}
     {% if balance_ohada_report_id %}
-    <p style="margin:0 0 0.75rem;line-height:1.45;">État : <strong>présent</strong> sur la base — <code>account.report</code> id <code>{{ balance_ohada_report_id }}</code>.</p>
+    <p style="margin:0 0 0.5rem;line-height:1.4;font-size:0.9rem;">État : <strong>présent</strong> — id <code>{{ balance_ohada_report_id }}</code></p>
     {% else %}
-    <p style="margin:0 0 0.75rem;line-height:1.45;">État : <strong>absent</strong> — vous pouvez le créer.</p>
+    <p style="margin:0 0 0.5rem;line-height:1.4;font-size:0.9rem;">État : <strong>absent</strong></p>
     {% endif %}
   {% else %}
-    <p class="sn-muted" style="margin:0 0 0.75rem;">Connectez la base ci-dessus pour voir l’état et agir.</p>
+    <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.88rem;">Sélectionnez une base connectée pour agir.</p>
   {% endif %}
-  <form id="form-create-balance-ohada" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate>
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="action" value="create_balance_ohada">
-    <button type="submit" class="sn-btn" style="margin-top:0.25rem;"
-      {% if conn_status != 'ok' %}disabled{% endif %}>
-      {% if balance_ohada_report_id %}Recréer{% else %}Créer{% endif %} Balance OHADA sur Odoo
-    </button>
+
+  <div class="sn-report-btn-row sn-report-btn-row--wrap" style="margin:0.65rem 0 0;align-items:stretch;">
+    <form id="form-create-balance-ohada" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="create_balance_ohada">
+      <button type="submit" class="sn-btn" {% if conn_status != 'ok' %}disabled{% endif %}>
+        {% if balance_ohada_report_id %}Recréer{% else %}Créer{% endif %} Balance OHADA
+      </button>
+    </form>
     {% if balance_ohada_report_id %}
-    <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.85rem;">L’instance actuelle (id {{ balance_ohada_report_id }}) sera remplacée.</p>
+    <form id="form-rewrite-balance-ohada-outer" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="rewrite_balance_ohada_outer_gross">
+      <button type="submit" class="sn-btn sn-btn--ghost" title="Cumuls bruts sur colonnes initiales/finales" {% if conn_status != 'ok' %}disabled{% endif %}>Colonnes → brut</button>
+    </form>
+    <form id="form-rewrite-balance-ohada-aggregation" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="rewrite_balance_ohada_aggregation">
+      <button type="submit" class="sn-btn sn-btn--ghost" title="Aggregation + positive (expérimental)" {% if conn_status != 'ok' %}disabled{% endif %}>Mode net (aggregation)</button>
+    </form>
     {% endif %}
-  </form>
+  </div>
   {% if balance_ohada_report_id %}
-  <form id="form-rewrite-balance-ohada-outer" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin-top:0.85rem;">
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="action" value="rewrite_balance_ohada_outer_gross">
-    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;font-size:0.88rem;">
-      <strong>Dernier correctif sans supprimer le rapport :</strong> réécrit les quatre expressions des colonnes <em>initiales / finales</em> en cumuls <strong>bruts</strong> (écritures débit &gt; 0 / crédit &gt; 0). À utiliser si le crédit initial ou final reste vide et que le débit affiche des montants négatifs rouges pour les comptes créditeurs.
-    </p>
-    <button type="submit" class="sn-btn sn-btn--ghost" {% if conn_status != 'ok' %}disabled{% endif %}>Colonnes extérieures → brut (API)</button>
-  </form>
-  <form id="form-rewrite-balance-ohada-aggregation" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin-top:0.65rem;">
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="action" value="rewrite_balance_ohada_aggregation">
-    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;font-size:0.88rem;">
-      <strong>Solde net sur les colonnes extérieures (expérimental) :</strong> remplace les six expressions par le moteur <code>aggregation</code> + <code>positive</code> (une seule face non nulle pour l’ouverture / la clôture si Odoo calcule correctement). Refusé sur certaines bases ; si l’écran redevient incohérent, repassez au bouton <strong>brut</strong> ci-dessus.
-    </p>
-    <button type="submit" class="sn-btn sn-btn--ghost" {% if conn_status != 'ok' %}disabled{% endif %}>Mode net OHADA — aggregation (API)</button>
-  </form>
+  <details class="sn-muted" style="margin:0.65rem 0 0;font-size:0.82rem;">
+    <summary style="cursor:pointer;">Aide — correctifs API (brut / net)</summary>
+    <p style="margin:0.45rem 0 0;line-height:1.45;"><strong>Brut :</strong> réécrit les 4 expressions extérieures en cumuls bruts si crédit init./final vide et débits négatifs affichés pour comptes créditeurs.</p>
+    <p style="margin:0.35rem 0 0;line-height:1.45;"><strong>Net :</strong> remplace les 6 expressions par <code>aggregation</code> + <code>positive</code>. Peut être refusé ou incohérent selon la base ; repasser en <strong>brut</strong> si besoin.</p>
+  </details>
   {% endif %}
+
   {% if balance_ohada_report_id %}
-  <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--sn-border);">
-  <h3 style="margin:0 0 0.5rem;font-size:1rem;">Supprimer de la base Odoo</h3>
-  <p class="sn-muted" style="margin:0 0 0.65rem;font-size:0.88rem;line-height:1.45;">
-    Retire le rapport <strong>Balance OHADA</strong> (repère <code>bal_ohada</code>), les entrées de menu et actions client d’exécution associées lorsque l’API y accède.
-  </p>
-  <form id="form-unlink-balance-ohada" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate>
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="action" value="unlink_balance_ohada">
-    <label for="confirm-unlink-ohada">Confirmation</label>
-    <p class="sn-muted" style="margin:0.25rem 0 0.5rem;font-size:0.82rem;">Saisissez exactement : <code>SUPPRIMER-BALANCE-OHADA</code></p>
-    <input type="text" id="confirm-unlink-ohada" name="confirm_delete" autocomplete="off" placeholder="SUPPRIMER-BALANCE-OHADA" style="max-width:24rem;width:100%;box-sizing:border-box;">
-    <button type="submit" class="sn-btn" style="margin-top:0.65rem;background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;"
-      {% if conn_status != 'ok' %}disabled{% endif %}>Supprimer Balance OHADA</button>
-  </form>
+  <details style="margin:1rem 0 0;border:1px solid var(--sn-border);border-radius:8px;padding:0.55rem 0.75rem;background:rgba(248,113,113,0.06);">
+    <summary style="cursor:pointer;font-weight:600;color:var(--sn-danger);">Supprimer le rapport sur Odoo</summary>
+    <form id="form-unlink-balance-ohada" class="form-sn-long-post" method="post" action="{{ request.path }}" novalidate style="margin:0.5rem 0 0;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="unlink_balance_ohada">
+      <label for="confirm-unlink-ohada" class="sn-muted" style="font-size:0.82rem;">Confirmation : <code>SUPPRIMER-BALANCE-OHADA</code></label>
+      <input type="text" id="confirm-unlink-ohada" name="confirm_delete" autocomplete="off" placeholder="SUPPRIMER-BALANCE-OHADA" style="display:block;max-width:24rem;width:100%;margin-top:0.35rem;box-sizing:border-box;">
+      <button type="submit" class="sn-btn" style="margin-top:0.55rem;background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;"
+        {% if conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
+    </form>
+  </details>
   {% endif %}
   {% elif accounting_mode == 'pl_budget' %}
   <h2 style="margin-top:0;font-size:1.1rem;">P&amp;L — analytique et budget</h2>
@@ -641,7 +564,7 @@
     {% if prefill_report_id %}
     <p style="margin:0 0 0.5rem;line-height:1.45;">Id <code>{{ prefill_report_id }}</code>{% if prefill_report_name %} — <strong>{{ prefill_report_name }}</strong>{% endif %}</p>
     {% else %}
-    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;">Aucun rapport sélectionné — cliquez sur <strong>Préparer (budget)</strong> sur une ligne du tableau.</p>
+    <p class="sn-muted" style="margin:0 0 0.5rem;line-height:1.45;">Aucun rapport sélectionné — bouton <strong>Préparer</strong> dans la liste.</p>
     {% endif %}
     <p class="sn-muted" style="font-size:0.85rem;margin:0 0 0.5rem;">Libellé de la copie : source + « — copie Senedoo (analytique budget) ».</p>
     <button type="submit" {% if not prefill_report_id %}disabled{% endif %}>Créer la copie (détail + analytique / budget)</button>
@@ -673,7 +596,7 @@
   {% endif %}
 </div>
 {% else %}
-<p class="sn-muted">« Actualiser » sans base sélectionnée affiche toutes les bases (ou filtrées par serveur) ; choisissez-en une dans la liste ou le tableau. Le formulaire d’ajout est masqué par défaut : cliquez sur <strong>Ajouter une base</strong>, puis <strong>Fermer</strong> pour le replier.</p>
+<p class="sn-muted" style="font-size:0.88rem;line-height:1.4;">Choisissez une base dans la liste ou le tableau après « Actualiser ». <strong>Ajouter une base</strong> ouvre le panneau d’enregistrement.</p>
 {% endif %}
 
 <div id="sn-personalize-overlay" class="sn-progress-overlay" hidden aria-hidden="true">
