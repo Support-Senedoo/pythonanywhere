@@ -7,18 +7,21 @@ Structure CPC SYSCOHADA complète (plan comptable OHADA / Sénégal).
 Compatible avec les fonctions execute_kw de personalize_syscohada_detail.py.
 Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
-Stratégie colonne Budget (contournement limitation Odoo SaaS v16-v19) :
-  engine='budget' est masqué par Odoo quand le filtre analytique est actif.
-  Solution : les expressions Budget des lignes de détail utilisent engine='external',
-  lues depuis account.report.external.value (pré-calculées par sync_cpc_budget_analytique.py).
-  Les lignes de totaux (X*) utilisent engine='aggregation' sur .budget des lignes de détail.
-  → Lancer "Synchroniser le budget" dans la Toolbox pour peupler les valeurs externes.
+Stratégie colonne Budget (données 100 % Odoo) :
+  - Colonne Budget : engine ``budget`` avec la même formule ``account_codes`` que le réalisé
+    (positions budgétaires / ``crossovered.budget.lines``).
+  - Après création du rapport : activation de ``filter_budgets`` ou ``filter_budget`` sur la
+    fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
+    Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
+    ne plus piloter correctement les colonnes budget / % avec l’analytique.
+  - Les totaux (codes X*) : engine ``aggregation`` sur les .budget des lignes de détail.
 """
 from __future__ import annotations
 
 import re
 from typing import Any
 
+from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
 from personalize_syscohada_detail import execute_kw
 
 CPC_BUDGET_ANALYTIQUE_NAME = "CPC SYSCOHADA \u2014 Budget Analytique (Senedoo)"
@@ -172,19 +175,17 @@ def create_toolbox_cpc_budget_analytique(
     Op\u00e9rations :
       1. Supprime les instances toolbox pr\u00e9existantes (m\u00eame nom).
       2. Cr\u00e9e l'enregistrement account.report avec filter_analytic=True.
-      3. Cr\u00e9e 4 colonnes : R\u00e9alis\u00e9 / Budget / \u00c9cart / % R\u00e9alisation.
-      4. Cr\u00e9e toutes les lignes CPC SYSCOHADA avec leurs expressions par colonne.
+      3. Active filter_budgets / filter_budget sur le rapport si le mod\u00e8le les expose.
+      4. Cr\u00e9e 4 colonnes : R\u00e9alis\u00e9 / Budget / \u00c9cart / % R\u00e9alisation.
+      5. Cr\u00e9e toutes les lignes CPC SYSCOHADA avec leurs expressions par colonne.
 
     Retourne un dict :
       report_id   : ID du rapport cr\u00e9\u00e9
       col_count   : nombre de colonnes cr\u00e9\u00e9es
       line_count  : nombre de lignes CPC cr\u00e9\u00e9es
       prior_ids   : IDs supprim\u00e9s avant cr\u00e9ation
-
-    Limitations :
-      Sur Odoo SaaS v16-v19, la colonne « Budget » peut \u00eatre masqu\u00e9e lorsque
-      le filtre analytique est actif (engine='budget' incompatible avec analytic_account_ids).
-      Contournement complet : account.report.external.value (CLI odoo_cpc_budget_analytique.py).
+      filter_written : bool\u00e9ens \u00e9crits sur le rapport (filter_analytic, filter_budgets, \u2026)
+      filter_personalization_error : message si l\u2019activation des filtres a \u00e9chou\u00e9
     """
     # \u00c9tape 1 \u2014 nettoyage
     prior_ids = purge_cpc_budget_analytique_instances(models, db, uid, password)
@@ -201,6 +202,16 @@ def create_toolbox_cpc_budget_analytique(
         "search_bar":                  True,
         "load_more_limit":             80,
     }]))
+
+    filter_written: dict[str, Any] = {}
+    filter_personalization_error: str | None = None
+    try:
+        opt = personalize_pl_analytic_budget_options(
+            models, db, uid, password, report_id, enable_budget_filter=True
+        )
+        filter_written = dict(opt.get("written") or {})
+    except Exception as e:
+        filter_personalization_error = str(e)
 
     # \u00c9tape 3 \u2014 4 colonnes
     col_defs = [
@@ -249,14 +260,12 @@ def create_toolbox_cpc_budget_analytique(
                     "formula":        formula_ac,
                     "date_scope":     "strict_range",
                 })
-                # Budget : engine external (lit account.report.external.value)
-                # \u2192 engine='budget' masqu\u00e9 par Odoo avec filtre analytique actif.
-                # \u2192 Peupler via action "Synchroniser le budget" dans la Toolbox.
+                # Budget : engine budget (crossovered.budget.lines), m\u00eame mapping comptes
                 _create_expression_safe(models, db, uid, password, {
                     "report_line_id": line_id,
                     "label":          "budget",
-                    "engine":         "external",
-                    "formula":        "",
+                    "engine":         "budget",
+                    "formula":        formula_ac,
                     "date_scope":     "strict_range",
                 })
                 # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9
@@ -318,4 +327,6 @@ def create_toolbox_cpc_budget_analytique(
         "col_count":  col_count,
         "line_count": line_count,
         "prior_ids":  prior_ids,
+        "filter_written": filter_written,
+        "filter_personalization_error": filter_personalization_error,
     }

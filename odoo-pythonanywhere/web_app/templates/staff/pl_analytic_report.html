@@ -245,8 +245,11 @@
     Toute instance Senedoo existante est supprimée avant la création.
   </p>
   <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.4;font-size:0.85rem;">
-    La colonne Budget utilise <code>engine='external'</code> (pas <code>engine='budget'</code> qui est masqué par Odoo avec le filtre analytique).
-    Après création, utilisez <strong>Synchroniser le budget</strong> ci-dessous pour peupler les montants.
+    La colonne Budget utilise le moteur natif <code>engine='budget'</code> (données
+    <code>crossovered.budget.lines</code>). Le rapport est créé avec
+    <code>filter_analytic</code> et, si votre version l’expose,
+    <code>filter_budgets</code> / <code>filter_budget</code> — comme sur une copie P&amp;L Senedoo :
+    dans Odoo, choisissez la période, le budget et l’analytique dans les filtres du rapport.
   </p>
   <div class="sn-report-btn-row">
     <form id="form-create-cpc-budget" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
@@ -266,70 +269,6 @@
       <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
     </form>
   </div>
-</div>
-
-{# ── Synchronisation budget → external.value ─────────────────────────────── #}
-<div class="sn-card">
-  <h2 style="margin-top:0;font-size:1.05rem;">Synchroniser le budget analytique</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
-    Calcule les montants budgétaires par ligne CPC et les stocke dans <code>account.report.external.value</code>.
-    Le rapport Odoo affiche ensuite la colonne <strong>Budget</strong> même avec le filtre analytique actif.<br>
-    <strong>À relancer</strong> si vous modifiez le budget ou changez de période.
-  </p>
-  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-    <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="action" value="sync_cpc_budget_analytique">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 1rem;margin-bottom:0.75rem;">
-      <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.9rem;">
-        ID rapport CPC (account.report)
-        <input type="number" name="sync_report_id" min="1"
-               value="{{ highlight_report_id or '' }}"
-               placeholder="ex : 69"
-               style="padding:0.35rem 0.5rem;border:1px solid var(--sn-border);border-radius:4px;font-size:0.9rem;">
-      </label>
-      <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.9rem;">
-        Compte analytique (projet)
-        <select name="sync_analytic_id" style="padding:0.35rem 0.5rem;border:1px solid var(--sn-border);border-radius:4px;font-size:0.9rem;">
-          <option value="0">— Tous (sans filtre analytique) —</option>
-          {% for a in analytic_accounts %}
-          <option value="{{ a.id }}">{{ a.label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.9rem;">
-        Budget (crossovered.budget)
-        <select name="sync_budget_id" required style="padding:0.35rem 0.5rem;border:1px solid var(--sn-border);border-radius:4px;font-size:0.9rem;">
-          <option value="">— Choisir un budget —</option>
-          {% for b in cpc_budgets %}
-          <option value="{{ b.id }}">{{ b.name }}{% if b.state %} ({{ b.state }}){% endif %}</option>
-          {% endfor %}
-        </select>
-        {% if not cpc_budgets and conn_status == 'ok' %}
-        <span style="font-size:0.8rem;color:var(--sn-warning);">Aucun budget trouvé — module account_budget installé ?</span>
-        {% endif %}
-      </label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-        <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.9rem;">
-          Du
-          <input type="date" name="sync_date_from"
-                 value="{{ sync_date_from_default }}"
-                 style="padding:0.35rem 0.5rem;border:1px solid var(--sn-border);border-radius:4px;font-size:0.9rem;">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.9rem;">
-          Au
-          <input type="date" name="sync_date_to"
-                 value="{{ sync_date_to_default }}"
-                 style="padding:0.35rem 0.5rem;border:1px solid var(--sn-border);border-radius:4px;font-size:0.9rem;">
-        </label>
-      </div>
-    </div>
-    <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>
-      Synchroniser le budget → Odoo
-    </button>
-  </form>
 </div>
 
 <div class="sn-card">

@@ -19,9 +19,9 @@
   ARCHITECTURE TECHNIQUE :
     - Les expressions "réalisé" utilisent l'engine account_codes
       avec date_scope = strict_range (respecte le filtre analytique)
-    - Les expressions "budget" utilisent l'engine budget_analytic
-      (ou external selon la version) en lisant directement dans
-      crossovered.budget.lines filtré par analytic_account_id
+    - Les expressions "budget" utilisent l'engine budget (données
+      crossovered.budget.lines). Le rapport active filter_budgets /
+      filter_budget lorsque le modèle Odoo les expose (comme le P&L Senedoo).
     - Les expressions "%" utilisent l'engine aggregation
 
   PRÉREQUIS :
@@ -38,7 +38,7 @@ import json
 import re
 from datetime import date, datetime
 
-from sync_cpc_budget_analytique import sync_cpc_budget_to_external_values
+from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
 
 # =============================================================================
 # 🔧 CONFIGURATION — À ADAPTER
@@ -295,8 +295,7 @@ def create_columns(models, uid, report_id):
             "sortable"         : True,
         },
         # ── COL 2 : BUDGET ANALYTIQUE ─────────────────────────────────────
-        # Valeurs lues via engine external (account.report.external.value),
-        # alimentées par sync_cpc_budget_analytique / create_external_budget_values.
+        # Moteur natif budget → crossovered.budget.lines (lignes d'expressions).
         {
             "name"             : "Budget",
             "expression_label" : "budget",
@@ -472,13 +471,12 @@ def create_report_lines(models, uid, report_id):
                     # On laisse le moteur calculer le solde net
                 })
 
-                # COL 2 : BUDGET — engine external (voir sync_cpc_budget_analytique.py)
-                # engine='budget' est masqué par Odoo quand le filtre analytique est actif.
+                # COL 2 : BUDGET — engine budget (crossovered.budget.lines)
                 create_expression_safe(models, uid, {
                     "report_line_id" : line_id,
                     "label"          : "budget",
-                    "engine"         : "external",
-                    "formula"        : "",
+                    "engine"         : "budget",
+                    "formula"        : formula_ac,
                     "date_scope"     : "strict_range",
                 })
 
@@ -545,75 +543,7 @@ def create_report_lines(models, uid, report_id):
 
 
 # =============================================================================
-# 💡 ÉTAPE 6 — WORKAROUND : PATCH DU FILTRE ANALYTIQUE SUR LA COLONNE BUDGET
-# =============================================================================
-"""
-EXPLICATION DU BUG NATIF ODOO :
-─────────────────────────────────────────────────────────────────────────────
-Quand on applique un filtre analytique, Odoo v16/v17/v18 masque la colonne
-budget parce que la méthode _get_columns_data() dans account_report.py
-supprime les expressions engine='budget' si analytic_account_ids est dans
-le contexte (filtre jugé incompatible).
-
-SOLUTION TECHNIQUE :
-  En Odoo SaaS, on ne peut pas patcher le Python natif.
-  La solution correcte pour SaaS est de :
-  1. Utiliser l'engine 'external' avec une formule SQL custom
-  2. OU utiliser l'engine 'aggregation' qui lit un champ calculé
-  3. OU créer une action server qui pré-calcule les budgets analytiques
-     dans un modèle intermédiaire account.report.external.value
-
-  L'approche recommandée en SaaS v19 :
-  → Utiliser account.report.external.value pour stocker les budgets par
-    compte analytique, puis les lire via engine='external'
-"""
-
-def create_external_budget_values(models, uid, report_id, analytic_account_id,
-                                  budget_id, date_from, date_to):
-    """
-    Calcule les montants de budget pour chaque ligne du rapport,
-    pour un compte analytique et un budget donnés, et les stocke
-    dans account.report.external.value.
-
-    Délègue à ``sync_cpc_budget_to_external_values`` (même algorithme que la Toolbox) :
-      - pas de champ erroné sur crossovered.budget.lines ;
-      - un montant ``planned_amount`` par ligne de budget ne peut être attribué
-        qu'une fois par ligne CPC (évite la sur-comptabilisation par compte).
-
-    Paramètres :
-      analytic_account_id : ID du compte analytique filtré (0 = sans filtre analytique)
-      budget_id           : ID du crossovered.budget sélectionné
-      date_from, date_to  : période
-    """
-    print(f"\n{'═'*64}")
-    print("  ÉTAPE 6 — CALCUL BUDGET ANALYTIQUE → external.value")
-    print(f"{'═'*64}\n")
-
-    result = sync_cpc_budget_to_external_values(
-        models,
-        DB,
-        uid,
-        API_KEY,
-        report_id=int(report_id),
-        analytic_account_id=int(analytic_account_id or 0),
-        budget_id=int(budget_id),
-        date_from=str(date_from),
-        date_to=str(date_to),
-    )
-    stored = int(result.get("stored", 0))
-    for msg in result.get("errors") or []:
-        print(f"  ⚠️  {msg}")
-    print(
-        f"  Résumé : {stored} valeur(s) stockée(s), "
-        f"{result.get('skipped', 0)} ignorée(s), "
-        f"{result.get('budget_lines_count', 0)} ligne(s) de budget utilisée(s).\n"
-    )
-    print(f"  ✅ {stored} valeurs budgétaires stockées\n")
-    return stored
-
-
-# =============================================================================
-# 💰 ÉTAPE 7 — CRÉATION DE BUDGETS DE DÉMONSTRATION ANALYTIQUES
+# 💰 ÉTAPE 6 — CRÉATION DE BUDGETS DE DÉMONSTRATION ANALYTIQUES
 # =============================================================================
 
 def create_demo_analytic_budget(models, uid, info):
@@ -622,7 +552,7 @@ def create_demo_analytic_budget(models, uid, info):
     Utile pour tester le rapport immédiatement après installation.
     """
     print(f"{'═'*64}")
-    print("  ÉTAPE 7 — BUDGET ANALYTIQUE DE DÉMONSTRATION")
+    print("  ÉTAPE 6 — BUDGET ANALYTIQUE DE DÉMONSTRATION")
     print(f"{'═'*64}\n")
 
     if not info.get("analytic_accounts"):
@@ -726,13 +656,13 @@ def create_demo_analytic_budget(models, uid, info):
 
 
 # =============================================================================
-# 🔗 ÉTAPE 8 — AJOUT AU MENU
+# 🔗 ÉTAPE 7 — AJOUT AU MENU
 # =============================================================================
 
 def add_to_menu(models, uid, report_id):
     """Ajoute le rapport dans le menu Comptabilité > Rapports."""
     print(f"{'═'*64}")
-    print("  ÉTAPE 8 — MENU")
+    print("  ÉTAPE 7 — MENU")
     print(f"{'═'*64}\n")
 
     try:
@@ -778,7 +708,7 @@ def add_to_menu(models, uid, report_id):
 
 
 # =============================================================================
-# 📊 ÉTAPE 9 — RÉSUMÉ FINAL
+# 📊 RÉSUMÉ FINAL
 # =============================================================================
 
 def print_summary(models, uid, report_id, budget_id, analytic_id):
@@ -814,8 +744,9 @@ def print_summary(models, uid, report_id, budget_id, analytic_id):
   │                                                          │
   │  1. Comptabilité → Rapports → {REPORT_NAME[:26]:<26}│
   │                                                          │
-  │  2. Cliquer sur "Filtres" → "Analytique"                 │
-  │     → Sélectionner votre compte analytique               │
+  │  2. Cliquer sur "Filtres" : période, budget (crossovered) │
+  │     et analytique — les montants viennent des modèles    │
+  │     Odoo (aucune table de synchro externe).              │
   │                                                          │
   │  3. Les 4 colonnes s'affichent :                         │
   │     Réalisé | Budget | Écart | % Réalisation             │
@@ -824,10 +755,9 @@ def print_summary(models, uid, report_id, budget_id, analytic_id):
   │  {ODOO_URL}/odoo/accounting/reports/{report_id}         │
   └─────────────────────────────────────────────────────────┘
 
-  ⚠️  IMPORTANT — Si la colonne Budget reste vide :
-     Exécuter la fonction create_external_budget_values()
-     avec votre compte analytique et budget ID pour
-     pré-calculer les valeurs (workaround bug SaaS v19).
+  ⚠️  Si la colonne Budget reste vide : vérifier qu'un budget est
+     sélectionné dans les filtres du rapport et que les lignes
+     crossovered.budget.lines portent le bon compte analytique.
 """)
 
 
@@ -863,16 +793,19 @@ def main():
     # 7. Lignes SYSCOHADA
     create_report_lines(models, uid, report_id)
 
-    # 8. Budget de démonstration
-    budget_id, analytic_id = create_demo_analytic_budget(models, uid, info)
-
-    # 9. Calcul budget analytique → external.value (si budget créé)
-    if budget_id and analytic_id:
-        create_external_budget_values(
-            models, uid, report_id,
-            analytic_id, budget_id,
-            FISCAL_YEAR_START, FISCAL_YEAR_END
+    # 8. Filtres budgets + analytique (même logique que la toolbox Senedoo)
+    try:
+        opt = personalize_pl_analytic_budget_options(
+            models, DB, uid, API_KEY, report_id, enable_budget_filter=True
         )
+        written = opt.get("written") or {}
+        if written:
+            print(f"\n  ✅ Filtres rapport : {written}\n")
+    except Exception as e:
+        print(f"\n  ⚠️  Filtres budgets / analytique : {e}\n")
+
+    # 9. Budget de démonstration
+    budget_id, analytic_id = create_demo_analytic_budget(models, uid, info)
 
     # 10. Menu
     add_to_menu(models, uid, report_id)
@@ -884,17 +817,8 @@ def main():
 # =============================================================================
 # USAGE EN MODE INTERACTIF (appel depuis Cursor ou REPL)
 # =============================================================================
-# Pour recalculer le budget analytique manuellement :
-#
-#   uid, models = connect()
-#   create_external_budget_values(
-#       models, uid,
-#       report_id        = 42,          # ID de votre rapport
-#       analytic_account_id = 5,        # ID du compte analytique
-#       budget_id        = 3,           # ID du crossovered.budget
-#       date_from        = "2025-01-01",
-#       date_to          = "2025-12-31"
-#   )
+# Pour réactiver filter_budgets sur un rapport existant :
+#   python personalize_pl_analytic_budget.py --report-id <id>
 # =============================================================================
 
 if __name__ == "__main__":
