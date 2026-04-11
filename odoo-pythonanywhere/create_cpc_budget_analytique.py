@@ -198,7 +198,6 @@ def create_toolbox_cpc_budget_analytique(
         "default_opening_date_filter": "this_year",
         "search_bar":                  True,
         "load_more_limit":             80,
-        "prefix_groups_count":         0,
     }]))
 
     # \u00c9tape 3 \u2014 4 colonnes
