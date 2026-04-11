@@ -545,7 +545,7 @@ def create_report_lines(models, uid, report_id):
                     "report_line_id": line_id,
                     "label":          "balance",
                     "engine":         "aggregation",
-                    "formula":        formula_agg,
+                    "formula":        _agg_formula_with_suffix(formula_agg, "balance"),
                     "date_scope":     "strict_range",
                 })
                 create_expression_safe(models, uid, {

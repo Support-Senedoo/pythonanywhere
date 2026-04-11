@@ -464,13 +464,13 @@ def create_toolbox_cpc_budget_analytique(
             })
 
         elif nature == "aggregate":
-            # R\u00e9alis\u00e9 (agr\u00e9gation des lignes de d\u00e9tail \u2014 r\u00e9f\u00e9rence implicite .balance)
+            # Odoo 19+ : la regex d'agr\u00e9gation exige code.libell\u00e9 (ex. TA.balance), pas seul TA.
             _push_expr({
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "balance",
                 "engine":         "aggregation",
-                "formula":        formula_agg,
+                "formula":        _agg_formula_with_suffix(formula_agg, "balance"),
                 "date_scope":     "strict_range",
             })
             # Budget (m\u00eame formule mais sur .budget de chaque code)

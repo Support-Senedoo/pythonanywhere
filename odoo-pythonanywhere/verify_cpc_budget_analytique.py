@@ -35,6 +35,7 @@ except ImportError:
 from create_cpc_budget_analytique import (
     CPC_BUDGET_ANALYTIQUE_NAME,
     CPC_BUDGET_STRUCTURE,
+    _agg_formula_with_suffix,
     cpc_budget_pct_aggregation_formula,
     expression_engine_keys,
     normalize_cpc_account_codes_formula,
@@ -270,6 +271,33 @@ def verify_cpc_budget_analytique_report(
                     eng = (ex[lab].get("engine") or "").strip()
                     if eng != "aggregation":
                         lc_errors.append(f"{lab}: engine={eng!r}, attendu aggregation")
+                if row_spec and row_spec[2] == "aggregate" and row_spec[4]:
+                    fa = row_spec[4]
+                    _norm = lambda s: (s or "").replace(" ", "")
+                    bal_e = _norm(_agg_formula_with_suffix(fa, "balance"))
+                    if _norm(ex["balance"].get("formula")) != bal_e:
+                        lc_errors.append(
+                            f"balance: formule « {_norm(ex['balance'].get('formula'))} » "
+                            f"≠ attendue « {bal_e} »"
+                        )
+                    bud_e = _norm(_agg_formula_with_suffix(fa, "budget"))
+                    if _norm(ex["budget"].get("formula")) != bud_e:
+                        lc_errors.append(
+                            f"budget: formule « {_norm(ex['budget'].get('formula'))} » "
+                            f"≠ attendue « {bud_e} »"
+                        )
+                    ec_e = _norm(f"{code}.budget-{code}.balance")
+                    ec_g = _norm(ex["ecart"].get("formula"))
+                    if ec_g != ec_e:
+                        lc_errors.append(f"ecart: formule « {ec_g} » ≠ attendue « {ec_e} »")
+                    pct_e = _norm(
+                        cpc_budget_pct_aggregation_formula(
+                            code, budget_engine_native=budget_native
+                        )
+                    )
+                    pct_g = _norm(ex["pct"].get("formula"))
+                    if pct_g != pct_e:
+                        lc_errors.append(f"pct: formule « {pct_g} » ≠ attendue « {pct_e} »")
             else:
                 b_eng = (ex["balance"].get("engine") or "").strip()
                 if b_eng != "account_codes":
