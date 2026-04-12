@@ -505,10 +505,12 @@ def create_cpc_wizard(
             vals.update(extra)
         return int(_ek(models, db, uid, pwd, "ir.model.fields", "create", [vals]))
 
-    # Compte analytique
+    # Compte analytique (required=True → ondelete doit etre restrict ou cascade)
     _create_field("x_analytic_account_id", "many2one",
                   "Compte analytique",
-                  {"relation": "account.analytic.account", "required": True})
+                  {"relation": "account.analytic.account",
+                   "required": True,
+                   "on_delete": "restrict"})
 
     # Dates
     _create_field("x_date_from", "date", "Periode du", {"required": True})
@@ -518,7 +520,8 @@ def create_cpc_wizard(
     if _model_exists(models, db, uid, pwd, "account.report.budget"):
         _create_field("x_budget_id", "many2one",
                       "Budget",
-                      {"relation": "account.report.budget"})
+                      {"relation": "account.report.budget",
+                       "on_delete": "set null"})
     else:
         _create_field("x_budget_id", "char", "Reference budget (nom)")
 
