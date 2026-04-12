@@ -726,16 +726,7 @@ def pl_analytic_project_report():
                 flash(result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo.", "success")
             except Exception as e:
                 flash(f"Echec installation wizard CPC : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
 
         if action == "delete_cpc_wizard":
             try:
@@ -743,16 +734,7 @@ def pl_analytic_project_report():
                 flash(result.get("message") or "Wizard CPC supprime.", "info")
             except Exception as e:
                 flash(f"Echec suppression wizard CPC : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
 
         if action == "run_report":
             try:
@@ -1006,24 +988,8 @@ def pl_analytic_project_report():
     if add_base_only:
         selected = ""
 
-    if "q" in request.args:
-        filter_q = (request.args.get("q") or "").strip()
-    else:
-        filter_q = (prefs.get("filter_q") or "").strip()
-
-    if "aq" in request.args:
-        analytic_q = (request.args.get("aq") or "").strip()
-    else:
-        analytic_q = (prefs.get("analytic_q") or "").strip()
-
-    prefill_rid = request.args.get("report_id", type=int)
-
     conn_status = "idle"
     conn_detail = ""
-    analytic_accounts: list[dict[str, Any]] = []
-    reports: list = []
-    report_open_urls: dict[int, str] = {}
-    prefill_report_name = ""
     financial_budgets: list[dict[str, Any]] = []
     cpc_wizard_installed = False
     if selected:
@@ -1033,58 +999,15 @@ def pl_analytic_project_report():
             conn_detail = msg
             conn_status = "ok" if ok else "error"
             if ok:
-                analytic_accounts = search_analytic_accounts_for_select(
-                    models, db, uid, pwd, analytic_q
-                )
                 try:
                     financial_budgets = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
                     cpc_wizard_installed = _staff_cpc_wizard_installed(models, db, uid, pwd)
                 except Exception:
                     financial_budgets = []
                     cpc_wizard_installed = False
-                try:
-                    reports = search_account_reports(models, db, uid, pwd, filter_q)
-                except Exception:
-                    reports = []
-                if reports and selected in reg:
-                    bu = reg[selected].url
-                    for r in reports:
-                        report_open_urls[int(r["id"])] = account_report_odoo_form_url(
-                            bu, int(r["id"])
-                        )
-                if prefill_rid and prefill_rid > 0:
-                    for r in reports:
-                        if int(r["id"]) == int(prefill_rid):
-                            prefill_report_name = (str(r.get("name") or "")).strip()
-                            break
-                    if not prefill_report_name:
-                        try:
-                            prefill_report_name = (
-                                read_account_report_label(
-                                    models, db, uid, pwd, int(prefill_rid)
-                                )
-                                or ""
-                            ).strip()
-                        except Exception:
-                            prefill_report_name = ""
         except Exception as e:
             conn_status = "error"
             conn_detail = str(e)
-
-    highlight_report_id, highlight_report_missing = _pl_analytic_highlight_info(
-        prefs, selected, reports
-    )
-
-    default_analytic_id = None
-    abc_get = prefs.get("analytic_account_by_client")
-    if isinstance(abc_get, dict) and selected:
-        raw_aid = abc_get.get(selected)
-        try:
-            da = int(raw_aid) if raw_aid is not None else 0
-        except (TypeError, ValueError):
-            da = 0
-        if da > 0:
-            default_analytic_id = da
 
     clients_for_select = (
         configs_for_same_host(reg, filter_host)
@@ -1096,8 +1019,6 @@ def pl_analytic_project_report():
         _pl_analytic_prefs_merge_save(
             client_id=selected,
             filter_host=filter_host,
-            filter_q=filter_q,
-            analytic_q=analytic_q,
         )
 
     return render_template(
@@ -1108,25 +1029,12 @@ def pl_analytic_project_report():
         distinct_odoo_hosts=distinct_odoo_hosts(reg),
         selected_client=selected,
         filter_host=filter_host,
-        filter_q=filter_q,
-        analytic_q=analytic_q,
-        analytic_accounts=analytic_accounts,
-        reports=reports,
-        report_open_urls=report_open_urls,
-        prefill_report_id=prefill_rid,
-        prefill_report_name=prefill_report_name,
-        highlight_report_id=highlight_report_id,
-        highlight_report_missing=highlight_report_missing,
         conn_status=conn_status,
         conn_detail=conn_detail,
         utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
         utility_version=UTILITY_VERSION,
         utility_date=UTILITY_DATE,
         utility_author=UTILITY_AUTHOR,
-        report_result=None,
-        form_analytic_id=default_analytic_id,
-        form_full_line=False,
-        form_currency_mode="company",
         add_base_only=add_base_only,
         financial_budgets=financial_budgets,
         cpc_wizard_installed=cpc_wizard_installed,
