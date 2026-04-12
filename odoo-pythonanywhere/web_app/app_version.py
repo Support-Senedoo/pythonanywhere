@@ -11,7 +11,7 @@ from pathlib import Path
 #   - adapter _DEFAULT_DATE au jour de la livraison (YYYY-MM-DD).
 _DEFAULT_VERSION = "1.5.79"
 _DEFAULT_DATE = "2026-04-12"
-_DEFAULT_TIME = "02:10"
+_DEFAULT_TIME = "02:30"
 
 # Valeurs souvent mises par erreur dans l’onglet Web PA (ne reflètent pas la livraison réelle).
 _IGNORE_TOOLBOX_APP_VERSION = frozenset({"1", "1.0", "1.0.0"})

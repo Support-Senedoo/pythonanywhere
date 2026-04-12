@@ -404,23 +404,16 @@ _FORM_VIEW_ARCH = f"""<?xml version="1.0"?>
     <div class="oe_title">
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
-        Selectionnez un compte analytique, une periode et un budget, puis cliquez
-        sur &lt;strong&gt;Calculer&lt;/strong&gt; pour mettre a jour le rapport CPC.
+        Selectionnez un axe analytique et une periode, puis cliquez sur Calculer.
       </p>
     </div>
     <group>
-      <group string="Parametres">
-        <field name="x_analytic_account_id" required="1"/>
-        <field name="x_date_from" required="1"/>
-        <field name="x_date_to" required="1"/>
-        <field name="x_budget_id"/>
-      </group>
-      <group string="Resultat">
-        <field name="x_status" readonly="1"/>
-      </group>
+      <field name="x_analytic_account_id" required="1"/>
+      <field name="x_date_from" required="1"/>
+      <field name="x_date_to" required="1"/>
     </group>
     <footer>
-      <button name="action_compute" type="object" string="Calculer le rapport CPC"
+      <button name="action_compute" type="object" string="Calculer"
               class="btn-primary" icon="fa-calculator"/>
       <button special="cancel" string="Fermer"/>
     </footer>
