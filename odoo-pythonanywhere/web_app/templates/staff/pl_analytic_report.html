@@ -106,20 +106,20 @@
 
 {% if selected_client and conn_status == 'ok' %}
 <div class="sn-card" style="border:1px solid rgba(59,130,246,0.35);background:rgba(59,130,246,0.06);">
-  <h2 style="margin-top:0;font-size:1.05rem;">Nouveau rapport CPC dans Odoo — quel bouton ?</h2>
+  <h2 style="margin-top:0;font-size:1.05rem;">CPC Budget Analytique dans Odoo — comment ça marche ?</h2>
   <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.5;font-size:0.93rem;">
     Ce n’est <strong>pas</strong> le bouton <strong>« Générer le rapport »</strong> du tableau plus bas (celui-ci produit un
     <strong>tableau dans la toolbox</strong> + Excel, sans créer de rapport comptable dans Odoo).
   </p>
   <p style="margin:0 0 0.65rem;line-height:1.55;font-size:0.95rem;">
-    Pour créer le <strong>compte de résultat CPC SYSCOHADA</strong> avec <strong>4 colonnes</strong> (Réalisé / Budget / Écart / %)
-    dans Odoo, faites défiler jusqu’à la carte <strong>« CPC SYSCOHADA — Budget Analytique (rapport neuf) »</strong> et cliquez sur
-    <strong>« Créer / recréer le CPC Budget Analytique »</strong>.
+    Installez le <strong>Wizard CPC Budget Analytique</strong> (carte ci-dessous) une seule fois dans la base Odoo du client.
+    Ensuite, dans Odoo : <strong>Comptabilité &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong> — saisissez l’axe analytique,
+    la période et le budget, puis cliquez <strong>Calculer</strong>.
+    Le CPC s’affiche avec les colonnes <strong>Réalisé / Budget / Écart / %</strong> et propose PDF et Excel natifs.
   </p>
   <p class="sn-muted" style="margin:0;line-height:1.45;font-size:0.88rem;">
-    Dans Odoo : ouvrez ce rapport, utilisez <strong>Filtres</strong> pour la <strong>période</strong>, le <strong>compte analytique</strong>
-    et le <strong>budget</strong> ; dépliez les lignes (elles sont repliées par défaut). Si tout est à zéro, vérifiez qu’il existe des
-    écritures sur la période et l’analytique choisis, et un budget croisé avec les mêmes critères.
+    Si les colonnes Budget sont toutes à zéro : vérifiez qu’un budget financier (<code>account.report.budget.item</code>)
+    existe pour la période et l’analytique, et que les lignes du budget portent des codes de compte SYSCOHADA correspondant aux écritures.
   </p>
 </div>
 <div class="sn-card">
@@ -255,147 +255,51 @@
 </div>
 
 <div class="sn-card">
-  <h2 style="margin-top:0;font-size:1.05rem;">CPC SYSCOHADA — Budget Analytique (rapport neuf)</h2>
+  <h2 style="margin-top:0;font-size:1.05rem;">Wizard CPC Budget Analytique — installation dans Odoo</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
-    Crée un rapport <code>account.report</code> complet depuis zéro : structure CPC SYSCOHADA,
-    <strong>4 colonnes</strong> (Réalisé / Budget / Écart / % Réalisation), filtre analytique activé.
-    Toute instance Senedoo existante est supprimée avant la création.
+    Installe un <strong>wizard natif Odoo</strong> (<code>x_cpc_budget_wizard</code>) accessible sous
+    <strong>Comptabilité &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong>.
+    L’utilisateur saisit l’axe analytique, la période et le budget puis clique <strong>Calculer</strong> :
+    le CPC s’ouvre avec les colonnes Réalisé / Budget / Écart / % et propose l’export PDF et Excel natifs Odoo.
   </p>
   <details class="sn-doc" style="margin:0 0 0.85rem;">
     <summary style="cursor:pointer;font-weight:600;">À quoi servent les autres boutons de cette page ?</summary>
     <ul style="margin:0.55rem 0 0;line-height:1.55;font-size:0.9rem;padding-left:1.2rem;">
       <li><strong>Actualiser la liste</strong> (carte Base Odoo) : recharge la base choisie, la liste des rapports Odoo et des axes analytiques.</li>
       <li><strong>Ajouter une base</strong> : enregistrer une nouvelle connexion Odoo.</li>
-      <li><strong>Préparer (budget)</strong> puis <strong>Créer la copie</strong> : duplique un <strong>rapport existant</strong> de la grille (ex. P&amp;L) avec options analytique / budget — ce n’est pas le CPC neuf.</li>
+      <li><strong>Préparer (budget)</strong> puis <strong>Créer la copie</strong> : duplique un <strong>rapport existant</strong> de la grille (ex. P&amp;L) avec options analytique / budget — ce n’est pas le wizard CPC.</li>
       <li><strong>Ouvrir dans Odoo</strong> : fiche technique du rapport dans le backend.</li>
       <li><strong>Renommer / Supprimer</strong> : agissent sur le rapport dont la ligne est affichée.</li>
       <li><strong>Lancer la sonde</strong> : lecture seule sur les modèles budget / analytique (diagnostic).</li>
       <li><strong>Générer le rapport</strong> (tableau API) : calcule un tableau ici + bouton Excel — <strong>aucun</strong> <code>account.report</code> créé.</li>
-      <li><strong>Supprimer</strong> (rouge, carte CPC) : enlève uniquement le rapport toolbox « CPC … Senedoo », pas les autres rapports.</li>
+      <li><strong>Supprimer le wizard</strong> (rouge, carte CPC) : enlève uniquement le wizard toolbox de la base Odoo.</li>
     </ul>
   </details>
-  <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.4;font-size:0.85rem;">
-    Colonne Budget : moteur natif <code>budget</code> si votre Odoo l’expose ; sinon moteur
-    <code>external</code> avec injection depuis <strong>account.report.budget.item</strong>
-    (budget financier créé dans le rapport comptable) ou, à défaut, depuis
-    <code>crossovered.budget.lines</code> (budget analytique). Le rapport active
-    <code>filter_analytic</code> et, si disponible, <code>filter_budgets</code> / <code>filter_budget</code>.
-  </p>
   <div class="sn-report-btn-row">
-    <form id="form-create-cpc-budget" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+    {% if not cpc_wizard_installed %}
+    <form id="form-create-cpc-wizard" class="form-sn-long-post" method="post" action="{{ url_for(‘staff.pl_analytic_project_report’) }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or ‘’ }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or ‘’ }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
-      <input type="hidden" name="action" value="create_cpc_budget_analytique">
-      <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Créer / recréer le CPC Budget Analytique</button>
+      <input type="hidden" name="action" value="create_cpc_wizard">
+      <button type="submit" {% if not selected_client or conn_status != ‘ok’ %}disabled{% endif %}>Installer Wizard CPC (Odoo)</button>
     </form>
-    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
-      <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
-      <input type="hidden" name="filter_host" value="{{ filter_host }}">
-      <input type="hidden" name="action" value="delete_cpc_budget_analytique">
-      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
-    </form>
-  </div>
-  {% if conn_status == 'ok' and cpc_budget_report_id %}
-  <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Test d’injection CPC (intégrateur uniquement)</h3>
-    <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
-      Les **utilisateurs Odoo** ne passent pas par cet écran : ils choisissent période, analytique et
-      budget dans **l’interface Odoo**. Ce bloc sert à **essayer** l’écriture des
-      <code>account.report.external.value</code> sur le rapport id {{ cpc_budget_report_id }} (YTD) ;
-      en production, reproduire la même logique en **action planifiée / module sur le serveur Odoo**.
-      {% if report_budget_item_model %}Priorité test : budget financier
-      (<code>account.report.budget</code> / <code>account.report.budget.item</code>) si sélectionné ;
-      sinon crossovered pour l’analytique.{% else %}Source test : crossovered + analytique (obligatoire).{% endif %}
+    {% else %}
+    <p style="margin:0 0 0.65rem;font-size:0.95rem;color:var(--sn-success, #166534);">
+      &#10003; Wizard CPC installe dans cette base Odoo.
+      Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong>.
     </p>
-    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic" style="margin:0;">
+    <form method="post" action="{{ url_for(‘staff.pl_analytic_project_report’) }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or ‘’ }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or ‘’ }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
-      <input type="hidden" name="action" value="sync_cpc_budget_external">
-      {% if financial_budgets and report_budget_item_model %}
-      <label for="account_report_budget_id">Budget financier (account.report.budget)</label>
-      <select id="account_report_budget_id" name="account_report_budget_id">
-        <option value="">— Optionnel : laisser vide pour n’utiliser que le crossovered —</option>
-        {% for b in financial_budgets %}
-        <option value="{{ b.id }}">{{ b.name }} (#{{ b.id }})</option>
-        {% endfor %}
-      </select>
-      {% endif %}
-      <label for="cpc_inject_analytic_id">Axe analytique (crossovered)</label>
-      <select id="cpc_inject_analytic_id" name="analytic_account_id">
-        <option value="">— Aucun —</option>
-        {% for a in analytic_accounts %}
-        <option value="{{ a.id }}" {% if form_analytic_id is not none and form_analytic_id == a.id %}selected{% endif %}>{{ a.label }}</option>
-        {% endfor %}
-      </select>
-      <div style="margin-top:0.65rem;">
-        <button type="submit" {% if not selected_client %}disabled{% endif %}>Lancer injection test (CPC)</button>
-      </div>
+      <input type="hidden" name="action" value="delete_cpc_wizard">
+      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != ‘ok’ %}disabled{% endif %}>Supprimer le Wizard CPC</button>
     </form>
+    {% endif %}
   </div>
-  {% endif %}
-</div>
-
-<div class="sn-card">
-  <h2 style="margin-top:0;font-size:1.05rem;">CR analytique budgété (rapport Odoo pour utilisateurs)</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
-    Rapport <code>account.report</code> distinct du CPC : <strong>Réalisé</strong> (écritures sur la période,
-    ventilées sur l’analytique choisi **dans Odoo**), <strong>Budget analytique</strong> (crossovered),
-    et si la base le permet une colonne <strong>Budget financier</strong> pilotée par le **filtre budgets
-    natif** du rapport (comme sur le compte de résultat). Les **utilisateurs finaux** n’utilisent que l’UI Odoo.
-    Si la colonne budget analytique est en moteur <code>external</code>, son contenu doit être alimenté
-    **sur le serveur Odoo** (cron, module, action serveur) — le bloc « test d’injection » ci-dessous est
-    réservé à l’intégrateur Senedoo (mise au point), pas au métier au quotidien.
-  </p>
-  <div class="sn-report-btn-row">
-    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
-      <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
-      <input type="hidden" name="filter_host" value="{{ filter_host }}">
-      <input type="hidden" name="action" value="create_cr_analytique_budget">
-      <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Créer / recréer le CR analytique budgété</button>
-    </form>
-    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
-      <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
-      <input type="hidden" name="filter_host" value="{{ filter_host }}">
-      <input type="hidden" name="action" value="delete_cr_analytique_budget">
-      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer</button>
-    </form>
-  </div>
-  {% if conn_status == 'ok' and cr_budget_report_id %}
-  <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--sn-border);">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Test d’injection budget analytique (intégrateur uniquement)</h3>
-    <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
-      Rapport id {{ cr_budget_report_id }}, période YTD. Les **utilisateurs Odoo** filtrent déjà l’analytique
-      dans le rapport ; ce formulaire ne remplace **pas** une automatisation Odoo en production.
-    </p>
-    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic" style="margin:0;">
-      <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_host" value="{{ filter_host }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
-      <input type="hidden" name="action" value="sync_cr_analytique_budget_external">
-      <label for="cr_inject_analytic_id">Axe analytique (obligatoire)</label>
-      <select id="cr_inject_analytic_id" name="analytic_account_id_cr" required>
-        <option value="">— Choisir —</option>
-        {% for a in analytic_accounts %}
-        <option value="{{ a.id }}" {% if form_analytic_id is not none and form_analytic_id == a.id %}selected{% endif %}>{{ a.label }}</option>
-        {% endfor %}
-      </select>
-      <div style="margin-top:0.65rem;">
-        <button type="submit" {% if not selected_client %}disabled{% endif %}>Lancer injection test (CR)</button>
-      </div>
-    </form>
-  </div>
-  {% endif %}
 </div>
 
 <div class="sn-card">

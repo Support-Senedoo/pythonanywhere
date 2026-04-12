@@ -62,20 +62,12 @@ from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
     probe_financial_budget_analytic_summary,
 )
-from cpc_budget_external_sync import sync_cpc_budget_external_values
-from create_cpc_budget_analytique import (
-    CPC_BUDGET_ANALYTIQUE_NAME,
-    CPC_BUDGET_STRUCTURE,
-    cpc_account_report_budget_item_available,
-    create_toolbox_cpc_budget_analytique,
-    purge_cpc_budget_analytique_instances,
+from create_cpc_odoo_wizard import (
+    create_cpc_wizard,
+    purge_cpc_wizard,
+    cpc_wizard_exists,
+    WIZARD_MENU_LABEL as CPC_WIZARD_MENU_LABEL,
 )
-from create_cr_analytique_budget_senedoo import (
-    CR_ANALYTIQUE_BUDGET_REPORT_NAME,
-    create_toolbox_cr_analytique_budget_report,
-    purge_cr_analytique_budget_report_instances,
-)
-from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
 from project_pl_analytic_report import (
     build_report,
@@ -367,38 +359,12 @@ def _staff_financial_budgets_for_odoo(
         return []
 
 
-def _staff_resolve_cpc_budget_report_id(models: Any, db: str, uid: int, pwd: str) -> int:
+def _staff_cpc_wizard_installed(models: Any, db: str, uid: int, pwd: str) -> bool:
+    """True si le wizard CPC Budget Analytique est installé sur cette base Odoo."""
     try:
-        ids = execute_kw(
-            models,
-            db,
-            uid,
-            pwd,
-            "account.report",
-            "search",
-            [[["name", "=", CPC_BUDGET_ANALYTIQUE_NAME]]],
-            {"limit": 1},
-        )
-        return int(ids[0]) if ids else 0
+        return cpc_wizard_exists(models, db, uid, pwd)
     except Exception:
-        return 0
-
-
-def _staff_resolve_cr_analytique_budget_report_id(models: Any, db: str, uid: int, pwd: str) -> int:
-    try:
-        ids = execute_kw(
-            models,
-            db,
-            uid,
-            pwd,
-            "account.report",
-            "search",
-            [[["name", "=", CR_ANALYTIQUE_BUDGET_REPORT_NAME]]],
-            {"limit": 1},
-        )
-        return int(ids[0]) if ids else 0
-    except Exception:
-        return 0
+        return False
 
 
 @bp.route("/utilities/pl-analytique-projet", methods=["GET", "POST"])
@@ -754,120 +720,12 @@ def pl_analytic_project_report():
                 ),
             )
 
-        if action == "create_cpc_budget_analytique":
+        if action == "create_cpc_wizard":
             try:
-                result = create_toolbox_cpc_budget_analytique(models, db, uid, pwd)
-                rid = result["report_id"]
-                prior = result["prior_ids"]
-                rlabel = read_account_report_label(models, db, uid, pwd, rid) or CPC_BUDGET_ANALYTIQUE_NAME
-                cc = int(result.get("col_count") or 0)
-                cerr = result.get("column_errors") or []
-                lerr = result.get("line_errors") or []
-                xerr = result.get("expression_errors") or []
-                cw = result.get("creation_warnings") or []
-                verif = result.get("verification") or {}
-                ver_ok = bool(verif.get("ok"))
-                expected_lines = len(CPC_BUDGET_STRUCTURE)
-                lc = int(result.get("line_count") or 0)
-                msg = (
-                    f"Rapport « {rlabel} » créé (account.report id={rid}) — "
-                    f"{cc} colonne(s), {lc} lignes CPC SYSCOHADA."
-                )
-                if cw:
-                    msg += " " + " ".join(str(x) for x in cw[:2])
-                    if len(cw) > 2:
-                        msg += " …"
-                if verif:
-                    vtag = "OK" if ver_ok else "à contrôler"
-                    msg += f" Vérification automatique : {vtag}."
-                    ver_errs = verif.get("errors") or []
-                    if ver_errs:
-                        msg += " " + " | ".join(str(x) for x in ver_errs[:3])
-                    if len(ver_errs) > 3:
-                        msg += " …"
-                    ver_warn = verif.get("warnings") or []
-                    if ver_ok and ver_warn:
-                        msg += " Avertissements : " + " | ".join(str(x) for x in ver_warn[:2])
-                        if len(ver_warn) > 2:
-                            msg += " …"
-                if prior:
-                    msg += (
-                        f" Instance(s) précédente(s) retirée(s) (anciens id : {', '.join(str(x) for x in prior)})."
-                    )
-                fw = result.get("filter_written") or {}
-                if fw:
-                    msg += " Filtres sur le rapport : " + ", ".join(
-                        f"{k}={v!r}" for k, v in sorted(fw.items())
-                    ) + "."
-                ferr = result.get("filter_personalization_error")
-                if ferr:
-                    msg += f" Attention filtres budgets : {ferr}"
-                if cerr:
-                    msg += " Détail colonnes : " + " | ".join(str(x) for x in cerr[:4])
-                    if len(cerr) > 4:
-                        msg += " …"
-                if lerr:
-                    msg += " Détail lignes : " + " | ".join(str(x) for x in lerr[:3])
-                    if len(lerr) > 3:
-                        msg += " …"
-                if xerr:
-                    msg += " Expressions : " + " | ".join(str(x) for x in xerr[:3])
-                    if len(xerr) > 3:
-                        msg += " …"
-                msg += (
-                    " Dans Odoo : menu Comptabilité → Rapports (ou lien « Ouvrir dans Odoo » dans la liste), "
-                    "puis Filtres → période, analytique, budget ; déplier les lignes si tout semble vide."
-                )
-                msg += (
-                    " Contrôle technique (CLI, .env Odoo) : "
-                    "`python verify_cpc_budget_analytique.py` ou "
-                    f"`python verify_cpc_budget_analytique.py --report-id {rid}`."
-                )
-                flash_cat = "success"
-                if cc < 4:
-                    flash_cat = "danger"
-                    msg = (
-                        "Création CPC incomplète : moins de 4 colonnes sur le rapport Odoo — "
-                        "l’interface peut n’afficher aucune colonne. " + msg
-                    )
-                elif lc < expected_lines or lerr or xerr or not ver_ok:
-                    flash_cat = (
-                        "danger"
-                        if (lc < expected_lines or not ver_ok or bool(xerr))
-                        else "warning"
-                    )
-                    if lc < expected_lines:
-                        msg = (
-                            f"Création CPC incomplète : {lc}/{expected_lines} lignes — "
-                            "l’interface peut rester vide ou sans en-têtes. " + msg
-                        )
-                    elif not ver_ok:
-                        msg = (
-                            "Vérification automatique : le rapport semble incorrect ou incomplet. " + msg
-                        )
-                elif cerr:
-                    flash_cat = "warning"
-                try:
-                    _ba, menu_mid = ensure_account_report_reporting_menu(
-                        models, db, uid, pwd, rid,
-                        rlabel.strip()[:240] or CPC_BUDGET_ANALYTIQUE_NAME,
-                        under_trial_balance=False,
-                    )
-                    if menu_mid:
-                        msg += " Entrée de menu ajoutée sous Rapports comptables."
-                except Exception:
-                    pass
-                flash(msg, flash_cat)
-                _pl_analytic_prefs_merge_save(
-                    client_id=cid,
-                    filter_host=fl_save,
-                    filter_q=filter_q_post,
-                    analytic_q=analytic_q_post,
-                    last_created_report_id=rid,
-                    last_created_client_id=cid,
-                )
+                result = create_cpc_wizard(models, db, uid, pwd)
+                flash(result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo.", "success")
             except Exception as e:
-                flash(f"Échec création CPC Budget Analytique : {e!s}", "danger")
+                flash(f"Echec installation wizard CPC : {e!s}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
@@ -879,179 +737,12 @@ def pl_analytic_project_report():
                 ),
             )
 
-        if action == "delete_cpc_budget_analytique":
+        if action == "delete_cpc_wizard":
             try:
-                prior = purge_cpc_budget_analytique_instances(models, db, uid, pwd)
-                if prior:
-                    flash(
-                        f"Rapport(s) CPC Budget Analytique supprimé(s) (id : {', '.join(str(x) for x in prior)}).",
-                        "success",
-                    )
-                else:
-                    flash("Aucun rapport CPC Budget Analytique toolbox trouvé sur cette base.", "info")
+                result = purge_cpc_wizard(models, db, uid, pwd)
+                flash(result.get("message") or "Wizard CPC supprime.", "info")
             except Exception as e:
-                flash(f"Échec suppression CPC Budget Analytique : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
-
-        if action == "sync_cpc_budget_external":
-            try:
-                aid = int(request.form.get("analytic_account_id") or "0")
-            except ValueError:
-                aid = 0
-            try:
-                fb = int(request.form.get("account_report_budget_id") or "0")
-            except ValueError:
-                fb = 0
-            date_from, date_to = default_period_ytd()
-            try:
-                rid = _staff_resolve_cpc_budget_report_id(models, db, uid, pwd)
-                sync = sync_cpc_budget_external_values(
-                    models,
-                    db,
-                    uid,
-                    pwd,
-                    report_id=rid,
-                    analytic_account_id=aid,
-                    date_from=date_from,
-                    date_to=date_to,
-                    account_report_budget_id=fb if fb > 0 else None,
-                )
-                if sync.get("ok"):
-                    src = sync.get("source") or "?"
-                    flash(
-                        f"Injection test CPC (external) : {int(sync.get('written') or 0)} ligne(s), "
-                        f"période {date_from} → {date_to}, source={src}.",
-                        "success",
-                    )
-                else:
-                    flash(sync.get("reason") or "Injection test CPC impossible.", "danger")
-            except Exception as e:
-                flash(f"Injection test CPC : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
-
-        if action == "sync_cr_analytique_budget_external":
-            try:
-                aid = int(request.form.get("analytic_account_id_cr") or "0")
-            except ValueError:
-                aid = 0
-            date_from, date_to = default_period_ytd()
-            try:
-                rid = _staff_resolve_cr_analytique_budget_report_id(models, db, uid, pwd)
-                sync = sync_cpc_budget_external_values(
-                    models,
-                    db,
-                    uid,
-                    pwd,
-                    report_id=rid,
-                    analytic_account_id=aid,
-                    date_from=date_from,
-                    date_to=date_to,
-                    account_report_budget_id=None,
-                    expression_label="budget_analytic",
-                )
-                if sync.get("ok"):
-                    flash(
-                        f"Injection test CR (budget_analytic) : {int(sync.get('written') or 0)} "
-                        f"ligne(s), période {date_from} → {date_to}.",
-                        "success",
-                    )
-                else:
-                    flash(sync.get("reason") or "Injection test CR impossible.", "danger")
-            except Exception as e:
-                flash(f"Injection test CR : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
-
-        if action == "create_cr_analytique_budget":
-            try:
-                result = create_toolbox_cr_analytique_budget_report(models, db, uid, pwd)
-                rid = result["report_id"]
-                prior = result["prior_ids"]
-                rlabel = read_account_report_label(models, db, uid, pwd, rid) or CR_ANALYTIQUE_BUDGET_REPORT_NAME
-                cc = int(result.get("col_count") or 0)
-                min_c = int(result.get("min_columns_expected") or 4)
-                cw = result.get("creation_warnings") or []
-                msg = (
-                    f"Rapport « {rlabel} » créé (id={rid}) — {cc} colonne(s), "
-                    f"{int(result.get('line_count') or 0)} lignes."
-                )
-                if cw:
-                    msg += " " + " ".join(str(x) for x in cw[:2])
-                if prior:
-                    msg += f" Ancienne instance retirée (id : {', '.join(str(x) for x in prior)})."
-                flash_cat = "success" if cc >= min_c else "warning"
-                if cc < min_c:
-                    msg = (
-                        f"Création incomplète : {cc}/{min_c} colonnes attendues. " + msg
-                    )
-                    flash_cat = "danger"
-                try:
-                    _, menu_mid = ensure_account_report_reporting_menu(
-                        models,
-                        db,
-                        uid,
-                        pwd,
-                        rid,
-                        rlabel.strip()[:240] or CR_ANALYTIQUE_BUDGET_REPORT_NAME,
-                        under_trial_balance=False,
-                    )
-                    if menu_mid:
-                        msg += " Entrée de menu sous Rapports comptables."
-                except Exception:
-                    pass
-                flash(msg, flash_cat)
-            except Exception as e:
-                flash(f"Échec création CR analytique budgété : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
-
-        if action == "delete_cr_analytique_budget":
-            try:
-                prior = purge_cr_analytique_budget_report_instances(models, db, uid, pwd)
-                if prior:
-                    flash(
-                        f"Rapport(s) « {CR_ANALYTIQUE_BUDGET_REPORT_NAME} » supprimé(s) "
-                        f"(id : {', '.join(str(x) for x in prior)}).",
-                        "success",
-                    )
-                else:
-                    flash("Aucun rapport CR analytique budgété toolbox sur cette base.", "info")
-            except Exception as e:
-                flash(f"Échec suppression CR analytique budgété : {e!s}", "danger")
+                flash(f"Echec suppression wizard CPC : {e!s}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
@@ -1191,6 +882,8 @@ def pl_analytic_project_report():
                 form_full_line=full_line,
                 form_currency_mode=currency_mode,
                 add_base_only=False,
+                financial_budgets=[],
+                cpc_wizard_installed=False,
             )
 
         if action == "export_excel":
@@ -1332,9 +1025,7 @@ def pl_analytic_project_report():
     report_open_urls: dict[int, str] = {}
     prefill_report_name = ""
     financial_budgets: list[dict[str, Any]] = []
-    report_budget_item_model = False
-    cpc_budget_report_id = 0
-    cr_budget_report_id = 0
+    cpc_wizard_installed = False
     if selected:
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
@@ -1346,19 +1037,11 @@ def pl_analytic_project_report():
                     models, db, uid, pwd, analytic_q
                 )
                 try:
-                    report_budget_item_model = cpc_account_report_budget_item_available(
-                        models, db, uid, pwd
-                    )
                     financial_budgets = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
-                    cpc_budget_report_id = _staff_resolve_cpc_budget_report_id(models, db, uid, pwd)
-                    cr_budget_report_id = _staff_resolve_cr_analytique_budget_report_id(
-                        models, db, uid, pwd
-                    )
+                    cpc_wizard_installed = _staff_cpc_wizard_installed(models, db, uid, pwd)
                 except Exception:
-                    report_budget_item_model = False
                     financial_budgets = []
-                    cpc_budget_report_id = 0
-                    cr_budget_report_id = 0
+                    cpc_wizard_installed = False
                 try:
                     reports = search_account_reports(models, db, uid, pwd, filter_q)
                 except Exception:
@@ -1446,9 +1129,7 @@ def pl_analytic_project_report():
         form_currency_mode="company",
         add_base_only=add_base_only,
         financial_budgets=financial_budgets,
-        report_budget_item_model=report_budget_item_model,
-        cpc_budget_report_id=cpc_budget_report_id,
-        cr_budget_report_id=cr_budget_report_id,
+        cpc_wizard_installed=cpc_wizard_installed,
     )
 
 
