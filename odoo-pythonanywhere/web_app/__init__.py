@@ -58,6 +58,14 @@ def create_app() -> Flask:
     app.register_blueprint(staff_admin_bp, url_prefix="/staff")
 
     from web_app import app_version
+    from flask import request as _req, session as _sess
+
+    @app.before_request
+    def _clear_oversized_session() -> None:
+        """Efface la session si le cookie entrant dépasse 4000 bytes (évite 502 uWSGI)."""
+        raw = _req.cookies.get("session", "")
+        if len(raw) > 4000:
+            _sess.clear()
 
     @app.context_processor
     def _inject_toolbox_version() -> dict:
