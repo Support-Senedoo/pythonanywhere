@@ -48,14 +48,14 @@
   <summary>Descriptif — compte de résultat analytique (API)</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
     <strong>But.</strong> Générer un <strong>nouveau</strong> tableau <strong>réalisé / budget / %</strong> par compte général
-    pour l’<strong>axe analytique</strong> choisi (projet, etc.). Les données viennent de l’API Odoo
+    pour l'<strong>axe analytique</strong> choisi (projet, etc.). Les données viennent de l'API Odoo
     (<code>account.move.line</code>, <code>analytic_distribution</code>, <code>crossovered.budget.lines</code>).
-    <strong>Aucun enregistrement <code>account.report</code> n’est créé pour ce tableau</strong> — le calcul est côté API.
-    Vous pouvez en revanche, plus bas, <strong>dupliquer et personnaliser un rapport Odoo</strong> (comme l’utilitaire
+    <strong>Aucun enregistrement <code>account.report</code> n'est créé pour ce tableau</strong> — le calcul est côté API.
+    Vous pouvez en revanche, plus bas, <strong>dupliquer et personnaliser un rapport Odoo</strong> (comme l'utilitaire
     « P&amp;L analytique / budget ») : copie, renommage, suppression.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.92rem;">
-    <strong>Période :</strong> calcul automatique du <strong>1<sup>er</sup> janvier</strong> de l’année en cours jusqu’à
+    <strong>Période :</strong> calcul automatique du <strong>1<sup>er</sup> janvier</strong> de l'année en cours jusqu'à
     <strong>la date du jour</strong> (pas de saisie manuelle).
   </p>
   <p class="sn-muted" style="margin:0.55rem 0 0;line-height:1.45;font-size:0.92rem;">
@@ -73,7 +73,7 @@
 <div class="sn-card sn-card--accent">
   <h2 style="margin-top:0;font-size:1.05rem;">Base Odoo</h2>
   <form method="get" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
-    <label for="filter_host">Serveur Odoo (hôte de l’URL)</label>
+    <label for="filter_host">Serveur Odoo (hôte de l'URL)</label>
     <select id="filter_host" name="filter_host">
       <option value="">— Tous les serveurs —</option>
       {% for h in distinct_odoo_hosts %}
@@ -108,26 +108,26 @@
 <div class="sn-card" style="border:1px solid rgba(59,130,246,0.35);background:rgba(59,130,246,0.06);">
   <h2 style="margin-top:0;font-size:1.05rem;">CPC Budget Analytique dans Odoo — comment ça marche ?</h2>
   <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.5;font-size:0.93rem;">
-    Ce n’est <strong>pas</strong> le bouton <strong>« Générer le rapport »</strong> du tableau plus bas (celui-ci produit un
+    Ce n'est <strong>pas</strong> le bouton <strong>« Générer le rapport »</strong> du tableau plus bas (celui-ci produit un
     <strong>tableau dans la toolbox</strong> + Excel, sans créer de rapport comptable dans Odoo).
   </p>
   <p style="margin:0 0 0.65rem;line-height:1.55;font-size:0.95rem;">
     Installez le <strong>Wizard CPC Budget Analytique</strong> (carte ci-dessous) une seule fois dans la base Odoo du client.
-    Ensuite, dans Odoo : <strong>Comptabilité &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong> — saisissez l’axe analytique,
+    Ensuite, dans Odoo : <strong>Comptabilité &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong> — saisissez l'axe analytique,
     la période et le budget, puis cliquez <strong>Calculer</strong>.
-    Le CPC s’affiche avec les colonnes <strong>Réalisé / Budget / Écart / %</strong> et propose PDF et Excel natifs.
+    Le CPC s'affiche avec les colonnes <strong>Réalisé / Budget / Écart / %</strong> et propose PDF et Excel natifs.
   </p>
   <p class="sn-muted" style="margin:0;line-height:1.45;font-size:0.88rem;">
-    Si les colonnes Budget sont toutes à zéro : vérifiez qu’un budget financier (<code>account.report.budget.item</code>)
-    existe pour la période et l’analytique, et que les lignes du budget portent des codes de compte SYSCOHADA correspondant aux écritures.
+    Si les colonnes Budget sont toutes à zéro : vérifiez qu'un budget financier (<code>account.report.budget.item</code>)
+    existe pour la période et l'analytique, et que les lignes du budget portent des codes de compte SYSCOHADA correspondant aux écritures.
   </p>
 </div>
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Copie Odoo — P&amp;L analytique / budget</h2>
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
     Choisissez un compte de résultat dans la liste, cliquez <strong>Préparer (budget)</strong>, puis
-    <strong>Créer la copie</strong>. La copie est une nouvelle entrée <code>account.report</code> (l’original n’est pas modifié).
-    Renommage et suppression agissent sur le rapport dont l’<strong>id</strong> est indiqué dans la ligne.
+    <strong>Créer la copie</strong>. La copie est une nouvelle entrée <code>account.report</code> (l'original n'est pas modifié).
+    Renommage et suppression agissent sur le rapport dont l'<strong>id</strong> est indiqué dans la ligne.
   </p>
   <details id="sn-reports-list-pl-api" class="sn-reports-details" {% if not prefill_report_id %}open{% endif %} style="margin-top:0.35rem;">
     <summary style="cursor:pointer;font-weight:600;font-size:1.02rem;">
@@ -139,7 +139,7 @@
     <div style="margin-top:0.75rem;">
   {% if highlight_report_id is not none and highlight_report_id and highlight_report_missing %}
   <p style="margin:0 0 0.65rem;padding:0.5rem 0.65rem;border:1px solid var(--sn-border);border-radius:6px;background:rgba(59,130,246,0.06);line-height:1.45;font-size:0.88rem;">
-    <strong>Dernière copie créée</strong> (id <code>{{ highlight_report_id }}</code>) : elle n’apparaît pas avec le filtre actuel sur le nom. Videz le champ « Filtrer les rapports », élargissez la recherche, ou saisissez l’<strong>id</strong> seul pour retrouver la ligne.
+    <strong>Dernière copie créée</strong> (id <code>{{ highlight_report_id }}</code>) : elle n'apparaît pas avec le filtre actuel sur le nom. Videz le champ « Filtrer les rapports », élargissez la recherche, ou saisissez l'<strong>id</strong> seul pour retrouver la ligne.
   </p>
   {% endif %}
   {% if not reports %}
@@ -208,7 +208,7 @@
                 <input type="hidden" name="filter_host" value="{{ filter_host }}">
                 <input type="hidden" name="action" value="unlink">
                 <input type="hidden" name="report_id" value="{{ r.id }}">
-                <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Supprime aussi le menu et l’action client liés à cette copie lorsque l’API y accède.</p>
+                <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Supprime aussi le menu et l'action client liés à cette copie lorsque l'API y accède.</p>
                 <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Tapez exactement : <code>SUPPRIMER-{{ r.id }}</code></p>
                 <input type="text" name="confirm_delete" placeholder="SUPPRIMER-{{ r.id }}" autocomplete="off" style="margin-top:0;">
                 <button type="submit" style="margin-top:0.5rem;background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer définitivement</button>
@@ -226,7 +226,7 @@
   </details>
 
   <h3 style="margin:1rem 0 0.5rem;font-size:1rem;">Sonde — lignes de budget et analytique</h3>
-  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">Lecture seule (même sonde que l’utilitaire P&amp;L budget).</p>
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">Lecture seule (même sonde que l'utilitaire P&amp;L budget).</p>
   <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
@@ -259,15 +259,15 @@
   <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;font-size:0.92rem;">
     Installe un <strong>wizard natif Odoo</strong> (<code>x_cpc_budget_wizard</code>) accessible sous
     <strong>Comptabilité &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong>.
-    L’utilisateur saisit l’axe analytique, la période et le budget puis clique <strong>Calculer</strong> :
-    le CPC s’ouvre avec les colonnes Réalisé / Budget / Écart / % et propose l’export PDF et Excel natifs Odoo.
+    L'utilisateur saisit l'axe analytique, la période et le budget puis clique <strong>Calculer</strong> :
+    le CPC s'ouvre avec les colonnes Réalisé / Budget / Écart / % et propose l'export PDF et Excel natifs Odoo.
   </p>
   <details class="sn-doc" style="margin:0 0 0.85rem;">
     <summary style="cursor:pointer;font-weight:600;">À quoi servent les autres boutons de cette page ?</summary>
     <ul style="margin:0.55rem 0 0;line-height:1.55;font-size:0.9rem;padding-left:1.2rem;">
       <li><strong>Actualiser la liste</strong> (carte Base Odoo) : recharge la base choisie, la liste des rapports Odoo et des axes analytiques.</li>
       <li><strong>Ajouter une base</strong> : enregistrer une nouvelle connexion Odoo.</li>
-      <li><strong>Préparer (budget)</strong> puis <strong>Créer la copie</strong> : duplique un <strong>rapport existant</strong> de la grille (ex. P&amp;L) avec options analytique / budget — ce n’est pas le wizard CPC.</li>
+      <li><strong>Préparer (budget)</strong> puis <strong>Créer la copie</strong> : duplique un <strong>rapport existant</strong> de la grille (ex. P&amp;L) avec options analytique / budget — ce n'est pas le wizard CPC.</li>
       <li><strong>Ouvrir dans Odoo</strong> : fiche technique du rapport dans le backend.</li>
       <li><strong>Renommer / Supprimer</strong> : agissent sur le rapport dont la ligne est affichée.</li>
       <li><strong>Lancer la sonde</strong> : lecture seule sur les modèles budget / analytique (diagnostic).</li>
@@ -277,26 +277,26 @@
   </details>
   <div class="sn-report-btn-row">
     {% if not cpc_wizard_installed %}
-    <form id="form-create-cpc-wizard" class="form-sn-long-post" method="post" action="{{ url_for(‘staff.pl_analytic_project_report’) }}" novalidate style="margin:0;display:inline;">
+    <form id="form-create-cpc-wizard" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or ‘’ }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or ‘’ }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="create_cpc_wizard">
-      <button type="submit" {% if not selected_client or conn_status != ‘ok’ %}disabled{% endif %}>Installer Wizard CPC (Odoo)</button>
+      <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Installer Wizard CPC (Odoo)</button>
     </form>
     {% else %}
     <p style="margin:0 0 0.65rem;font-size:0.95rem;color:var(--sn-success, #166534);">
       &#10003; Wizard CPC installe dans cette base Odoo.
       Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong>.
     </p>
-    <form method="post" action="{{ url_for(‘staff.pl_analytic_project_report’) }}" novalidate style="margin:0;display:inline;">
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or ‘’ }}">
-      <input type="hidden" name="analytic_q" value="{{ analytic_q or ‘’ }}">
+      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="delete_cpc_wizard">
-      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != ‘ok’ %}disabled{% endif %}>Supprimer le Wizard CPC</button>
+      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Supprimer le Wizard CPC</button>
     </form>
     {% endif %}
   </div>
@@ -308,7 +308,7 @@
     Connexion : {{ conn_detail or 'OK' }}
   </p>
   <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.45;font-size:0.92rem;">
-    <strong>Période incluse :</strong> du 1<sup>er</sup> janvier de l’année en cours jusqu’à la date du jour (calcul automatique côté serveur).
+    <strong>Période incluse :</strong> du 1<sup>er</sup> janvier de l'année en cours jusqu'à la date du jour (calcul automatique côté serveur).
   </p>
   <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" class="sn-form-pl-analytic">
     <input type="hidden" name="client_id" value="{{ selected_client }}">
