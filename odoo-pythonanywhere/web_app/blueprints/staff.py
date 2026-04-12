@@ -66,8 +66,8 @@ from create_cpc_odoo_wizard import (
     create_cpc_wizard,
     purge_cpc_wizard,
     cpc_wizard_exists,
-    WIZARD_MENU_LABEL as CPC_WIZARD_MENU_LABEL,
 )
+from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
 from project_pl_analytic_report import (
     build_report,
