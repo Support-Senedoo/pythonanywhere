@@ -143,7 +143,7 @@ wizard = record
 analytic_id = int(wizard.x_analytic_account_id.id) if wizard.x_analytic_account_id else 0
 date_from = str(wizard.x_date_from) if wizard.x_date_from else ''
 date_to   = str(wizard.x_date_to)   if wizard.x_date_to   else ''
-budget_id = int(wizard.x_budget_id.id) if wizard.x_budget_id else 0
+budget_id = 0  # champ budget retire du formulaire
 
 if not analytic_id or not date_from or not date_to:
     raise UserError("Veuillez remplir tous les champs obligatoires (analytique, dates).")
@@ -395,10 +395,9 @@ action = {
 }
 '''
 
-# ---------------------------------------------------------------------------
-# XML de la vue formulaire du wizard
-# ---------------------------------------------------------------------------
-_FORM_VIEW_ARCH = f"""<?xml version="1.0"?>
+def _make_form_view_arch(sa_id: int) -> str:
+    """Vue formulaire avec bouton Calculer pointant sur le server action (type=action)."""
+    return f"""<?xml version="1.0"?>
 <form string="{WIZARD_NAME}">
   <sheet>
     <div class="oe_title">
@@ -411,9 +410,10 @@ _FORM_VIEW_ARCH = f"""<?xml version="1.0"?>
       <field name="x_analytic_account_id" required="1"/>
       <field name="x_date_from" required="1"/>
       <field name="x_date_to" required="1"/>
+      <field name="x_status" readonly="1"/>
     </group>
     <footer>
-      <button name="action_compute" type="object" string="Calculer"
+      <button name="{sa_id}" type="action" string="Calculer"
               class="btn-primary" icon="fa-calculator"/>
       <button special="cancel" string="Fermer"/>
     </footer>
@@ -485,59 +485,67 @@ def create_cpc_wizard(
     }])
     result["model_id"] = model_id
 
-    # ---- 2. Champs ----------------------------------------------------------
-    def _create_field(fname: str, ftype: str, fstring: str, extra: dict | None = None) -> int:
-        vals: dict[str, Any] = {
-            "name":     fname,
-            "field_description": fstring,
-            "ttype":    ftype,
+    # ---- 2. Champs (batch : 1 seul appel XML-RPC) ---------------------------
+    field_defs: list[dict[str, Any]] = [
+        {
+            "name": "x_analytic_account_id",
+            "field_description": "Compte analytique",
+            "ttype": "many2one",
             "model_id": model_id,
-            "state":    "manual",
-        }
-        if extra:
-            vals.update(extra)
-        return int(_ek(models, db, uid, pwd, "ir.model.fields", "create", [vals]))
+            "state": "manual",
+            "relation": "account.analytic.account",
+            "required": True,
+            "on_delete": "restrict",
+        },
+        {
+            "name": "x_date_from",
+            "field_description": "Periode du",
+            "ttype": "date",
+            "model_id": model_id,
+            "state": "manual",
+            "required": True,
+        },
+        {
+            "name": "x_date_to",
+            "field_description": "Periode au",
+            "ttype": "date",
+            "model_id": model_id,
+            "state": "manual",
+            "required": True,
+        },
+        {
+            "name": "x_budget_id",
+            "field_description": "Reference budget",
+            "ttype": "char",
+            "model_id": model_id,
+            "state": "manual",
+        },
+        {
+            "name": "x_status",
+            "field_description": "Statut / resultat",
+            "ttype": "char",
+            "model_id": model_id,
+            "state": "manual",
+        },
+    ]
+    _ek(models, db, uid, pwd, "ir.model.fields", "create", [field_defs])
 
-    # Compte analytique (required=True → ondelete doit etre restrict ou cascade)
-    _create_field("x_analytic_account_id", "many2one",
-                  "Compte analytique",
-                  {"relation": "account.analytic.account",
-                   "required": True,
-                   "on_delete": "restrict"})
-
-    # Dates
-    _create_field("x_date_from", "date", "Periode du", {"required": True})
-    _create_field("x_date_to",   "date", "Periode au", {"required": True})
-
-    # Budget parent (account.report.budget si le modele existe, sinon Char)
-    if _model_exists(models, db, uid, pwd, "account.report.budget"):
-        _create_field("x_budget_id", "many2one",
-                      "Budget",
-                      {"relation": "account.report.budget",
-                       "on_delete": "set null"})
-    else:
-        _create_field("x_budget_id", "char", "Reference budget (nom)")
-
-    # Statut
-    _create_field("x_status", "char", "Statut / resultat")
-
-    # ---- 3. Server action (Python code) -------------------------------------
-    sa_model_id = _get_model_id(models, db, uid, pwd, WIZARD_MODEL)
+    # ---- 3. Server action (Python code) — model_id déjà connu ---------------
     sa_id = _ek(models, db, uid, pwd, "ir.actions.server", "create", [{
         "name":     f"Calculer CPC Budget ({WIZARD_NAME})",
-        "model_id": sa_model_id,
+        "model_id": model_id,
         "state":    "code",
         "code":     _SERVER_ACTION_CODE,
-        "binding_model_id": sa_model_id,
+        "binding_model_id": model_id,
     }])
     result["server_action_id"] = sa_id
 
-    # ---- 4. Vue formulaire --------------------------------------------------
+    # ---- 4. Vue formulaire (bouton référence le sa_id réel) -----------------
     view_id = _ek(models, db, uid, pwd, "ir.ui.view", "create", [{
         "name":    f"{WIZARD_MODEL}.form",
         "model":   WIZARD_MODEL,
         "type":    "form",
-        "arch":    _FORM_VIEW_ARCH,
+        "arch":    _make_form_view_arch(sa_id),
     }])
     result["view_id"] = view_id
 
@@ -547,7 +555,7 @@ def create_cpc_wizard(
         "res_model":  WIZARD_MODEL,
         "view_mode":  "form",
         "target":     "new",
-        "binding_model_id": sa_model_id,
+        "binding_model_id": model_id,
     }])
     result["act_window_id"] = aw_id
 
@@ -574,36 +582,26 @@ def create_cpc_wizard(
 
 def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
     """
-    Cherche le menu 'Rapports' sous Comptabilité.
-    Retourne son id ou None si introuvable.
+    Cherche le menu 'Rapports' sous Comptabilité — 1 ou 2 appels XML-RPC max.
     """
-    candidates = ["Rapports", "Reports", "Reporting"]
-    # Recherche d'abord dans les sous-menus Comptabilité
-    accounting_menus = _ek(
+    # Recherche directe : menu "Rapports" (ou variante) dont le parent est Comptabilité
+    ids = _ek(
         models, db, uid, pwd, "ir.ui.menu", "search",
-        [["|", ("name", "ilike", "Comptabilit"),
-               ("name", "ilike", "Accounting")]],
-        {"limit": 10},
+        [[("name", "in", ["Rapports", "Reports", "Reporting"]),
+          "|",
+          ("parent_id.name", "ilike", "Comptabilit"),
+          ("parent_id.name", "ilike", "Accounting")]],
+        {"limit": 1},
     )
-    for am in accounting_menus:
-        for cand in candidates:
-            ids = _ek(
-                models, db, uid, pwd, "ir.ui.menu", "search",
-                [[("parent_id", "=", am), ("name", "ilike", cand)]],
-                {"limit": 1},
-            )
-            if ids:
-                return int(ids[0])
-    # Fallback : cherche globalement
-    for cand in candidates:
-        ids = _ek(
-            models, db, uid, pwd, "ir.ui.menu", "search",
-            [[("name", "=", cand)]],
-            {"limit": 1},
-        )
-        if ids:
-            return int(ids[0])
-    return None
+    if ids:
+        return int(ids[0])
+    # Fallback : n'importe quel menu "Rapports" / "Reports"
+    ids = _ek(
+        models, db, uid, pwd, "ir.ui.menu", "search",
+        [[("name", "in", ["Rapports", "Reports", "Reporting"])]],
+        {"limit": 1},
+    )
+    return int(ids[0]) if ids else None
 
 
 # ---------------------------------------------------------------------------
