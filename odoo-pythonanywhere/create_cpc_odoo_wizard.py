@@ -113,12 +113,53 @@ _LINE_SIGN = {
 # ---------------------------------------------------------------------------
 
 # NOTE : Ce string doit être indentation-neutre (pas d'indentation initiale)
-# car Odoo exécute le code avec exec() dans son propre contexte.
+# car Odoo exécute le code avec safe_eval : **aucun import**, pas de générateurs/opcode exotiques.
 _SERVER_ACTION_CODE = r'''
-import json as _json
-import re as _re
+# Pas d'import : ir.actions.server utilise safe_eval (opcodes IMPORT interdits sur Odoo SaaS).
 
-# ------------------------------------------------------------------ helpers
+def _parse_flat_json_obj(s):
+    """Parse {\"k\": float, ...} pour analytic_distribution serialise en str — sans module json."""
+    if not s or not isinstance(s, str):
+        return None
+    s = s.strip()
+    if len(s) < 2 or s[0] != '{' or s[-1] != '}':
+        return None
+    inner = s[1:-1].strip()
+    if not inner:
+        return {}
+    out = {}
+    for chunk in inner.split(','):
+        chunk = chunk.strip()
+        if ':' not in chunk:
+            continue
+        k, v = chunk.split(':', 1)
+        k = k.strip().strip('"').strip("'")
+        v = v.strip()
+        try:
+            out[k] = float(v)
+        except Exception:
+            pass
+    return out
+
+def _split_formula_tokens(s):
+    """Decoupe 'TA - RA + RB' en jetons sans re."""
+    s = (s or "").strip()
+    out = []
+    buf = []
+    for c in s:
+        if c == '+' or c == '-':
+            t = ''.join(buf).strip()
+            if t:
+                out.append(t)
+            out.append(c)
+            buf = []
+        else:
+            buf.append(c)
+    t = ''.join(buf).strip()
+    if t:
+        out.append(t)
+    return out
+
 def _ek(model, method, args=None, kwargs=None):
     return getattr(env[model], method)(*(args or []), **(kwargs or {}))
 
@@ -136,7 +177,7 @@ def _sum_formula(formula_str, amounts_by_code):
 
 def _eval_aggregate(formula_str, line_vals):
     """Evalue une formule d'agregation type 'TA - RA - RB' sur line_vals dict {code: val}."""
-    tokens = _re.split(r'([+\-])', (formula_str or "").strip())
+    tokens = _split_formula_tokens(formula_str)
     result = 0.0
     sign = 1
     for tok in tokens:
@@ -146,7 +187,7 @@ def _eval_aggregate(formula_str, line_vals):
         elif tok == '-':
             sign = -1
         elif tok:
-            result += sign * float(line_vals.get(tok, 0.0))
+            result = result + sign * float(line_vals.get(tok, 0.0))
     return result
 
 # ------------------------------------------------------------------ wizard fields
@@ -235,8 +276,10 @@ for ml in move_lines:
         continue
     if isinstance(raw_dist, str):
         try:
-            raw_dist = _json.loads(raw_dist)
+            raw_dist = _parse_flat_json_obj(raw_dist)
         except Exception:
+            continue
+        if raw_dist is None:
             continue
     if not isinstance(raw_dist, dict):
         continue
@@ -273,17 +316,19 @@ _use_line_budget = None
 
 if 'account_id' in fg_bi:
     # Odoo 19+ : account.report.budget.item a un champ account_id direct
-    amt_field = next(
-        (f for f in ('value', 'budget_amount', 'amount', 'planned_amount') if f in fg_bi),
-        None,
-    )
+    amt_field = None
+    for f in ('value', 'budget_amount', 'amount', 'planned_amount'):
+        if f in fg_bi:
+            amt_field = f
+            break
     if amt_field:
         b_domain = []
         # Filtrer par budget parent si fourni
-        parent_field = next(
-            (f for f in ('budget_id', 'report_budget_id', 'budget') if f in fg_bi),
-            None,
-        )
+        parent_field = None
+        for f in ('budget_id', 'report_budget_id', 'budget'):
+            if f in fg_bi:
+                parent_field = f
+                break
         if parent_field and budget_id:
             b_domain.append((parent_field, '=', budget_id))
         # Filtrer par chevauchement de période si les champs existent
@@ -316,15 +361,18 @@ if 'account_id' in fg_bi:
 
 elif 'report_line_id' in fg_bi:
     # Fallback : account.report.budget.item lié aux lignes du rapport (sans account_id direct)
-    amt_field = next(
-        (f for f in ('value', 'budget_amount', 'amount', 'planned_amount') if f in fg_bi),
-        None,
-    )
+    amt_field = None
+    for f in ('value', 'budget_amount', 'amount', 'planned_amount'):
+        if f in fg_bi:
+            amt_field = f
+            break
     if amt_field:
         b_domain = [('report_line_id.report_id', '=', cpc_report_id)]
-        parent_field = next(
-            (f for f in ('budget_id', 'report_budget_id') if f in fg_bi), None,
-        )
+        parent_field = None
+        for f in ('budget_id', 'report_budget_id'):
+            if f in fg_bi:
+                parent_field = f
+                break
         if parent_field and budget_id:
             b_domain.append((parent_field, '=', budget_id))
         if 'date_from' in fg_bi and date_from and date_to:
@@ -339,17 +387,19 @@ elif 'report_line_id' in fg_bi:
         items = env['account.report.budget.item'].search_read(
             b_domain, ['report_line_id', amt_field], limit=0,
         )
-        # Récupérer les codes de lignes
-        line_ids = list({
-            item['report_line_id'][0]
-            for item in items
-            if item.get('report_line_id')
-        })
-        lines_meta = {
-            r['id']: r['code']
-            for r in env['account.report.line'].browse(line_ids).read(['code'])
-            if r.get('code')
-        }
+        # Récupérer les codes de lignes (sans set comprehension — safe_eval)
+        line_ids = []
+        for item in items:
+            lt = item.get('report_line_id')
+            if not lt:
+                continue
+            lid = lt[0] if isinstance(lt, (list, tuple)) else int(lt)
+            if lid not in line_ids:
+                line_ids.append(lid)
+        lines_meta = {}
+        for r in env['account.report.line'].browse(line_ids).read(['code']):
+            if r.get('code'):
+                lines_meta[r['id']] = r['code']
         # On ne peut pas mapper directement ligne→compte prefix ici,
         # donc on utilise les montants tels quels par code de ligne
         # (budget_by_line_code sera converti plus bas)
@@ -424,15 +474,15 @@ for code, expr_id in expr_by_code.items():
 written = len(expr_by_code)
 wizard.write({
     'x_status': (
-        f"OK - {written} ligne(s) CPC mise(s) a jour. "
-        f"Ouvrez le rapport CPC dans Odoo avec le filtre analytique = compte {analytic_id}."
+        "OK - " + str(written) + " ligne(s) CPC mise(s) a jour. "
+        "Ouvrez le rapport CPC dans Odoo avec le filtre analytique = compte " + str(analytic_id) + "."
     )
 })
 
 # ------------------------------------------------------------------ ouvrir le rapport
 action = {
     'type':   'ir.actions.act_url',
-    'url':    f'/odoo/accounting/reports/{cpc_report_id}',
+    'url':    '/odoo/accounting/reports/' + str(cpc_report_id),
     'target': 'self',
 }
 '''
