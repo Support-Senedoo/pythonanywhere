@@ -308,11 +308,52 @@ def cpc_budget_pct_aggregation_formula(line_code: str, *, budget_pct_meaningful:
     Formule moteur ``aggregation`` pour la colonne %.
     Odoo 19 : ``if_other_is_zero(...)`` n'est plus accept\u00e9 par la regex de validation.
     Si la colonne budget n'est pas fiable (même GL que le r\u00e9alis\u00e9), retourner ``0``.
+
+    Pour \u00e9viter une division par z\u00e9ro lorsque le budget vaut 0, associer la
+    sous-formule :func:`cpc_budget_pct_subformula` (moteur aggregation, Odoo 19).
     """
     if not budget_pct_meaningful:
         return "0"
     c = line_code
     return f"{c}.balance/{c}.budget*100"
+
+
+def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
+    """
+    Code ISO 4217 (3 lettres) de la devise de la soci\u00e9t\u00e9 de l'utilisateur connect\u00e9.
+    Utilis\u00e9 dans ``if_other_expr_above(..., XXX(0))`` pour la colonne %.
+    """
+    try:
+        users = _ek(models, db, uid, password, "res.users", "read", [[uid]], {"fields": ["company_id"]})
+        if not users or not users[0].get("company_id"):
+            return "XOF"
+        cid = users[0]["company_id"][0]
+        comps = _ek(models, db, uid, password, "res.company", "read", [[cid]], {"fields": ["currency_id"]})
+        if not comps or not comps[0].get("currency_id"):
+            return "XOF"
+        cur_id = comps[0]["currency_id"][0]
+        cur = _ek(models, db, uid, password, "res.currency", "read", [[cur_id]], {"fields": ["name"]})
+        if not cur:
+            return "XOF"
+        name = (cur[0].get("name") or "").strip().upper()
+        if len(name) == 3 and name.isalpha():
+            return name
+    except Exception:
+        pass
+    return "XOF"
+
+
+def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
+    """
+    Sous-formule du moteur \u00ab Aggregate Other Formulas \u00bb : le r\u00e9sultat de la formule
+    (``balance/budget*100``) n'est renvoy\u00e9 que si ``budget > 0``, sinon 0 \u2014 \u00e9vite la
+    division par z\u00e9ro. Voir doc Odoo 19 : ``if_other_expr_above(LINE.LABEL, CUR(amount))``.
+    """
+    c = (line_code or "").strip()
+    cur = (currency_code or "XOF").strip().upper()
+    if len(cur) != 3 or not cur.isalpha():
+        cur = "XOF"
+    return f"if_other_expr_above({c}.budget, {cur}(0))"
 
 
 # ---------------------------------------------------------------------------
@@ -464,6 +505,7 @@ def create_toolbox_cpc_budget_analytique(
         budget_mode = "fallback_gl"
         budget_engine_used = "account_codes"
     budget_pct_meaningful = budget_mode != "fallback_gl"
+    currency_code = company_currency_code(models, db, uid, password)
     creation_warnings: list[str] = []
     if budget_mode == "fallback_gl":
         creation_warnings.append(
@@ -557,8 +599,8 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        f"{code}.budget - {code}.balance",
                 "date_scope":     "strict_range",
             })
-            # % R\u00e9alisation
-            _push_expr({
+            # % R\u00e9alisation (sous-formule \u2192 pas de division par z\u00e9ro si budget = 0)
+            _pct_vals: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "pct",
@@ -567,7 +609,10 @@ def create_toolbox_cpc_budget_analytique(
                     code, budget_pct_meaningful=budget_pct_meaningful
                 ),
                 "date_scope":     "strict_range",
-            })
+            }
+            if budget_pct_meaningful:
+                _pct_vals["subformula"] = cpc_budget_pct_subformula(code, currency_code)
+            _push_expr(_pct_vals)
 
         elif nature == "aggregate":
             # Odoo 19+ : la regex d'agr\u00e9gation exige code.libell\u00e9 (ex. TA.balance), pas seul TA.
@@ -597,8 +642,8 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        f"{code}.budget - {code}.balance",
                 "date_scope":     "strict_range",
             })
-            # % R\u00e9alisation
-            _push_expr({
+            # % R\u00e9alisation (sous-formule \u2192 pas de division par z\u00e9ro si budget = 0)
+            _pct_vals_b: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "pct",
@@ -607,7 +652,10 @@ def create_toolbox_cpc_budget_analytique(
                     code, budget_pct_meaningful=budget_pct_meaningful
                 ),
                 "date_scope":     "strict_range",
-            })
+            }
+            if budget_pct_meaningful:
+                _pct_vals_b["subformula"] = cpc_budget_pct_subformula(code, currency_code)
+            _push_expr(_pct_vals_b)
 
     verification: dict[str, Any] = {}
     try:

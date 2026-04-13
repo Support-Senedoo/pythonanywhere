@@ -42,6 +42,8 @@ from personalize_pl_analytic_budget import personalize_pl_analytic_budget_option
 from create_cpc_budget_analytique import (
     cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
+    cpc_budget_pct_subformula,
+    company_currency_code,
     cpc_crossovered_budget_available,
     normalize_cpc_account_codes_formula,
 )
@@ -469,6 +471,7 @@ def create_report_lines(models, uid, report_id):
     else:
         budget_mode = "fallback_gl"
     budget_pct_meaningful = budget_mode != "fallback_gl"
+    currency_code = company_currency_code(models, DB, uid, API_KEY)
     if budget_mode == "fallback_gl":
         print(
             "  ⚠️  Pas de moteur « budget » sur les expressions ni account.report.budget.item ni "
@@ -579,9 +582,8 @@ def create_report_lines(models, uid, report_id):
                     "date_scope"     : "strict_range",
                 })
 
-                # COL 4 : % RÉALISATION
-                # if_other_is_zero gère la division par zéro
-                create_expression_safe(models, uid, {
+                # COL 4 : % RÉALISATION (subformula → pas de division par zéro si budget = 0)
+                _pct_ev = {
                     "report_line_id" : line_id,
                     "label"          : "pct",
                     "engine"         : "aggregation",
@@ -589,7 +591,10 @@ def create_report_lines(models, uid, report_id):
                         code, budget_pct_meaningful=budget_pct_meaningful
                     ),
                     "date_scope"     : "strict_range",
-                })
+                }
+                if budget_pct_meaningful:
+                    _pct_ev["subformula"] = cpc_budget_pct_subformula(code, currency_code)
+                create_expression_safe(models, uid, _pct_ev)
 
             elif nature == "aggregate":
                 create_expression_safe(models, uid, {
@@ -613,7 +618,7 @@ def create_report_lines(models, uid, report_id):
                     "formula":        f"{code}.budget - {code}.balance",
                     "date_scope":     "strict_range",
                 })
-                create_expression_safe(models, uid, {
+                _pct_ev2 = {
                     "report_line_id": line_id,
                     "label":          "pct",
                     "engine":         "aggregation",
@@ -621,7 +626,10 @@ def create_report_lines(models, uid, report_id):
                         code, budget_pct_meaningful=budget_pct_meaningful
                     ),
                     "date_scope":     "strict_range",
-                })
+                }
+                if budget_pct_meaningful:
+                    _pct_ev2["subformula"] = cpc_budget_pct_subformula(code, currency_code)
+                create_expression_safe(models, uid, _pct_ev2)
 
             icon = "Σ" if is_total else "·"
             print(f"  {icon} [{code:<4}] {label[:55]:<55}")

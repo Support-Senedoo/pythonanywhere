@@ -38,7 +38,9 @@ from create_cpc_budget_analytique import (
     _agg_formula_with_suffix,
     cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
+    cpc_budget_pct_subformula,
     cpc_crossovered_budget_available,
+    company_currency_code,
     expression_engine_keys,
     normalize_cpc_account_codes_formula,
 )
@@ -268,6 +270,7 @@ def verify_cpc_budget_analytique_report(
     else:
         expected_budget_mode = "fallback_gl"
     budget_pct_meaningful = expected_budget_mode != "fallback_gl"
+    currency_code = company_currency_code(models, db, uid, password)
     for ln in sorted(lines, key=lambda x: str(x.get("code") or "")):
         code = str(ln.get("code") or "")
         lid = int(ln["id"])
@@ -312,6 +315,17 @@ def verify_cpc_budget_analytique_report(
                     pct_g = _norm(ex["pct"].get("formula"))
                     if pct_g != pct_e:
                         lc_errors.append(f"pct: formule « {pct_g} » ≠ attendue « {pct_e} »")
+                    if budget_pct_meaningful:
+                        sub_e = _norm(cpc_budget_pct_subformula(code, currency_code))
+                        sub_g = _norm(ex["pct"].get("subformula") or "")
+                        if sub_g != sub_e:
+                            lc_errors.append(
+                                f"pct: subformula « {sub_g} » ≠ attendue « {sub_e} »"
+                            )
+                    elif (ex["pct"].get("subformula") or "").strip():
+                        lc_errors.append(
+                            f"pct: subformula attendue vide, obtenue « {ex['pct'].get('subformula')!r} »"
+                        )
             else:
                 b_eng = (ex["balance"].get("engine") or "").strip()
                 if b_eng != "account_codes":
@@ -346,6 +360,17 @@ def verify_cpc_budget_analytique_report(
                 ).replace(" ", "")
                 if pct_got != pct_exp:
                     lc_errors.append(f"pct: formule « {pct_got} » ≠ attendue « {pct_exp} »")
+                if budget_pct_meaningful:
+                    sub_e = cpc_budget_pct_subformula(code, currency_code).replace(" ", "")
+                    sub_g = (ex["pct"].get("subformula") or "").replace(" ", "")
+                    if sub_g != sub_e:
+                        lc_errors.append(
+                            f"pct: subformula « {sub_g} » ≠ attendue « {sub_e} »"
+                        )
+                elif (ex["pct"].get("subformula") or "").strip():
+                    lc_errors.append(
+                        f"pct: subformula attendue vide, obtenue « {ex['pct'].get('subformula')!r} »"
+                    )
 
                 if row_spec and row_spec[2] == "account" and row_spec[3]:
                     f_bal = normalize_cpc_account_codes_formula(ex["balance"].get("formula"))
