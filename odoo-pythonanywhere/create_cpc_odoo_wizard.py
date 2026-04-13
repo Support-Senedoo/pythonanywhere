@@ -11,11 +11,10 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       5. Ouvre le rapport CPC dans Odoo
   - Menu : Comptabilité > Rapports > CPC Budget Analytique (Senedoo)
 
-Sur account.report.budget / account.report.budget.item, ajouter en Studio un Many2one
-``x_analytic_account_id`` vers account.analytic.account pour lier budget financier et axe ;
-la server action filtre alors les lignes d’items et contrôle l’en-tête si le champ est renseigné.
+Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
+``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
 
-Aucune dépendance module custom — fonctionne sur Odoo 17-19 SaaS Enterprise avec Studio.
+Aucune dépendance module custom — fonctionne sur Odoo 17-19 SaaS Enterprise (droits admin / Studio).
 
 Usage Flask toolbox (action staff.py) :
     from create_cpc_odoo_wizard import create_cpc_wizard, purge_cpc_wizard, cpc_wizard_exists
@@ -33,6 +32,13 @@ WIZARD_NAME    = "CPC Budget Analytique"
 WIZARD_MENU_LABEL = "CPC Budget Analytique (Senedoo)"
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike dans account.report
 EXTERNAL_EXPR_LABEL  = "budget_analytique"    # label expression externe à peupler
+
+# Champs créés sur les modèles budget reporting (Many2one vers l’axe analytique)
+BUDGET_ANALYTIC_FIELD_NAME = "x_analytic_account_id"
+BUDGET_MODELS_WITH_ANALYTIC_M2O = (
+    "account.report.budget",
+    "account.report.budget.item",
+)
 
 # ---------------------------------------------------------------------------
 # Structure CPC SYSCOHADA (identique à create_cpc_budget_analytique._CPC_STRUCTURE)
@@ -439,7 +445,7 @@ def _make_form_view_arch(sa_id: int) -> str:
     <div class="oe_title">
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
-        Choisissez le compte analytique, le budget financier rattache (Studio : x_analytic_account_id sur le budget),
+        Choisissez le compte analytique, le budget financier rattache (champs x_analytic_account_id crees par la toolbox),
         la periode, puis Calculez pour injecter le budget CPC.
       </p>
     </div>
@@ -496,6 +502,64 @@ def _get_model_id(models: Any, db: str, uid: int, pwd: str, model_name: str) -> 
         raise RuntimeError(f"Modele {model_name!r} introuvable dans ir.model")
     return int(ids[0])
 
+
+def ensure_budget_report_analytic_fields(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Crée ``x_analytic_account_id`` (Many2one ``account.analytic.account``) sur
+    ``account.report.budget`` et ``account.report.budget.item`` si absents.
+
+    Idempotent : ne recrée pas un champ déjà présent (Studio ou exécution antérieure).
+    Retourne ``{ "by_model": { model: { "status": "created"|"skipped"|"missing_model"|"error", ... } } }``.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for model_name in BUDGET_MODELS_WITH_ANALYTIC_M2O:
+        entry: dict[str, Any] = {"model": model_name}
+        if not _model_exists(models, db, uid, pwd, model_name):
+            entry["status"] = "missing_model"
+            entry["note"] = "Modele non installe sur cette base."
+            out[model_name] = entry
+            continue
+        if _field_exists(models, db, uid, pwd, model_name, BUDGET_ANALYTIC_FIELD_NAME):
+            entry["status"] = "skipped"
+            entry["note"] = "Champ deja present."
+            out[model_name] = entry
+            continue
+        try:
+            mid = _get_model_id(models, db, uid, pwd, model_name)
+            fid = _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.model.fields",
+                "create",
+                [{
+                    "name": BUDGET_ANALYTIC_FIELD_NAME,
+                    "field_description": "Compte analytique (Toolbox Senedoo)",
+                    "ttype": "many2one",
+                    "model_id": mid,
+                    "state": "manual",
+                    "relation": "account.analytic.account",
+                    "required": False,
+                    "on_delete": "set null",
+                }],
+            )
+            entry["status"] = "created"
+            entry["field_id"] = fid
+        except Exception as e:
+            entry["status"] = "error"
+            entry["error"] = str(e)
+        out[model_name] = entry
+    return {"by_model": out, "ok": all(
+        v.get("status") in ("created", "skipped") for v in out.values()
+    )}
+
+
 # ---------------------------------------------------------------------------
 # Création du wizard dans Odoo
 # ---------------------------------------------------------------------------
@@ -515,6 +579,11 @@ def create_cpc_wizard(
     purge_cpc_wizard(models, db, uid, pwd)
 
     result: dict[str, Any] = {}
+
+    # ---- 0. Champs analytique sur les budgets financiers (reporting) -------
+    result["budget_analytic_fields"] = ensure_budget_report_analytic_fields(
+        models, db, uid, pwd
+    )
 
     # ---- 1. ir.model --------------------------------------------------------
     model_id = _ek(models, db, uid, pwd, "ir.model", "create", [{
@@ -613,12 +682,20 @@ def create_cpc_wizard(
     }])
     result["menu_id"] = menu_id
 
+    ba = result.get("budget_analytic_fields") or {}
     result["ok"] = True
+    result["budget_analytic_fields_ok"] = bool(ba.get("ok", True))
     result["message"] = (
         f"Wizard CPC cree : modele {WIZARD_MODEL!r}, "
         f"server action id={sa_id}, menu id={menu_id}. "
-        f"Accessible dans Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL!r}."
+        f"Accessible dans Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL!r}. "
+        f"Champs budget/analytique : {ba.get('by_model', {})}."
     )
+    if not result["budget_analytic_fields_ok"]:
+        result["message"] += (
+            " Attention : un ou plusieurs champs x_analytic_account_id n'ont pas ete crees "
+            "(voir budget_analytic_fields.by_model)."
+        )
     return result
 
 

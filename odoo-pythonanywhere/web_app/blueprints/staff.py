@@ -777,6 +777,12 @@ def pl_analytic_project_report():
             try:
                 result = create_cpc_wizard(models, db, uid, pwd)
                 flash(result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo.", "success")
+                if result.get("budget_analytic_fields_ok") is False:
+                    flash(
+                        "Les champs x_analytic_account_id sur les budgets financiers n'ont pas tous ete crees "
+                        "(droits Odoo ou modele manquant). Verifiez budget_analytic_fields dans les logs.",
+                        "warning",
+                    )
             except Exception as e:
                 flash(f"Echec installation wizard CPC : {e!s}", "danger")
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
