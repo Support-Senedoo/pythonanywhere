@@ -2,13 +2,18 @@
 Crée dans Odoo (via XML-RPC) un wizard natif « CPC Budget Analytique ».
 
 Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
-  - Compte analytique, Période Du/Au, Budget
+  - Compte analytique, budget financier (account.report.budget), période Du/Au
   - Bouton « Calculer » → server action Python qui :
-      1. Lit account.move.line (analytic filtered) → calcule le réalisé CPC
-      2. Lit account.report.budget.item → calcule le budget CPC
-      3. Écrit account.report.external.value (colonne Budget du rapport CPC)
-      4. Ouvre le rapport CPC dans Odoo
+      1. Vérifie la cohérence analytique avec le budget (champs Studio optionnels sur account.report.budget)
+      2. Lit account.move.line (filtré analytique) → réalisé CPC
+      3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
+      4. Écrit account.report.external.value (colonne Budget du rapport CPC)
+      5. Ouvre le rapport CPC dans Odoo
   - Menu : Comptabilité > Rapports > CPC Budget Analytique (Senedoo)
+
+Sur account.report.budget / account.report.budget.item, ajouter en Studio un Many2one
+``x_analytic_account_id`` vers account.analytic.account pour lier budget financier et axe ;
+la server action filtre alors les lignes d’items et contrôle l’en-tête si le champ est renseigné.
 
 Aucune dépendance module custom — fonctionne sur Odoo 17-19 SaaS Enterprise avec Studio.
 
@@ -143,10 +148,27 @@ wizard = record
 analytic_id = int(wizard.x_analytic_account_id.id) if wizard.x_analytic_account_id else 0
 date_from = str(wizard.x_date_from) if wizard.x_date_from else ''
 date_to   = str(wizard.x_date_to)   if wizard.x_date_to   else ''
-budget_id = 0  # champ budget retire du formulaire
+budget_id = int(wizard.x_report_budget_id.id) if wizard.x_report_budget_id else 0
 
 if not analytic_id or not date_from or not date_to:
     raise UserError("Veuillez remplir tous les champs obligatoires (analytique, dates).")
+if not budget_id:
+    raise UserError("Veuillez selectionner un budget financier (account.report.budget).")
+
+# Coherence avec l'axe (champs Studio optionnels : x_analytic_account_id ou analytic_account_id)
+rb = env['account.report.budget'].browse(budget_id)
+fg_rb = env['account.report.budget'].fields_get()
+for fname in ('x_analytic_account_id', 'analytic_account_id'):
+    if fname not in fg_rb:
+        continue
+    rel = rb[fname]
+    if rel:
+        rid = int(rel.id if hasattr(rel, 'id') else rel[0])
+        if rid != int(analytic_id):
+            raise UserError(
+                "Le budget financier choisi n'est pas rattache au meme compte analytique que la selection."
+            )
+        break
 
 # ------------------------------------------------------------------ CPC structure
 CPC_STRUCTURE = ''' + repr(_CPC_STRUCTURE) + r'''
@@ -241,6 +263,7 @@ for ml in move_lines:
 # ------------------------------------------------------------------ budget
 fg_bi = env['account.report.budget.item'].fields_get()
 budget_by_code = {}
+_use_line_budget = None
 
 if 'account_id' in fg_bi:
     # Odoo 19+ : account.report.budget.item a un champ account_id direct
@@ -262,6 +285,13 @@ if 'account_id' in fg_bi:
             b_domain += [('date_from', '<=', date_to), ('date_to', '>=', date_from)]
         elif 'date' in fg_bi and date_from and date_to:
             b_domain += [('date', '>=', date_from), ('date', '<=', date_to)]
+        # Lignes rattachees a l'axe OU sans axe (Studio : x_analytic_account_id sur l'item)
+        for fname in ('x_analytic_account_id', 'analytic_account_id'):
+            if fname in fg_bi and (fg_bi[fname].get('type') or '') == 'many2one':
+                b_domain.append('|')
+                b_domain.append((fname, '=', analytic_id))
+                b_domain.append((fname, '=', False))
+                break
 
         items = env['account.report.budget.item'].search_read(
             b_domain, ['account_id', amt_field], limit=0,
@@ -293,6 +323,12 @@ elif 'report_line_id' in fg_bi:
             b_domain.append((parent_field, '=', budget_id))
         if 'date_from' in fg_bi and date_from and date_to:
             b_domain += [('date_from', '<=', date_to), ('date_to', '>=', date_from)]
+        for fname in ('x_analytic_account_id', 'analytic_account_id'):
+            if fname in fg_bi and (fg_bi[fname].get('type') or '') == 'many2one':
+                b_domain.append('|')
+                b_domain.append((fname, '=', analytic_id))
+                b_domain.append((fname, '=', False))
+                break
 
         items = env['account.report.budget.item'].search_read(
             b_domain, ['report_line_id', amt_field], limit=0,
@@ -403,11 +439,14 @@ def _make_form_view_arch(sa_id: int) -> str:
     <div class="oe_title">
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
-        Selectionnez un axe analytique et une periode, puis cliquez sur Calculer.
+        Choisissez le compte analytique, le budget financier rattache (Studio : x_analytic_account_id sur le budget),
+        la periode, puis Calculez pour injecter le budget CPC.
       </p>
     </div>
     <group>
       <field name="x_analytic_account_id" required="1"/>
+      <field name="x_report_budget_id" required="1"
+             options="{'no_create': True, 'no_create_edit': True}"/>
       <field name="x_date_from" required="1"/>
       <field name="x_date_to" required="1"/>
       <field name="x_status" readonly="1"/>
@@ -514,11 +553,14 @@ def create_cpc_wizard(
             "required": True,
         },
         {
-            "name": "x_budget_id",
-            "field_description": "Reference budget",
-            "ttype": "char",
+            "name": "x_report_budget_id",
+            "field_description": "Budget financier (account.report.budget)",
+            "ttype": "many2one",
             "model_id": model_id,
             "state": "manual",
+            "relation": "account.report.budget",
+            "required": True,
+            "on_delete": "restrict",
         },
         {
             "name": "x_status",
