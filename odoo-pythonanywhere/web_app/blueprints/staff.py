@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import io
+import json
+import tempfile
 import threading
 import uuid as _uuid
 import zipfile
@@ -121,8 +123,27 @@ from web_app.session_odoo import get_config_by_id, get_xmlrpc_for_staff_client_i
 bp = Blueprint("staff", __name__)
 
 # Jobs background (installation longue Odoo : évite le 502 PythonAnywhere 30s)
-# clé = jid hex, valeur = {'status': 'running'|'done'|'error', 'message': str}
-_bg_jobs: dict[str, dict] = {}
+# Stockage fichier /tmp → partagé entre tous les workers WSGI de PythonAnywhere.
+def _job_path(jid: str) -> Path:
+    return Path(tempfile.gettempdir()) / f"sn_bg_{jid}.json"
+
+def _job_set(jid: str, data: dict) -> None:
+    try:
+        _job_path(jid).write_text(json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+
+def _job_get(jid: str) -> dict:
+    try:
+        return json.loads(_job_path(jid).read_text(encoding="utf-8"))
+    except Exception:
+        return {"status": "not_found"}
+
+def _job_del(jid: str) -> None:
+    try:
+        _job_path(jid).unlink(missing_ok=True)
+    except Exception:
+        pass
 
 
 @bp.after_request
@@ -770,36 +791,36 @@ def pl_analytic_project_report():
 
         if action == "create_manager_dashboard":
             jid = _uuid.uuid4().hex[:12]
-            _bg_jobs[jid] = {"status": "running"}
+            _job_set(jid, {"status": "running"})
             _m, _d, _u, _p = models, db, uid, pwd
 
             def _run_install(m=_m, d=_d, u=_u, p=_p, j=jid):
                 try:
                     res = create_manager_dashboard(m, d, u, p)
-                    _bg_jobs[j] = {
+                    _job_set(j, {
                         "status": "done",
                         "message": res.get("message") or "Tableau de Bord Manager installe.",
-                    }
+                    })
                 except Exception as exc:
-                    _bg_jobs[j] = {"status": "error", "message": str(exc)}
+                    _job_set(j, {"status": "error", "message": str(exc)})
 
             threading.Thread(target=_run_install, daemon=True).start()
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save), jid=jid))
 
         if action == "delete_manager_dashboard":
             jid = _uuid.uuid4().hex[:12]
-            _bg_jobs[jid] = {"status": "running"}
+            _job_set(jid, {"status": "running"})
             _m, _d, _u, _p = models, db, uid, pwd
 
             def _run_purge(m=_m, d=_d, u=_u, p=_p, j=jid):
                 try:
                     res = purge_manager_dashboard(m, d, u, p)
-                    _bg_jobs[j] = {
+                    _job_set(j, {
                         "status": "done",
                         "message": res.get("message") or "Tableau de Bord Manager supprime.",
-                    }
+                    })
                 except Exception as exc:
-                    _bg_jobs[j] = {"status": "error", "message": str(exc)}
+                    _job_set(j, {"status": "error", "message": str(exc)})
 
             threading.Thread(target=_run_purge, daemon=True).start()
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save), jid=jid))
@@ -1027,13 +1048,14 @@ def pl_analytic_project_report():
     jid = (request.args.get("jid") or "").strip()
     job_running = False
     if jid:
-        info = _bg_jobs.get(jid, {"status": "not_found"})
+        info = _job_get(jid)
         if info["status"] == "running":
             job_running = True
         else:
-            _bg_jobs.pop(jid, None)
-            cat = "success" if info["status"] == "done" else "danger"
-            flash(info.get("message") or "Operation terminee.", cat)
+            _job_del(jid)
+            if info["status"] != "not_found":
+                cat = "success" if info["status"] == "done" else "danger"
+                flash(info.get("message") or "Operation terminee.", cat)
             cid_r = (request.args.get("client_id") or "").strip().lower()
             fh_r = (request.args.get("filter_host") or "").strip()
             return redirect(ru(**_pl_analytic_url_params(client_id=cid_r, filter_host=fh_r)))
