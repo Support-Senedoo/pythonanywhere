@@ -125,6 +125,43 @@
     {% endif %}
   </div>
 </div>
+<div class="sn-card" style="margin-top:1rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">Tableau de Bord Manager — installation dans Odoo</h2>
+  {% if manager_dashboard_installed %}
+  <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
+    &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le tableau de bord dans Odoo.
+    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; Tableau de Bord Manager (Senedoo)</strong>.
+  </p>
+  {% endif %}
+  <details class="sn-doc" style="margin:0 0 0.75rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ca marche ?</summary>
+    <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
+      Installe un wizard natif Odoo (<code>x_manager_dashboard_wizard</code>). Le manager selectionne
+      la periode (mois, annee, trimestre, cumul YTD ou personnalisee), la societe et l'axe analytique optionnel,
+      puis clique <strong>Calculer</strong> : le tableau de bord s'affiche directement dans Odoo
+      avec KPIs Ventes, Achats, Facturation, Tresorerie, Stock et Fabrication — comparaison N vs N-1 automatique.
+      Seules les sections correspondant aux modules Odoo installes apparaissent.
+    </p>
+  </details>
+  <div class="sn-report-btn-row">
+    <form id="form-create-manager-dashboard" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="create_manager_dashboard">
+      <button type="submit">
+        {% if manager_dashboard_installed %}Mettre a jour le Tableau de Bord Manager{% else %}Installer le Tableau de Bord Manager (Odoo){% endif %}
+      </button>
+    </form>
+    {% if manager_dashboard_installed %}
+    <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
+      <input type="hidden" name="client_id" value="{{ selected_client }}">
+      <input type="hidden" name="filter_host" value="{{ filter_host }}">
+      <input type="hidden" name="action" value="delete_manager_dashboard">
+      <button type="submit" class="sn-btn sn-btn--ghost" style="color:var(--sn-danger);">Supprimer</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
 {% elif selected_client and conn_status == 'error' %}
 <p class="sn-muted">Connexion impossible : {{ conn_detail }}</p>
 {% endif %}

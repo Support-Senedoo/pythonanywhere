@@ -67,6 +67,11 @@ from create_cpc_odoo_wizard import (
     purge_cpc_wizard,
     cpc_wizard_exists,
 )
+from create_manager_dashboard import (
+    create_manager_dashboard,
+    purge_manager_dashboard,
+    manager_dashboard_exists,
+)
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
 from project_pl_analytic_report import (
@@ -363,6 +368,14 @@ def _staff_cpc_wizard_installed(models: Any, db: str, uid: int, pwd: str) -> boo
     """True si le wizard CPC Budget Analytique est installé sur cette base Odoo."""
     try:
         return cpc_wizard_exists(models, db, uid, pwd)
+    except Exception:
+        return False
+
+
+def _staff_manager_dashboard_installed(models: Any, db: str, uid: int, pwd: str) -> bool:
+    """True si le Tableau de Bord Manager est installé sur cette base Odoo."""
+    try:
+        return manager_dashboard_exists(models, db, uid, pwd)
     except Exception:
         return False
 
@@ -736,6 +749,22 @@ def pl_analytic_project_report():
                 flash(f"Echec suppression wizard CPC : {e!s}", "danger")
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
 
+        if action == "create_manager_dashboard":
+            try:
+                result = create_manager_dashboard(models, db, uid, pwd)
+                flash(result.get("message") or "Tableau de Bord Manager installe dans Odoo.", "success")
+            except Exception as e:
+                flash(f"Echec installation Tableau de Bord Manager : {e!s}", "danger")
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+
+        if action == "delete_manager_dashboard":
+            try:
+                result = purge_manager_dashboard(models, db, uid, pwd)
+                flash(result.get("message") or "Tableau de Bord Manager supprime.", "info")
+            except Exception as e:
+                flash(f"Echec suppression Tableau de Bord Manager : {e!s}", "danger")
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+
         if action == "run_report":
             try:
                 aid = int(request.form.get("analytic_account_id") or "0")
@@ -866,6 +895,7 @@ def pl_analytic_project_report():
                 add_base_only=False,
                 financial_budgets=[],
                 cpc_wizard_installed=False,
+                manager_dashboard_installed=False,
             )
 
         if action == "export_excel":
@@ -992,6 +1022,7 @@ def pl_analytic_project_report():
     conn_detail = ""
     financial_budgets: list[dict[str, Any]] = []
     cpc_wizard_installed = False
+    manager_dashboard_installed = False
     if selected:
         try:
             models, db, uid, pwd = get_xmlrpc_for_staff_client_id(selected)
@@ -1002,9 +1033,11 @@ def pl_analytic_project_report():
                 try:
                     financial_budgets = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
                     cpc_wizard_installed = _staff_cpc_wizard_installed(models, db, uid, pwd)
+                    manager_dashboard_installed = _staff_manager_dashboard_installed(models, db, uid, pwd)
                 except Exception:
                     financial_budgets = []
                     cpc_wizard_installed = False
+                    manager_dashboard_installed = False
         except Exception as e:
             conn_status = "error"
             conn_detail = str(e)
@@ -1038,6 +1071,7 @@ def pl_analytic_project_report():
         add_base_only=add_base_only,
         financial_budgets=financial_budgets,
         cpc_wizard_installed=cpc_wizard_installed,
+        manager_dashboard_installed=manager_dashboard_installed,
     )
 
 
