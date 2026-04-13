@@ -23,3 +23,6 @@ odoo-pythonanywhere/.flask_session/
 # IDE / OS
 .DS_Store
 Thumbs.db
+
+# Fichiers locaux assistants (ne pas versionner)
+.claude/
