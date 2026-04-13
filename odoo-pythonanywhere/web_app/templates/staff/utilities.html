@@ -6,29 +6,43 @@
 
 <div class="sn-card sn-card--accent" style="margin-bottom:1rem;">
   <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation des rapports comptables</h2>
-  <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.45;">Trois parcours distincts selon l’objectif. Les écrans qui listent des rapports affichent les <code>account.report</code> de la base choisie.</p>
+  <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.45;">Parcours distincts selon l’objectif. Les écrans qui listent des rapports affichent les <code>account.report</code> de la base choisie.</p>
   <ul style="margin:0;padding-left:1.2rem;line-height:1.55;">
     <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.rapports_comptables') }}"><strong>Compte de résultat personnalisé</strong></a>
-      — copie d’un rapport P&amp;L (ou équivalent) + personnalisation Senedoo <strong>détail comptes / SYSCOHADA</strong> (<code>personalize_syscohada_detail</code>). Renommage et suppression de rapports depuis la liste.
+      <a href="{{ url_for(‘staff.rapports_comptables’) }}"><strong>Compte de résultat personnalisé</strong></a>
+      — copie d’un rapport P&amp;L + personnalisation Senedoo <strong>détail comptes / SYSCOHADA</strong>. Renommage et suppression depuis la liste.
     </li>
     <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.rapports_balance') }}"><strong>Balance OHADA (6 colonnes)</strong></a>
-      — crée sur la base un rapport <strong>Balance OHADA</strong> (six colonnes débit/crédit initiaux et finaux) ou le supprime ; pas de liste de rapports sur cette page.
+      <a href="{{ url_for(‘staff.rapports_balance’) }}"><strong>Balance OHADA (6 colonnes)</strong></a>
+      — crée ou supprime un rapport Balance OHADA (six colonnes débit/crédit initiaux et finaux).
     </li>
     <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique (réalisé / budget / %)</strong></a>
-      — <strong>tableau API</strong> par compte pour un axe analytique (réalisé / budget / %, export Excel) ; sur la même page : <strong>copie Odoo</strong> du P&amp;L avec <code>filter_analytic</code> / <code>filter_budgets</code>, liste des <code>account.report</code>, sonde budget / analytique, renommage / suppression des copies.
+      <a href="{{ url_for(‘staff.pl_analytic_project_report’) }}"><strong>Compte de résultat analytique + Wizards Odoo</strong></a>
+      — tableau CR analytique par axe (réalisé / budget / %, export Excel) ;
+      sur la même page après sélection d’un client :
+      <strong>Wizard CPC Budget Analytique</strong> et
+      <strong>Tableau de Bord Manager</strong> (installation en un clic dans Odoo).
     </li>
   </ul>
-  <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/pl-analytique-projet</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé). L’ancienne entrée <code>…/personalize-pl-budget</code> reste accessible pour les favoris mais n’est plus listée ici (fonctions regroupées sous « compte de résultat analytique »).</p>
+</div>
+
+<div class="sn-card" style="margin-bottom:1rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">&#128200; Tableau de Bord Manager (Senedoo)</h2>
+  <p style="margin:0 0 0.75rem;line-height:1.45;font-size:0.93rem;">
+    Installe un wizard natif dans Odoo SaaS : KPIs Ventes, Achats, Facturation, Trésorerie, Stock, Fabrication —
+    comparaison N vs N-1 automatique, charte graphique Senedoo, sélection société et axe analytique.
+    Accessible dans Odoo : <strong>Comptabilité &gt; Rapports &gt; Tableau de Bord Manager (Senedoo)</strong>.
+  </p>
+  <a class="sn-btn" href="{{ url_for(‘staff.pl_analytic_project_report’) }}">
+    Installer / mettre à jour le Tableau de Bord Manager →
+  </a>
 </div>
 
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Autres outils</h2>
   <ul style="margin:0;padding-left:1.2rem;">
-    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}#ajouter-base-odoo">Ajouter une base Odoo</a> (formulaire seul, depuis l’utilitaire P&amp;L personnalisé)</li>
-    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.odoo_account_databases_probe') }}">Sonde bases Odoo</a> (login / mot de passe, liste des bases)</li>
+    <li style="margin-bottom:0.5rem;"><a href="{{ url_for(‘staff.rapports_comptables’, add_base_only=’1’) }}#ajouter-base-odoo">Ajouter une base Odoo</a> (formulaire seul)</li>
+    <li style="margin-bottom:0.5rem;"><a href="{{ url_for(‘staff.odoo_account_databases_probe’) }}">Sonde bases Odoo</a> (login / mot de passe, liste des bases)</li>
   </ul>
 </div>
 
