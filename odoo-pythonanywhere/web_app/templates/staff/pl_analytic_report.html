@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{% if add_base_only %}Ajouter une base Odoo{% else %}{{ utility_title }} — Senedoo{% endif %}{% endblock %}
 {% block main_class %}sn-main--wide{% endblock %}
+{% block extra_head %}{% if job_running %}<meta http-equiv="refresh" content="6">{% endif %}{% endblock %}
 {% block body %}
+{% if job_running %}
+<div class="sn-flash info" style="margin-bottom:1rem;">
+  Installation en cours dans Odoo&#8230; La page se rafraichit automatiquement.
+</div>
+{% endif %}
 {% if add_base_only %}
 <h1>Ajouter une base Odoo</h1>
 <p class="sn-muted" style="margin:-0.35rem 0 0.85rem;">

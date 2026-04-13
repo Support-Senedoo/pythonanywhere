@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import io
+import threading
+import uuid as _uuid
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -117,6 +119,10 @@ from web_app.odoo_account_reports import (
 from web_app.session_odoo import get_config_by_id, get_xmlrpc_for_staff_client_id
 
 bp = Blueprint("staff", __name__)
+
+# Jobs background (installation longue Odoo : évite le 502 PythonAnywhere 30s)
+# clé = jid hex, valeur = {'status': 'running'|'done'|'error', 'message': str}
+_bg_jobs: dict[str, dict] = {}
 
 
 @bp.after_request
@@ -763,20 +769,40 @@ def pl_analytic_project_report():
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
 
         if action == "create_manager_dashboard":
-            try:
-                result = create_manager_dashboard(models, db, uid, pwd)
-                flash(result.get("message") or "Tableau de Bord Manager installe dans Odoo.", "success")
-            except Exception as e:
-                flash(f"Echec installation Tableau de Bord Manager : {e!s}", "danger")
-            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            jid = _uuid.uuid4().hex[:12]
+            _bg_jobs[jid] = {"status": "running"}
+            _m, _d, _u, _p = models, db, uid, pwd
+
+            def _run_install(m=_m, d=_d, u=_u, p=_p, j=jid):
+                try:
+                    res = create_manager_dashboard(m, d, u, p)
+                    _bg_jobs[j] = {
+                        "status": "done",
+                        "message": res.get("message") or "Tableau de Bord Manager installe.",
+                    }
+                except Exception as exc:
+                    _bg_jobs[j] = {"status": "error", "message": str(exc)}
+
+            threading.Thread(target=_run_install, daemon=True).start()
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save), jid=jid))
 
         if action == "delete_manager_dashboard":
-            try:
-                result = purge_manager_dashboard(models, db, uid, pwd)
-                flash(result.get("message") or "Tableau de Bord Manager supprime.", "info")
-            except Exception as e:
-                flash(f"Echec suppression Tableau de Bord Manager : {e!s}", "danger")
-            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            jid = _uuid.uuid4().hex[:12]
+            _bg_jobs[jid] = {"status": "running"}
+            _m, _d, _u, _p = models, db, uid, pwd
+
+            def _run_purge(m=_m, d=_d, u=_u, p=_p, j=jid):
+                try:
+                    res = purge_manager_dashboard(m, d, u, p)
+                    _bg_jobs[j] = {
+                        "status": "done",
+                        "message": res.get("message") or "Tableau de Bord Manager supprime.",
+                    }
+                except Exception as exc:
+                    _bg_jobs[j] = {"status": "error", "message": str(exc)}
+
+            threading.Thread(target=_run_purge, daemon=True).start()
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save), jid=jid))
 
         if action == "run_report":
             try:
@@ -997,6 +1023,21 @@ def pl_analytic_project_report():
             ),
         )
 
+    # --- Suivi job background (installation longue) ---
+    jid = (request.args.get("jid") or "").strip()
+    job_running = False
+    if jid:
+        info = _bg_jobs.get(jid, {"status": "not_found"})
+        if info["status"] == "running":
+            job_running = True
+        else:
+            _bg_jobs.pop(jid, None)
+            cat = "success" if info["status"] == "done" else "danger"
+            flash(info.get("message") or "Operation terminee.", cat)
+            cid_r = (request.args.get("client_id") or "").strip().lower()
+            fh_r = (request.args.get("filter_host") or "").strip()
+            return redirect(ru(**_pl_analytic_url_params(client_id=cid_r, filter_host=fh_r)))
+
     prefs = _pl_analytic_prefs()
 
     if "client_id" in request.args:
@@ -1085,6 +1126,8 @@ def pl_analytic_project_report():
         financial_budgets=financial_budgets,
         cpc_wizard_installed=cpc_wizard_installed,
         manager_dashboard_installed=manager_dashboard_installed,
+        job_running=job_running,
+        job_id=jid,
     )
 
 
