@@ -66,11 +66,6 @@ from personalize_pl_analytic_budget import (
     personalize_pl_analytic_budget_options,
     probe_financial_budget_analytic_summary,
 )
-from create_cpc_odoo_wizard import (
-    create_cpc_wizard,
-    purge_cpc_wizard,
-    cpc_wizard_exists,
-)
 try:
     from create_manager_dashboard import (
         create_manager_dashboard,
@@ -407,6 +402,8 @@ def _staff_financial_budgets_for_odoo(
 def _staff_cpc_wizard_installed(models: Any, db: str, uid: int, pwd: str) -> bool:
     """True si le wizard CPC Budget Analytique est installé sur cette base Odoo."""
     try:
+        from create_cpc_odoo_wizard import cpc_wizard_exists
+
         return cpc_wizard_exists(models, db, uid, pwd)
     except Exception:
         return False
@@ -775,6 +772,8 @@ def pl_analytic_project_report():
 
         if action == "create_cpc_wizard":
             try:
+                from create_cpc_odoo_wizard import create_cpc_wizard
+
                 result = create_cpc_wizard(models, db, uid, pwd)
                 flash(result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo.", "success")
                 if result.get("budget_analytic_fields_ok") is False:
@@ -789,6 +788,8 @@ def pl_analytic_project_report():
 
         if action == "delete_cpc_wizard":
             try:
+                from create_cpc_odoo_wizard import purge_cpc_wizard
+
                 result = purge_cpc_wizard(models, db, uid, pwd)
                 flash(result.get("message") or "Wizard CPC supprime.", "info")
             except Exception as e:

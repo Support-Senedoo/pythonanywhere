@@ -9,7 +9,7 @@ from pathlib import Path
 #   - patch (1.3.x → 1.3.y) : correctifs sans changement de comportement visible ;
 #   - minor (1.3.x → 1.4.0) : nouvelle fonctionnalité ou évolution d’écran / API toolbox ;
 #   - adapter _DEFAULT_DATE au jour de la livraison (YYYY-MM-DD).
-_DEFAULT_VERSION = "1.5.91"
+_DEFAULT_VERSION = "1.5.92"
 _DEFAULT_DATE = "2026-04-11"
 _DEFAULT_TIME = "20:45"
 
@@ -35,10 +35,24 @@ TOOLBOX_APP_TIME = (os.environ.get("TOOLBOX_APP_TIME") or _DEFAULT_TIME).strip()
 TOOLBOX_APP_LABEL = (os.environ.get("TOOLBOX_APP_LABEL") or "Toolbox Senedoo").strip() or "Toolbox Senedoo"
 TOOLBOX_APP_AUTHOR = (os.environ.get("TOOLBOX_APP_AUTHOR") or "Senedoo").strip() or "Senedoo"
 
+# Un seul `git rev-parse` par worker WSGI (le context_processor l’appelait à **chaque** requête → sous-processus
+# répétés, disque, risque de lenteur / 502 sur PythonAnywhere). Après un git pull sans Reload, la valeur peut être
+# périmée jusqu’au prochain redémarrage du worker — comme pour le code Python en RAM.
+# Pour forcer la relecture à chaque requête (débogage) : TOOLBOX_GIT_HEAD_NO_CACHE=1
+_git_head_short_cache: str | None = None
+
 
 def git_head_short() -> str:
-    """Hash court du commit (lecture disque via git). Utile sur PA : après un git pull sans Reload Web, la « Version »
-    ci-dessus peut rester figée en RAM alors que cette révision reflète le dépôt sur disque — incohérence = cliquer Reload."""
+    """Hash court du commit (lecture disque via git, mise en cache par processus)."""
+    global _git_head_short_cache
+    no_cache = os.environ.get("TOOLBOX_GIT_HEAD_NO_CACHE", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if not no_cache and _git_head_short_cache is not None:
+        return _git_head_short_cache
+    result = "?"
     try:
         import subprocess
 
@@ -49,16 +63,19 @@ def git_head_short() -> str:
                 root = p
                 break
         if root is None:
-            return "?"
-        out = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=4,
-            check=False,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
+            result = "?"
+        else:
+            out = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=4,
+                check=False,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                result = out.stdout.strip()
     except OSError:
         pass
-    return "?"
+    if not no_cache:
+        _git_head_short_cache = result
+    return result
