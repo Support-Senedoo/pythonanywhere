@@ -67,11 +67,24 @@ from create_cpc_odoo_wizard import (
     purge_cpc_wizard,
     cpc_wizard_exists,
 )
-from create_manager_dashboard import (
-    create_manager_dashboard,
-    purge_manager_dashboard,
-    manager_dashboard_exists,
-)
+try:
+    from create_manager_dashboard import (
+        create_manager_dashboard,
+        purge_manager_dashboard,
+        manager_dashboard_exists,
+    )
+    _MANAGER_DASHBOARD_AVAILABLE = True
+except ImportError:
+    _MANAGER_DASHBOARD_AVAILABLE = False
+
+    def create_manager_dashboard(*a, **kw):  # type: ignore[misc]
+        raise RuntimeError("Module create_manager_dashboard introuvable sur ce serveur.")
+
+    def purge_manager_dashboard(*a, **kw):  # type: ignore[misc]
+        raise RuntimeError("Module create_manager_dashboard introuvable sur ce serveur.")
+
+    def manager_dashboard_exists(*a, **kw) -> bool:  # type: ignore[misc]
+        return False
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
 from project_pl_analytic_report import (
