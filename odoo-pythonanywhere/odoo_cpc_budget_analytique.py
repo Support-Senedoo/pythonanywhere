@@ -14,7 +14,7 @@
       1. Réalisé          → écritures filtrées par compte analytique
       2. Budget Analytique → budget lié au compte analytique sélectionné
       3. Écart             → Budget - Réalisé
-      4. % Réalisation    → Réalisé / Budget × 100
+      4. % Réalisation    → balance×100/(budget+devise(epsilon)) (évite division par zéro au dépliage compte)
 
   ARCHITECTURE TECHNIQUE :
     - Les expressions "réalisé" utilisent l'engine account_codes
@@ -42,7 +42,6 @@ from personalize_pl_analytic_budget import personalize_pl_analytic_budget_option
 from create_cpc_budget_analytique import (
     cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
-    cpc_budget_pct_subformula,
     company_currency_code,
     cpc_crossovered_budget_available,
     normalize_cpc_account_codes_formula,
@@ -582,18 +581,18 @@ def create_report_lines(models, uid, report_id):
                     "date_scope"     : "strict_range",
                 })
 
-                # COL 4 : % RÉALISATION (subformula → pas de division par zéro si budget = 0)
+                # COL 4 : % RÉALISATION (dénominateur budget + devise epsilon)
                 _pct_ev = {
                     "report_line_id" : line_id,
                     "label"          : "pct",
                     "engine"         : "aggregation",
                     "formula"        : cpc_budget_pct_aggregation_formula(
-                        code, budget_pct_meaningful=budget_pct_meaningful
+                        code,
+                        budget_pct_meaningful=budget_pct_meaningful,
+                        currency_code=currency_code,
                     ),
                     "date_scope"     : "strict_range",
                 }
-                if budget_pct_meaningful:
-                    _pct_ev["subformula"] = cpc_budget_pct_subformula(code, currency_code)
                 create_expression_safe(models, uid, _pct_ev)
 
             elif nature == "aggregate":
@@ -623,12 +622,12 @@ def create_report_lines(models, uid, report_id):
                     "label":          "pct",
                     "engine":         "aggregation",
                     "formula":        cpc_budget_pct_aggregation_formula(
-                        code, budget_pct_meaningful=budget_pct_meaningful
+                        code,
+                        budget_pct_meaningful=budget_pct_meaningful,
+                        currency_code=currency_code,
                     ),
                     "date_scope":     "strict_range",
                 }
-                if budget_pct_meaningful:
-                    _pct_ev2["subformula"] = cpc_budget_pct_subformula(code, currency_code)
                 create_expression_safe(models, uid, _pct_ev2)
 
             icon = "Σ" if is_total else "·"

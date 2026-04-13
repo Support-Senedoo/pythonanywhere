@@ -303,19 +303,24 @@ def expression_engine_keys(models: Any, db: str, uid: int, password: str) -> fro
         return frozenset()
 
 
-def cpc_budget_pct_aggregation_formula(line_code: str, *, budget_pct_meaningful: bool) -> str:
+def cpc_budget_pct_aggregation_formula(
+    line_code: str,
+    *,
+    budget_pct_meaningful: bool,
+    currency_code: str = "XOF",
+) -> str:
     """
     Formule moteur ``aggregation`` pour la colonne %.
-    Odoo 19 : ``if_other_is_zero(...)`` n'est plus accept\u00e9 par la regex de validation.
-    Si la colonne budget n'est pas fiable (même GL que le r\u00e9alis\u00e9), retourner ``0``.
-
-    Pour \u00e9viter une division par z\u00e9ro lorsque le budget vaut 0, associer la
-    sous-formule :func:`cpc_budget_pct_subformula` (moteur aggregation, Odoo 19).
+    Denominateur ``budget + DEVISE(epsilon)`` pour eviter la division par zero
+    (y compris au depliage par compte).
     """
     if not budget_pct_meaningful:
         return "0"
-    c = line_code
-    return f"{c}.balance/{c}.budget*100"
+    c = (line_code or "").strip()
+    cur = (currency_code or "XOF").strip().upper()
+    if len(cur) != 3 or not cur.isalpha():
+        cur = "XOF"
+    return f"{c}.balance*100/({c}.budget+{cur}(0.0001))"
 
 
 def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
@@ -599,19 +604,19 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        f"{code}.budget - {code}.balance",
                 "date_scope":     "strict_range",
             })
-            # % R\u00e9alisation (sous-formule \u2192 pas de division par z\u00e9ro si budget = 0)
+            # % R\u00e9alisation (d\u00e9nominateur budget + devise epsilon, sans subformula)
             _pct_vals: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
                 "formula":        cpc_budget_pct_aggregation_formula(
-                    code, budget_pct_meaningful=budget_pct_meaningful
+                    code,
+                    budget_pct_meaningful=budget_pct_meaningful,
+                    currency_code=currency_code,
                 ),
                 "date_scope":     "strict_range",
             }
-            if budget_pct_meaningful:
-                _pct_vals["subformula"] = cpc_budget_pct_subformula(code, currency_code)
             _push_expr(_pct_vals)
 
         elif nature == "aggregate":
@@ -642,19 +647,19 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        f"{code}.budget - {code}.balance",
                 "date_scope":     "strict_range",
             })
-            # % R\u00e9alisation (sous-formule \u2192 pas de division par z\u00e9ro si budget = 0)
+            # % R\u00e9alisation (d\u00e9nominateur budget + devise epsilon, sans subformula)
             _pct_vals_b: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "pct",
                 "engine":         "aggregation",
                 "formula":        cpc_budget_pct_aggregation_formula(
-                    code, budget_pct_meaningful=budget_pct_meaningful
+                    code,
+                    budget_pct_meaningful=budget_pct_meaningful,
+                    currency_code=currency_code,
                 ),
                 "date_scope":     "strict_range",
             }
-            if budget_pct_meaningful:
-                _pct_vals_b["subformula"] = cpc_budget_pct_subformula(code, currency_code)
             _push_expr(_pct_vals_b)
 
     verification: dict[str, Any] = {}

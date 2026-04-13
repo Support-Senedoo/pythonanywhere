@@ -38,7 +38,6 @@ from create_cpc_budget_analytique import (
     _agg_formula_with_suffix,
     cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
-    cpc_budget_pct_subformula,
     cpc_crossovered_budget_available,
     company_currency_code,
     expression_engine_keys,
@@ -309,22 +308,19 @@ def verify_cpc_budget_analytique_report(
                         lc_errors.append(f"ecart: formule « {ec_g} » ≠ attendue « {ec_e} »")
                     pct_e = _norm(
                         cpc_budget_pct_aggregation_formula(
-                            code, budget_pct_meaningful=budget_pct_meaningful
+                            code,
+                            budget_pct_meaningful=budget_pct_meaningful,
+                            currency_code=currency_code,
                         )
                     )
                     pct_g = _norm(ex["pct"].get("formula"))
                     if pct_g != pct_e:
                         lc_errors.append(f"pct: formule « {pct_g} » ≠ attendue « {pct_e} »")
-                    if budget_pct_meaningful:
-                        sub_e = _norm(cpc_budget_pct_subformula(code, currency_code))
-                        sub_g = _norm(ex["pct"].get("subformula") or "")
-                        if sub_g != sub_e:
-                            lc_errors.append(
-                                f"pct: subformula « {sub_g} » ≠ attendue « {sub_e} »"
-                            )
-                    elif (ex["pct"].get("subformula") or "").strip():
+                    sub_g = _norm(str(ex["pct"].get("subformula") or ""))
+                    if sub_g:
                         lc_errors.append(
-                            f"pct: subformula attendue vide, obtenue « {ex['pct'].get('subformula')!r} »"
+                            "pct: subformula obsolète (attendu vide avec dénominateur budget+devise) — "
+                            f"obtenue « {ex['pct'].get('subformula')!r} » ; relancer la réparation CPC toolbox."
                         )
             else:
                 b_eng = (ex["balance"].get("engine") or "").strip()
@@ -356,20 +352,17 @@ def verify_cpc_budget_analytique_report(
 
                 pct_got = (ex["pct"].get("formula") or "").replace(" ", "")
                 pct_exp = cpc_budget_pct_aggregation_formula(
-                    code, budget_pct_meaningful=budget_pct_meaningful
+                    code,
+                    budget_pct_meaningful=budget_pct_meaningful,
+                    currency_code=currency_code,
                 ).replace(" ", "")
                 if pct_got != pct_exp:
                     lc_errors.append(f"pct: formule « {pct_got} » ≠ attendue « {pct_exp} »")
-                if budget_pct_meaningful:
-                    sub_e = cpc_budget_pct_subformula(code, currency_code).replace(" ", "")
-                    sub_g = (ex["pct"].get("subformula") or "").replace(" ", "")
-                    if sub_g != sub_e:
-                        lc_errors.append(
-                            f"pct: subformula « {sub_g} » ≠ attendue « {sub_e} »"
-                        )
-                elif (ex["pct"].get("subformula") or "").strip():
+                sub_g = (str(ex["pct"].get("subformula") or "")).replace(" ", "")
+                if sub_g:
                     lc_errors.append(
-                        f"pct: subformula attendue vide, obtenue « {ex['pct'].get('subformula')!r} »"
+                        "pct: subformula obsolète (attendu vide) — "
+                        f"obtenue « {ex['pct'].get('subformula')!r} » ; relancer la réparation CPC toolbox."
                     )
 
                 if row_spec and row_spec[2] == "account" and row_spec[3]:
