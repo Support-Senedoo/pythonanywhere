@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from flask import Flask
@@ -62,9 +63,20 @@ def create_app() -> Flask:
         app.config["SESSION_FILE_DIR"] = str(_sess_dir)
         app.config["SESSION_USE_SIGNER"] = True
         app.config["SESSION_PERMANENT"] = False
-        from flask_session import Session
+        try:
+            from flask_session import Session
 
-        Session(app)
+            Session(app)
+            app.config["TOOLBOX_SESSION_BACKEND"] = "filesystem"
+        except ImportError:
+            # Le worker WSGI utilise parfois un autre Python que `pip install --user` (ex. 3.11 vs 3.10) :
+            # sans flask-session, l’app ne doit pas planter — retour session cookie (risque 502 si cookie énorme).
+            print(
+                "Toolbox: flask-session introuvable pour cet interpréteur Python — "
+                "sessions cookie (réinstaller deps pour la même version que l’onglet Web).",
+                file=sys.stderr,
+            )
+            app.config["TOOLBOX_SESSION_BACKEND"] = "cookie_fallback"
 
     # Relecture des .html si le fichier change (complément au cache_size=0 ci-dessus sur PA).
     _force_tpl = os.environ.get("TOOLBOX_TEMPLATE_AUTO_RELOAD", "").lower() in ("1", "true", "yes")

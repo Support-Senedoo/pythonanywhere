@@ -33,13 +33,19 @@ fi
 
 cd "${APP_DIR}"
 
-# Sur PA, aligner avec la version Python de l’onglet Web (souvent 3.10).
-PY="${PYTHONANYWHERE_PYTHON:-python3.10}"
-if ! command -v "${PY}" &>/dev/null; then
-  PY="python3"
+# Dépendances pour chaque interpréteur présent : le worker WSGI peut utiliser 3.11 alors que seul 3.10
+# avait reçu `pip install` → ModuleNotFoundError (ex. flask_session) et erreur 500 au chargement.
+echo ">>> pip install --user (python3.10, 3.11, 3.12 si présents sur PA)"
+for _py in python3.10 python3.11 python3.12; do
+  if command -v "${_py}" &>/dev/null; then
+    echo "    ... ${_py}"
+    "${_py}" -m pip install --user -r requirements.txt || echo "    (avertissement: echec pip ${_py})" >&2
+  fi
+done
+if ! command -v python3.10 &>/dev/null && ! command -v python3.11 &>/dev/null && ! command -v python3.12 &>/dev/null; then
+  echo ">>> fallback python3"
+  python3 -m pip install --user -r requirements.txt
 fi
-echo ">>> pip (${PY}) install --user"
-"${PY}" -m pip install --user -r requirements.txt
 
 # Reload Web : une seule fois à configurer sur PA — fichier ~/.pythonanywhere_api_token (token « Account → API »).
 # Compte EU : fichier ~/.pythonanywhere_api_host avec une ligne https://eu.pythonanywhere.com
