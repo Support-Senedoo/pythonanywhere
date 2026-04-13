@@ -502,7 +502,7 @@ def _make_form_view_arch(sa_id: int) -> str:
     <group>
       <field name="x_analytic_account_id" required="1"/>
       <field name="x_report_budget_id" required="1"
-             options="{'no_create': True, 'no_create_edit': True}"/>
+             options="{{'no_create': True, 'no_create_edit': True}}"/>
       <field name="x_date_from" required="1"/>
       <field name="x_date_to" required="1"/>
       <field name="x_status" readonly="1"/>
