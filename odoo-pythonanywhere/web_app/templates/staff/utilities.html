@@ -20,6 +20,10 @@
       <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique (réalisé / budget / %)</strong></a>
       — <strong>tableau API</strong> par compte pour un axe analytique (réalisé / budget / %, export Excel) ; sur la même page : <strong>copie Odoo</strong> du P&amp;L avec <code>filter_analytic</code> / <code>filter_budgets</code>, liste des <code>account.report</code>, sonde budget / analytique, renommage / suppression des copies.
     </li>
+    <li style="margin-bottom:0.65rem;">
+      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Tableau de Bord Manager (Odoo natif)</strong></a>
+      — installe un wizard Odoo natif (<code>x_manager_dashboard_wizard</code>) avec KPIs Ventes, Achats, Facturation, Tresorerie, Stock, Fabrication, comparaison N vs N-1. Accessible depuis la page <em>Compte de résultat analytique</em>.
+    </li>
   </ul>
   <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/pl-analytique-projet</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé). L’ancienne entrée <code>…/personalize-pl-budget</code> reste accessible pour les favoris mais n’est plus listée ici (fonctions regroupées sous « compte de résultat analytique »).</p>
 </div>
