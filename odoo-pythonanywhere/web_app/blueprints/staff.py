@@ -938,6 +938,16 @@ def pl_analytic_project_report():
             hp_id, hp_miss = _pl_analytic_highlight_info(
                 _pl_analytic_prefs(), cid, reports
             )
+            fin_bu: list[dict[str, Any]] = []
+            cpc_ok = False
+            dash_ok = False
+            if conn_status == "ok":
+                try:
+                    fin_bu = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
+                    cpc_ok = _staff_cpc_wizard_installed(models, db, uid, pwd)
+                    dash_ok = _staff_manager_dashboard_installed(models, db, uid, pwd)
+                except Exception:
+                    pass
             return render_template(
                 "staff/pl_analytic_report.html",
                 clients=reg,
@@ -966,9 +976,9 @@ def pl_analytic_project_report():
                 form_full_line=full_line,
                 form_currency_mode=currency_mode,
                 add_base_only=False,
-                financial_budgets=[],
-                cpc_wizard_installed=False,
-                manager_dashboard_installed=False,
+                financial_budgets=fin_bu,
+                cpc_wizard_installed=cpc_ok,
+                manager_dashboard_installed=dash_ok,
             )
 
         if action == "export_excel":
@@ -1085,6 +1095,15 @@ def pl_analytic_project_report():
             distinct_odoo_hosts=distinct_odoo_hosts(reg),
             selected_client=cid_r,
             filter_host=fh_r,
+            filter_q="",
+            analytic_q="",
+            analytic_accounts=[],
+            reports=[],
+            report_open_urls={},
+            prefill_report_id=None,
+            prefill_report_name="",
+            highlight_report_id=None,
+            highlight_report_missing=False,
             conn_status="idle",
             conn_detail="",
             utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -1097,6 +1116,10 @@ def pl_analytic_project_report():
             manager_dashboard_installed=False,
             job_running=True,
             job_id=jid,
+            report_result=None,
+            form_analytic_id=0,
+            form_full_line=False,
+            form_currency_mode="company",
         )
 
     prefs = _pl_analytic_prefs()
@@ -1133,6 +1156,40 @@ def pl_analytic_project_report():
     if add_base_only:
         selected = ""
 
+    if "q" in request.args:
+        filter_q = (request.args.get("q") or "").strip()
+    else:
+        filter_q = (prefs.get("filter_q") or "").strip()
+    if "aq" in request.args:
+        analytic_q = (request.args.get("aq") or "").strip()
+    else:
+        analytic_q = (prefs.get("analytic_q") or "").strip()
+
+    prefill_report_id: int | None = None
+    if "report_id" in request.args:
+        try:
+            v = int(request.args.get("report_id") or "0")
+            prefill_report_id = v if v > 0 else None
+        except ValueError:
+            prefill_report_id = None
+
+    analytic_accounts: list[dict[str, Any]] = []
+    reports: list[dict[str, Any]] = []
+    report_open_urls: dict[int, str] = {}
+    highlight_report_id: int | None = None
+    highlight_report_missing = False
+    prefill_report_name = ""
+    report_result = None
+    form_analytic_id = 0
+    form_full_line = False
+    form_currency_mode = "company"
+    abc = prefs.get("analytic_account_by_client")
+    if isinstance(abc, dict) and selected:
+        try:
+            form_analytic_id = int(abc.get(selected) or 0)
+        except (TypeError, ValueError):
+            form_analytic_id = 0
+
     conn_status = "idle"
     conn_detail = ""
     financial_budgets: list[dict[str, Any]] = []
@@ -1148,11 +1205,39 @@ def pl_analytic_project_report():
                 try:
                     financial_budgets = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
                     cpc_wizard_installed = _staff_cpc_wizard_installed(models, db, uid, pwd)
-                    manager_dashboard_installed = _staff_manager_dashboard_installed(models, db, uid, pwd)
+                    manager_dashboard_installed = _staff_manager_dashboard_installed(
+                        models, db, uid, pwd
+                    )
+                    analytic_accounts = search_analytic_accounts_for_select(
+                        models, db, uid, pwd, analytic_q
+                    )
+                    reports = search_account_reports(models, db, uid, pwd, filter_q) or []
+                    report_open_urls = {}
+                    if reports and selected in reg:
+                        bu = reg[selected].url
+                        for r in reports:
+                            report_open_urls[int(r["id"])] = account_report_odoo_form_url(
+                                bu, int(r["id"])
+                            )
+                    hp_id, hp_miss = _pl_analytic_highlight_info(
+                        _pl_analytic_prefs(), selected, reports
+                    )
+                    highlight_report_id = hp_id
+                    highlight_report_missing = hp_miss
+                    if prefill_report_id:
+                        try:
+                            prefill_report_name = read_account_report_label(
+                                models, db, uid, pwd, int(prefill_report_id)
+                            )
+                        except Exception:
+                            prefill_report_name = ""
                 except Exception:
                     financial_budgets = []
                     cpc_wizard_installed = False
                     manager_dashboard_installed = False
+                    analytic_accounts = []
+                    reports = []
+                    report_open_urls = {}
         except Exception as e:
             conn_status = "error"
             conn_detail = str(e)
@@ -1167,6 +1252,8 @@ def pl_analytic_project_report():
         _pl_analytic_prefs_merge_save(
             client_id=selected,
             filter_host=filter_host,
+            filter_q=filter_q,
+            analytic_q=analytic_q,
         )
 
     return render_template(
@@ -1177,6 +1264,15 @@ def pl_analytic_project_report():
         distinct_odoo_hosts=distinct_odoo_hosts(reg),
         selected_client=selected,
         filter_host=filter_host,
+        filter_q=filter_q,
+        analytic_q=analytic_q,
+        analytic_accounts=analytic_accounts,
+        reports=reports,
+        report_open_urls=report_open_urls,
+        prefill_report_id=prefill_report_id,
+        prefill_report_name=prefill_report_name,
+        highlight_report_id=highlight_report_id,
+        highlight_report_missing=highlight_report_missing,
         conn_status=conn_status,
         conn_detail=conn_detail,
         utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -1189,6 +1285,10 @@ def pl_analytic_project_report():
         manager_dashboard_installed=manager_dashboard_installed,
         job_running=job_running,
         job_id=jid,
+        report_result=report_result,
+        form_analytic_id=form_analytic_id,
+        form_full_line=form_full_line,
+        form_currency_mode=form_currency_mode,
     )
 
 

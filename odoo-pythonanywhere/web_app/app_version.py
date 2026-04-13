@@ -9,8 +9,8 @@ from pathlib import Path
 #   - patch (1.3.x → 1.3.y) : correctifs sans changement de comportement visible ;
 #   - minor (1.3.x → 1.4.0) : nouvelle fonctionnalité ou évolution d’écran / API toolbox ;
 #   - adapter _DEFAULT_DATE au jour de la livraison (YYYY-MM-DD).
-_DEFAULT_VERSION = "1.6.5"
-_DEFAULT_DATE = "2026-04-11"
+_DEFAULT_VERSION = "1.6.6"
+_DEFAULT_DATE = "2026-04-13"
 _DEFAULT_TIME = "20:45"
 
 # Valeurs souvent mises par erreur dans l’onglet Web PA (ne reflètent pas la livraison réelle).

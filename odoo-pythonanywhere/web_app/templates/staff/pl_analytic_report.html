@@ -50,10 +50,20 @@
 </p>
 
 <details class="sn-doc">
-  <summary>Descriptif — CPC Budget Analytique</summary>
+  <summary>Mode d’emploi — analytique, budget financier (SaaS) et CPC</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    Installe un wizard natif Odoo pour générer le <strong>CPC SYSCOHADA</strong> avec les colonnes
-    Réalisé / Budget / Écart / % par axe analytique. Export PDF et Excel natifs Odoo.
+    <strong>Trois leviers complémentaires.</strong>
+    (1) <strong>Tableau API</strong> ci-dessous : réalisé / budget / % calculés sur le serveur toolbox à partir d’Odoo.
+    La colonne budget lit les <strong>budgets croisés</strong> (<code>crossovered.budget.lines</code>, module Budget classique).
+    Elle ne lit pas les montants des <strong>budgets financiers</strong> du reporting (<code>account.report.budget</code>).
+    (2) <strong>Budget financier + analytique dans l’UI Odoo</strong> : bouton « Créer copie P&L pilotage » sur un
+    <code>account.report</code> existant — la copie active filtres analytique et budgets ; vous choisissez le budget financier dans Odoo.
+    (3) <strong>CPC SYSCOHADA</strong> : wizard installé dans Odoo (Réalisé / Budget / Écart / %, PDF/Excel natifs) avec rattachement budget financier + axe (champs créés par la toolbox sur les budgets).
+  </p>
+  <p class="sn-muted" style="margin:0.55rem 0 0;line-height:1.45;font-size:0.88rem;">
+    Si le tableau API affiche un budget vide alors que vous n’utilisez que des budgets financiers : créez ou complétez des
+    lignes <strong>budgets croisés</strong> sur le même axe, ou passez par la copie P&amp;L / le wizard CPC.
+    Dépannage détaillé : <code>DEPLOY_PYTHONANYWHERE.md</code> (checklist budget × analytique).
   </p>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -91,6 +101,233 @@
 </div>
 
 {% if selected_client and conn_status == 'ok' %}
+<div class="sn-card" style="margin-top:1rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">Connexion et listes</h2>
+  <div class="sn-status" style="margin:0 0 0.75rem;">
+    <span class="sn-dot sn-dot--ok" title="OK"></span>
+    <span><strong>Opérationnel</strong> — {{ conn_detail }}</span>
+  </div>
+  {% if financial_budgets and financial_budgets|length > 0 %}
+  <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.88rem;line-height:1.45;">
+    <strong>Budgets financiers</strong> visibles sur la base (pour le wizard CPC / les filtres Odoo) — {{ financial_budgets|length }} entrée(s) :
+  </p>
+  <ul style="margin:0 0 0.75rem;padding-left:1.2rem;font-size:0.85rem;line-height:1.4;max-height:7rem;overflow:auto;">
+    {% for b in financial_budgets[:30] %}
+    <li><code>{{ b.id }}</code> — {{ b.name }}</li>
+    {% endfor %}
+    {% if financial_budgets|length > 30 %}<li class="sn-muted">…</li>{% endif %}
+  </ul>
+  {% else %}
+  <p class="sn-muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Aucun <code>account.report.budget</code> listable (droits ou édition sans reporting budgets).</p>
+  {% endif %}
+  <form method="get" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0 0 0.75rem;">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <label for="pl-q">Filtre noms de rapports (<code>account.report</code>)</label>
+    <input type="text" id="pl-q" name="q" value="{{ filter_q }}" autocomplete="off" spellcheck="false" style="margin-top:0.25rem;">
+    <label for="pl-aq" style="margin-top:0.5rem;">Filtre axes analytiques</label>
+    <input type="text" id="pl-aq" name="aq" value="{{ analytic_q }}" autocomplete="off" spellcheck="false" style="margin-top:0.25rem;">
+    <div class="sn-rapports-toolbar" style="margin-top:0.65rem;">
+      <button type="submit">Actualiser les listes</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0;">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
+    <input type="hidden" name="action" value="budget_probe">
+    <button type="submit" class="sn-btn sn-btn--ghost">Sonde budget × analytique (lecture seule)</button>
+  </form>
+</div>
+
+<div class="sn-card" style="margin-top:1rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">Tableau réalisé / budget / % (API toolbox)</h2>
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
+    Période : <strong>année civile en cours → aujourd’hui</strong> (YTD, calcul serveur). Budget = sommes
+    <code>crossovered.budget.lines</code> sur l’axe choisi (pas le budget financier reporting).
+  </p>
+  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
+    <label for="analytic_account_id">Axe analytique (projet)</label>
+    <select id="analytic_account_id" name="analytic_account_id" required style="margin-top:0.25rem;">
+      <option value="">— Choisir —</option>
+      {% for a in analytic_accounts %}
+      <option value="{{ a.id }}" {% if form_analytic_id == a.id %}selected{% endif %}>{{ a.label }}</option>
+      {% endfor %}
+    </select>
+    <label style="margin-top:0.65rem;display:flex;align-items:center;gap:0.45rem;cursor:pointer;">
+      <input type="checkbox" name="full_line_balance" value="1" {% if form_full_line %}checked{% endif %}>
+      Balance ligne entière (sans prorata % analytique)
+    </label>
+    <label for="currency_mode" style="margin-top:0.5rem;">Devise</label>
+    <select id="currency_mode" name="currency_mode" style="margin-top:0.25rem;">
+      <option value="company" {% if form_currency_mode == 'company' %}selected{% endif %}>Société</option>
+      <option value="transaction" {% if form_currency_mode == 'transaction' %}selected{% endif %}>Transaction</option>
+    </select>
+    <div class="sn-rapports-toolbar" style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+      <button type="submit" name="action" value="run_report">Calculer le tableau</button>
+      <button type="submit" name="action" value="export_excel" formnovalidate>Exporter Excel</button>
+    </div>
+  </form>
+  {% if report_result %}
+  <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--sn-border);">
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Résultat</h3>
+    <p style="margin:0 0 0.5rem;font-size:0.9rem;line-height:1.45;">
+      <strong>{{ report_result.analytic_account_label or ('#' ~ report_result.analytic_account_id) }}</strong>
+      — du {{ report_result.date_from }} au {{ report_result.date_to }}.
+    </p>
+    {% set sc = report_result.scope or {} %}
+    {% if sc.get('scope_note') %}
+    <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.85rem;">{{ sc.scope_note }}</p>
+    {% endif %}
+    {% if report_result.lines %}
+    <div class="sn-scroll-x" style="margin-top:0.5rem;">
+    <table class="sn-table" style="font-size:0.88rem;">
+      <thead>
+        <tr>
+          <th>Compte</th>
+          <th>Libellé</th>
+          <th style="text-align:right;">Réalisé</th>
+          <th style="text-align:right;">Budget</th>
+          <th style="text-align:right;">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in report_result.lines %}
+        <tr>
+          <td><code>{{ line.account_code }}</code></td>
+          <td>{{ line.account_name }}</td>
+          <td style="text-align:right;">{{ '%.2f'|format(line.realized|default(0)|float) }}</td>
+          <td style="text-align:right;">{{ '%.2f'|format(line.budget|default(0)|float) }}</td>
+          <td style="text-align:right;">{% if line.percentage is not none %}{{ '%.1f'|format(line.percentage * 100) }}&nbsp;%{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="sn-muted">Aucune ligne (période ou filtres).</p>
+    {% endif %}
+    {% set tot = report_result.totals or {} %}
+    {% if tot %}
+    {% set c6 = tot['class_6'] if 'class_6' in tot else {} %}
+    {% set c7 = tot['class_7'] if 'class_7' in tot else {} %}
+    {% set gl = tot['global'] if 'global' in tot else {} %}
+    <p style="margin:0.75rem 0 0;font-size:0.88rem;line-height:1.5;">
+      <strong>Totaux OHADA</strong> — classe 6 : réalisé {{ '%.2f'|format((c6.realized|default(0))|float) }}, budget {{ '%.2f'|format((c6.budget|default(0))|float) }} ;
+      classe 7 : réalisé {{ '%.2f'|format((c7.realized|default(0))|float) }}, budget {{ '%.2f'|format((c7.budget|default(0))|float) }} ;
+      global : réalisé {{ '%.2f'|format((gl.realized|default(0))|float) }}, budget {{ '%.2f'|format((gl.budget|default(0))|float) }}.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="sn-card" style="margin-top:1rem;" id="sn-pl-odoo-copy">
+  <h2 style="margin-top:0;font-size:1.05rem;">Copie P&amp;L dans Odoo (budget financier + analytique)</h2>
+  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
+    Duplique un rapport existant, active <code>filter_analytic</code> et le filtre budgets, ajuste le % si possible.
+    Ouvrez ensuite la copie dans Odoo et sélectionnez <strong>compte analytique</strong> + <strong>budget financier</strong> dans les options du rapport.
+  </p>
+  {% if highlight_report_id and highlight_report_missing %}
+  <p class="sn-flash warning" style="margin:0 0 0.65rem;font-size:0.88rem;">
+    Dernière copie toolbox (id <code>{{ highlight_report_id }}</code>) absente du filtre de liste actuel — élargissez le filtre « q » ou préparez depuis la ligne ci-dessous.
+  </p>
+  {% endif %}
+  {% if prefill_report_id %}
+  <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.85rem;">Rapport <code>{{ prefill_report_id }}</code> présélectionné{% if prefill_report_name %} ({{ prefill_report_name }}){% endif %}.</p>
+  {% endif %}
+  {% if not reports %}
+  <p class="sn-muted">Aucun <code>account.report</code> ne correspond au filtre.</p>
+  {% else %}
+  <div class="sn-scroll-x">
+  <table class="sn-table" style="font-size:0.88rem;">
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Nom</th>
+        <th>Odoo</th>
+        <th style="min-width:11rem;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      <tr {% if highlight_report_id == r.id %}style="background:rgba(111,45,168,0.1);"{% endif %}>
+        <td><code>{{ r.id }}</code></td>
+        <td>{{ r.name }}</td>
+        <td>
+          {% if report_open_urls.get(r.id) %}
+          <a class="sn-btn sn-btn--odoo sn-btn--odoo-ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;" href="{{ report_open_urls[r.id] }}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
+          {% else %}<span class="sn-muted">—</span>{% endif %}
+        </td>
+        <td>
+          <div class="sn-report-btn-row sn-report-btn-row--compact" style="flex-wrap:wrap;gap:0.35rem;">
+            <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="display:inline;margin:0;">
+              <input type="hidden" name="client_id" value="{{ selected_client }}">
+              <input type="hidden" name="filter_q" value="{{ filter_q }}">
+              <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
+              <input type="hidden" name="filter_host" value="{{ filter_host }}">
+              <input type="hidden" name="action" value="prefill">
+              <input type="hidden" name="report_id" value="{{ r.id }}">
+              <button type="submit" class="sn-btn" style="margin:0;padding:0.32rem 0.55rem;font-size:0.82rem;">Préparer copie</button>
+            </form>
+            <details style="display:inline-block;vertical-align:middle;">
+              <summary class="sn-btn sn-btn--ghost" style="display:inline-block;list-style:none;padding:0.32rem 0.55rem;font-size:0.82rem;cursor:pointer;">Renommer</summary>
+              <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
+                <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
+                  <input type="hidden" name="client_id" value="{{ selected_client }}">
+                  <input type="hidden" name="filter_q" value="{{ filter_q }}">
+                  <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
+                  <input type="hidden" name="filter_host" value="{{ filter_host }}">
+                  <input type="hidden" name="action" value="rename_report">
+                  <input type="hidden" name="report_id" value="{{ r.id }}">
+                  <label for="rename-pl-{{ r.id }}">Nouveau nom</label>
+                  <input type="text" id="rename-pl-{{ r.id }}" name="new_report_name" value="{{ r.name }}" required style="margin-top:0.35rem;">
+                  <button type="submit" class="sn-btn" style="margin-top:0.5rem;">Enregistrer</button>
+                </form>
+              </div>
+            </details>
+            <details style="display:inline-block;vertical-align:middle;">
+              <summary class="sn-btn sn-btn--ghost" style="display:inline-block;list-style:none;padding:0.32rem 0.55rem;font-size:0.82rem;cursor:pointer;color:var(--sn-danger);">Supprimer</summary>
+              <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
+                <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
+                  <input type="hidden" name="client_id" value="{{ selected_client }}">
+                  <input type="hidden" name="filter_q" value="{{ filter_q }}">
+                  <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
+                  <input type="hidden" name="filter_host" value="{{ filter_host }}">
+                  <input type="hidden" name="action" value="unlink">
+                  <input type="hidden" name="report_id" value="{{ r.id }}">
+                  <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Confirmer : <code>SUPPRIMER-{{ r.id }}</code></p>
+                  <input type="text" name="confirm_delete" placeholder="SUPPRIMER-{{ r.id }}" autocomplete="off">
+                  <button type="submit" style="margin-top:0.5rem;background:linear-gradient(165deg,#f87171,#dc2626);">Supprimer</button>
+                </form>
+              </div>
+            </details>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  <form id="form-personalize-pl-budget-pl" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin-top:1rem;">
+    <input type="hidden" name="client_id" value="{{ selected_client }}">
+    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
+    <input type="hidden" name="filter_host" value="{{ filter_host }}">
+    <input type="hidden" name="action" value="personalize_pl_budget">
+    <label for="pl-budget-src-report">Id du P&amp;L source (<code>account.report</code>)</label>
+    <input type="number" id="pl-budget-src-report" name="report_id" min="1" required
+           value="{{ prefill_report_id or '' }}" style="margin-top:0.35rem;max-width:12rem;">
+    <button type="submit" style="margin-top:0.65rem;">Créer copie P&amp;L pilotage (analytique + budgets)</button>
+  </form>
+</div>
+
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Wizard CPC Budget Analytique — installation dans Odoo</h2>
   {% if cpc_wizard_installed %}
