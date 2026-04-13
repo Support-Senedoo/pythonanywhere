@@ -470,12 +470,31 @@ for code, expr_id in expr_by_code.items():
         'company_id':       company_id,
     })
 
+# ------------------------------------------------------------------ aide codes comptes / lignes budget (diagnostic)
+codes_diag = ''
+try:
+    if budget_by_code is not None:
+        nz = sorted([k for k, v in budget_by_code.items() if abs(float(v or 0.0)) > 1e-9])
+        s = ', '.join(nz[:120])
+        if len(nz) > 120:
+            s = s + ' ... (+' + str(len(nz) - 120) + ' codes)'
+        codes_diag = ' | Comptes budget (non nuls): ' + s
+    elif _use_line_budget is not None:
+        nz = sorted([k for k, v in _use_line_budget.items() if abs(float(v or 0.0)) > 1e-9])
+        s = ', '.join(nz[:120])
+        if len(nz) > 120:
+            s = s + ' ... (+' + str(len(nz) - 120) + ' codes ligne)'
+        codes_diag = ' | Lignes budget CPC (non nuls): ' + s
+except Exception:
+    codes_diag = ''
+
 # ------------------------------------------------------------------ mise a jour statut wizard
 written = len(expr_by_code)
 wizard.write({
     'x_status': (
         "OK - " + str(written) + " ligne(s) CPC mise(s) a jour. "
         "Ouvrez le rapport CPC dans Odoo avec le filtre analytique = compte " + str(analytic_id) + "."
+        + codes_diag
     )
 })
 
@@ -755,11 +774,25 @@ def create_cpc_wizard(
     # Ne pas inclure by_model en entier dans message : le flash grossit la session cookie
     # (limite Werkzeug ~4093 octets) et provoque erreur à la redirection après POST.
     summary = _budget_fields_summary_for_user_message(ba)
+    pct_n = 0
+    pct_reports: list[int] = []
+    try:
+        from cpc_report_pct_fix import fix_pct_on_cpc_syscohada_reports
+
+        pct_n, pct_reports = fix_pct_on_cpc_syscohada_reports(models, db, uid, pwd)
+        result["cpc_pct_expressions_fixed"] = pct_n
+        result["cpc_pct_reports_touched"] = pct_reports
+    except Exception as pct_exc:
+        result["cpc_pct_expressions_fixed"] = 0
+        result["cpc_pct_reports_touched"] = []
+        result["cpc_pct_fix_error"] = str(pct_exc)
     result["message"] = (
         f"Wizard CPC cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
         f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL}. "
         f"Champs budget : {summary}."
     )
+    if pct_n:
+        result["message"] += f" Colonne % : {pct_n} expression(s) securisee(s) sur rapport(s) {pct_reports}."
     if not result["budget_analytic_fields_ok"]:
         result["message"] += (
             " Attention : certains champs x_analytic_account_id n'ont pas ete crees (voir detail JSON cote serveur)."

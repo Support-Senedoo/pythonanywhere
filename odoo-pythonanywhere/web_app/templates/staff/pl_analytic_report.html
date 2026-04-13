@@ -50,20 +50,18 @@
 </p>
 
 <details class="sn-doc">
-  <summary>Mode d’emploi — analytique, budget financier (SaaS) et CPC</summary>
+  <summary>Mode d’emploi — budget financier, analytique et CPC (Odoo)</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>Trois leviers complémentaires.</strong>
-    (1) <strong>Tableau API</strong> ci-dessous : réalisé / budget / % calculés sur le serveur toolbox à partir d’Odoo.
-    La colonne budget lit les <strong>budgets croisés</strong> (<code>crossovered.budget.lines</code>, module Budget classique).
-    Elle ne lit pas les montants des <strong>budgets financiers</strong> du reporting (<code>account.report.budget</code>).
-    (2) <strong>Budget financier + analytique dans l’UI Odoo</strong> : bouton « Créer copie P&L pilotage » sur un
-    <code>account.report</code> existant — la copie active filtres analytique et budgets ; vous choisissez le budget financier dans Odoo.
-    (3) <strong>CPC SYSCOHADA</strong> : wizard installé dans Odoo (Réalisé / Budget / Écart / %, PDF/Excel natifs) avec rattachement budget financier + axe (champs créés par la toolbox sur les budgets).
+    <strong>Deux leviers dans Odoo.</strong>
+    (1) <strong>Copie P&amp;L pilotage</strong> : duplique un <code>account.report</code>, active filtres analytique et budgets ;
+    vous choisissez le budget financier dans l’interface Odoo.
+    (2) <strong>Wizard CPC SYSCOHADA</strong> : après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
+    injecte le budget financier sur la colonne externe du CPC et affiche dans le statut du wizard la liste des
+    <strong>codes comptes budgétisés</strong> (non nuls). Réinstallez le wizard depuis la toolbox après une mise à jour pour
+    appliquer les correctifs d’expressions « % » (évite la division par zéro si budget = 0).
   </p>
   <p class="sn-muted" style="margin:0.55rem 0 0;line-height:1.45;font-size:0.88rem;">
-    Si le tableau API affiche un budget vide alors que vous n’utilisez que des budgets financiers : créez ou complétez des
-    lignes <strong>budgets croisés</strong> sur le même axe, ou passez par la copie P&amp;L / le wizard CPC.
-    Dépannage détaillé : <code>DEPLOY_PYTHONANYWHERE.md</code> (checklist budget × analytique).
+    Dépannage : <code>DEPLOY_PYTHONANYWHERE.md</code> (checklist budget × analytique).
   </p>
   <p class="sn-meta-line">
     <strong>Auteur :</strong> {{ utility_author }} ·
@@ -125,10 +123,8 @@
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
     <label for="pl-q">Filtre noms de rapports (<code>account.report</code>)</label>
     <input type="text" id="pl-q" name="q" value="{{ filter_q }}" autocomplete="off" spellcheck="false" style="margin-top:0.25rem;">
-    <label for="pl-aq" style="margin-top:0.5rem;">Filtre axes analytiques</label>
-    <input type="text" id="pl-aq" name="aq" value="{{ analytic_q }}" autocomplete="off" spellcheck="false" style="margin-top:0.25rem;">
     <div class="sn-rapports-toolbar" style="margin-top:0.65rem;">
-      <button type="submit">Actualiser les listes</button>
+      <button type="submit">Actualiser la liste des rapports</button>
     </div>
   </form>
   <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0;">
@@ -139,92 +135,6 @@
     <input type="hidden" name="action" value="budget_probe">
     <button type="submit" class="sn-btn sn-btn--ghost">Sonde budget × analytique (lecture seule)</button>
   </form>
-</div>
-
-<div class="sn-card" style="margin-top:1rem;">
-  <h2 style="margin-top:0;font-size:1.05rem;">Tableau réalisé / budget / % (API toolbox)</h2>
-  <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
-    Période : <strong>année civile en cours → aujourd’hui</strong> (YTD, calcul serveur). Budget = sommes
-    <code>crossovered.budget.lines</code> sur l’axe choisi (pas le budget financier reporting).
-  </p>
-  <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
-    <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
-    <label for="analytic_account_id">Axe analytique (projet)</label>
-    <select id="analytic_account_id" name="analytic_account_id" required style="margin-top:0.25rem;">
-      <option value="">— Choisir —</option>
-      {% for a in analytic_accounts %}
-      <option value="{{ a.id }}" {% if form_analytic_id == a.id %}selected{% endif %}>{{ a.label }}</option>
-      {% endfor %}
-    </select>
-    <label style="margin-top:0.65rem;display:flex;align-items:center;gap:0.45rem;cursor:pointer;">
-      <input type="checkbox" name="full_line_balance" value="1" {% if form_full_line %}checked{% endif %}>
-      Balance ligne entière (sans prorata % analytique)
-    </label>
-    <label for="currency_mode" style="margin-top:0.5rem;">Devise</label>
-    <select id="currency_mode" name="currency_mode" style="margin-top:0.25rem;">
-      <option value="company" {% if form_currency_mode == 'company' %}selected{% endif %}>Société</option>
-      <option value="transaction" {% if form_currency_mode == 'transaction' %}selected{% endif %}>Transaction</option>
-    </select>
-    <div class="sn-rapports-toolbar" style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
-      <button type="submit" name="action" value="run_report">Calculer le tableau</button>
-      <button type="submit" name="action" value="export_excel" formnovalidate>Exporter Excel</button>
-    </div>
-  </form>
-  {% if report_result %}
-  <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--sn-border);">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Résultat</h3>
-    <p style="margin:0 0 0.5rem;font-size:0.9rem;line-height:1.45;">
-      <strong>{{ report_result.analytic_account_label or ('#' ~ report_result.analytic_account_id) }}</strong>
-      — du {{ report_result.date_from }} au {{ report_result.date_to }}.
-    </p>
-    {% set sc = report_result.scope or {} %}
-    {% if sc.get('scope_note') %}
-    <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.85rem;">{{ sc.scope_note }}</p>
-    {% endif %}
-    {% if report_result.lines %}
-    <div class="sn-scroll-x" style="margin-top:0.5rem;">
-    <table class="sn-table" style="font-size:0.88rem;">
-      <thead>
-        <tr>
-          <th>Compte</th>
-          <th>Libellé</th>
-          <th style="text-align:right;">Réalisé</th>
-          <th style="text-align:right;">Budget</th>
-          <th style="text-align:right;">%</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for line in report_result.lines %}
-        <tr>
-          <td><code>{{ line.account_code }}</code></td>
-          <td>{{ line.account_name }}</td>
-          <td style="text-align:right;">{{ '%.2f'|format(line.realized|default(0)|float) }}</td>
-          <td style="text-align:right;">{{ '%.2f'|format(line.budget|default(0)|float) }}</td>
-          <td style="text-align:right;">{% if line.percentage is not none %}{{ '%.1f'|format(line.percentage * 100) }}&nbsp;%{% else %}—{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-    {% else %}
-    <p class="sn-muted">Aucune ligne (période ou filtres).</p>
-    {% endif %}
-    {% set tot = report_result.totals or {} %}
-    {% if tot %}
-    {% set c6 = tot['class_6'] if 'class_6' in tot else {} %}
-    {% set c7 = tot['class_7'] if 'class_7' in tot else {} %}
-    {% set gl = tot['global'] if 'global' in tot else {} %}
-    <p style="margin:0.75rem 0 0;font-size:0.88rem;line-height:1.5;">
-      <strong>Totaux OHADA</strong> — classe 6 : réalisé {{ '%.2f'|format((c6.realized|default(0))|float) }}, budget {{ '%.2f'|format((c6.budget|default(0))|float) }} ;
-      classe 7 : réalisé {{ '%.2f'|format((c7.realized|default(0))|float) }}, budget {{ '%.2f'|format((c7.budget|default(0))|float) }} ;
-      global : réalisé {{ '%.2f'|format((gl.realized|default(0))|float) }}, budget {{ '%.2f'|format((gl.budget|default(0))|float) }}.
-    </p>
-    {% endif %}
-  </div>
-  {% endif %}
 </div>
 
 <div class="sn-card" style="margin-top:1rem;" id="sn-pl-odoo-copy">

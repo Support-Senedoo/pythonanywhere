@@ -86,12 +86,6 @@ except ImportError:
         return False
 from personalize_pl_percent_analytic_budget import apply_percent_analytic_numerator
 from personalize_syscohada_detail import execute_kw, personalize_fix_detail_complete
-from project_pl_analytic_report import (
-    build_report,
-    default_period_ytd,
-    report_to_excel_bytes,
-    search_analytic_accounts_for_select,
-)
 
 from web_app.odoo_account_reports import (
     UTILITY_AUTHOR,
@@ -838,223 +832,6 @@ def pl_analytic_project_report():
             threading.Thread(target=_run_purge, daemon=True).start()
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save), jid=jid))
 
-        if action == "run_report":
-            try:
-                aid = int(request.form.get("analytic_account_id") or "0")
-            except ValueError:
-                aid = 0
-            date_from, date_to = default_period_ytd()
-            full_line = (request.form.get("full_line_balance") or "").strip().lower() in (
-                "1",
-                "on",
-                "yes",
-                "true",
-            )
-            currency_mode = (request.form.get("currency_mode") or "company").strip()
-            if currency_mode not in ("company", "transaction"):
-                currency_mode = "company"
-            if aid <= 0:
-                flash("Choisissez un axe analytique (projet) dans la liste.", "warning")
-                return redirect(
-                    ru(
-                        **_pl_analytic_url_params(
-                            client_id=cid,
-                            filter_host=fl_save,
-                            analytic_q=analytic_q_post,
-                            filter_q=filter_q_post,
-                        ),
-                    ),
-                )
-            try:
-                report = build_report(
-                    models,
-                    db,
-                    uid,
-                    pwd,
-                    aid,
-                    date_from,
-                    date_to,
-                    full_line_balance=full_line,
-                    currency_mode=currency_mode,
-                    account_report_id=None,
-                )
-            except Exception as e:
-                flash(f"Échec du calcul : {e!s}", "danger")
-                return redirect(
-                    ru(
-                        **_pl_analytic_url_params(
-                            client_id=cid,
-                            filter_host=fl_save,
-                            analytic_q=analytic_q_post,
-                            filter_q=filter_q_post,
-                        ),
-                    ),
-                )
-
-            valid_hosts = set(distinct_odoo_hosts(reg))
-            fh = fl_save
-            if fh and fh not in valid_hosts:
-                fh = ""
-            clients_for_select = (
-                configs_for_same_host(reg, fh) if fh else clients_sorted_for_select(reg)
-            )
-            conn_status = "ok"
-            conn_detail = ""
-            try:
-                ok, msg = probe_odoo_reports_access(models, db, uid, pwd)
-                conn_detail = msg
-                if not ok:
-                    conn_status = "error"
-            except Exception:
-                pass
-            analytic_accounts = search_analytic_accounts_for_select(
-                models, db, uid, pwd, analytic_q_post
-            )
-            reports: list = []
-            report_open_urls: dict[int, str] = {}
-            if conn_status == "ok":
-                try:
-                    reports = search_account_reports(models, db, uid, pwd, filter_q_post)
-                except Exception:
-                    reports = []
-                if reports and cid in reg:
-                    bu = reg[cid].url
-                    for r in reports:
-                        report_open_urls[int(r["id"])] = account_report_odoo_form_url(
-                            bu, int(r["id"])
-                        )
-            prefs_now = _pl_analytic_prefs()
-            abc = prefs_now.get("analytic_account_by_client")
-            if not isinstance(abc, dict):
-                abc = {}
-            abc[cid] = aid
-            _pl_analytic_prefs_merge_save(
-                client_id=cid,
-                filter_host=fh,
-                filter_q=filter_q_post,
-                analytic_q=analytic_q_post,
-                analytic_account_by_client=abc,
-            )
-            hp_id, hp_miss = _pl_analytic_highlight_info(
-                _pl_analytic_prefs(), cid, reports
-            )
-            fin_bu: list[dict[str, Any]] = []
-            cpc_ok = False
-            dash_ok = False
-            if conn_status == "ok":
-                try:
-                    fin_bu = _staff_financial_budgets_for_odoo(models, db, uid, pwd)
-                    cpc_ok = _staff_cpc_wizard_installed(models, db, uid, pwd)
-                    dash_ok = _staff_manager_dashboard_installed(models, db, uid, pwd)
-                except Exception:
-                    pass
-            return render_template(
-                "staff/pl_analytic_report.html",
-                clients=reg,
-                clients_sorted=clients_sorted_for_select(reg),
-                clients_for_select=clients_for_select,
-                distinct_odoo_hosts=distinct_odoo_hosts(reg),
-                selected_client=cid,
-                filter_host=fh,
-                filter_q=filter_q_post,
-                analytic_q=analytic_q_post,
-                analytic_accounts=analytic_accounts,
-                reports=reports,
-                report_open_urls=report_open_urls,
-                prefill_report_id=None,
-                prefill_report_name="",
-                highlight_report_id=hp_id,
-                highlight_report_missing=hp_miss,
-                conn_status=conn_status,
-                conn_detail=conn_detail,
-                utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
-                utility_version=UTILITY_VERSION,
-                utility_date=UTILITY_DATE,
-                utility_author=UTILITY_AUTHOR,
-                report_result=report,
-                form_analytic_id=aid,
-                form_full_line=full_line,
-                form_currency_mode=currency_mode,
-                add_base_only=False,
-                financial_budgets=fin_bu,
-                cpc_wizard_installed=cpc_ok,
-                manager_dashboard_installed=dash_ok,
-            )
-
-        if action == "export_excel":
-            try:
-                aid = int(request.form.get("analytic_account_id") or "0")
-            except ValueError:
-                aid = 0
-            date_from, date_to = default_period_ytd()
-            full_line = (request.form.get("full_line_balance") or "").strip().lower() in (
-                "1",
-                "on",
-                "yes",
-                "true",
-            )
-            currency_mode = (request.form.get("currency_mode") or "company").strip()
-            if currency_mode not in ("company", "transaction"):
-                currency_mode = "company"
-            if aid <= 0:
-                flash("Choisissez un axe analytique pour l’export.", "warning")
-                return redirect(
-                    ru(
-                        **_pl_analytic_url_params(
-                            client_id=cid,
-                            filter_host=fl_save,
-                            analytic_q=analytic_q_post,
-                            filter_q=filter_q_post,
-                        ),
-                    ),
-                )
-            try:
-                report = build_report(
-                    models,
-                    db,
-                    uid,
-                    pwd,
-                    aid,
-                    date_from,
-                    date_to,
-                    full_line_balance=full_line,
-                    currency_mode=currency_mode,
-                    account_report_id=None,
-                )
-                raw = report_to_excel_bytes(report)
-            except RuntimeError as e:
-                flash(str(e), "danger")
-                return redirect(
-                    ru(
-                        **_pl_analytic_url_params(
-                            client_id=cid,
-                            filter_host=fl_save,
-                            analytic_q=analytic_q_post,
-                            filter_q=filter_q_post,
-                        ),
-                    ),
-                )
-            except Exception as e:
-                flash(f"Export Excel : {e!s}", "danger")
-                return redirect(
-                    ru(
-                        **_pl_analytic_url_params(
-                            client_id=cid,
-                            filter_host=fl_save,
-                            analytic_q=analytic_q_post,
-                            filter_q=filter_q_post,
-                        ),
-                    ),
-                )
-            safe_db = "".join(c for c in reg[cid].db if c.isalnum() or c in "-_")[:40]
-            fname = f"pl_analytique_{safe_db}_{aid}.xlsx"
-            return send_file(
-                io.BytesIO(raw),
-                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                as_attachment=True,
-                download_name=fname,
-            )
-
         flash("Action non reconnue.", "warning")
         return redirect(
             ru(
@@ -1097,7 +874,6 @@ def pl_analytic_project_report():
             filter_host=fh_r,
             filter_q="",
             analytic_q="",
-            analytic_accounts=[],
             reports=[],
             report_open_urls={},
             prefill_report_id=None,
@@ -1116,10 +892,6 @@ def pl_analytic_project_report():
             manager_dashboard_installed=False,
             job_running=True,
             job_id=jid,
-            report_result=None,
-            form_analytic_id=0,
-            form_full_line=False,
-            form_currency_mode="company",
         )
 
     prefs = _pl_analytic_prefs()
@@ -1173,22 +945,11 @@ def pl_analytic_project_report():
         except ValueError:
             prefill_report_id = None
 
-    analytic_accounts: list[dict[str, Any]] = []
     reports: list[dict[str, Any]] = []
     report_open_urls: dict[int, str] = {}
     highlight_report_id: int | None = None
     highlight_report_missing = False
     prefill_report_name = ""
-    report_result = None
-    form_analytic_id = 0
-    form_full_line = False
-    form_currency_mode = "company"
-    abc = prefs.get("analytic_account_by_client")
-    if isinstance(abc, dict) and selected:
-        try:
-            form_analytic_id = int(abc.get(selected) or 0)
-        except (TypeError, ValueError):
-            form_analytic_id = 0
 
     conn_status = "idle"
     conn_detail = ""
@@ -1207,9 +968,6 @@ def pl_analytic_project_report():
                     cpc_wizard_installed = _staff_cpc_wizard_installed(models, db, uid, pwd)
                     manager_dashboard_installed = _staff_manager_dashboard_installed(
                         models, db, uid, pwd
-                    )
-                    analytic_accounts = search_analytic_accounts_for_select(
-                        models, db, uid, pwd, analytic_q
                     )
                     reports = search_account_reports(models, db, uid, pwd, filter_q) or []
                     report_open_urls = {}
@@ -1235,7 +993,6 @@ def pl_analytic_project_report():
                     financial_budgets = []
                     cpc_wizard_installed = False
                     manager_dashboard_installed = False
-                    analytic_accounts = []
                     reports = []
                     report_open_urls = {}
         except Exception as e:
@@ -1266,7 +1023,6 @@ def pl_analytic_project_report():
         filter_host=filter_host,
         filter_q=filter_q,
         analytic_q=analytic_q,
-        analytic_accounts=analytic_accounts,
         reports=reports,
         report_open_urls=report_open_urls,
         prefill_report_id=prefill_report_id,
@@ -1285,10 +1041,6 @@ def pl_analytic_project_report():
         manager_dashboard_installed=manager_dashboard_installed,
         job_running=job_running,
         job_id=jid,
-        report_result=report_result,
-        form_analytic_id=form_analytic_id,
-        form_full_line=form_full_line,
-        form_currency_mode=form_currency_mode,
     )
 
 

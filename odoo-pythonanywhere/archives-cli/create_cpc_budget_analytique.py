@@ -353,7 +353,7 @@ def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(0))"
+    return f"if_other_expr_above({c}.budget, {cur}(0.0001))"
 
 
 # ---------------------------------------------------------------------------
