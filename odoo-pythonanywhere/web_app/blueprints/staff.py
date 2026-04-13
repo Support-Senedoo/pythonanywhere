@@ -775,15 +775,21 @@ def pl_analytic_project_report():
                 from create_cpc_odoo_wizard import create_cpc_wizard
 
                 result = create_cpc_wizard(models, db, uid, pwd)
-                flash(result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo.", "success")
+                _msg = result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo."
+                # La session Flask (flash) vit dans le cookie si pas de flask-session : garder un message court.
+                if len(_msg) > 3500:
+                    _msg = _msg[:3490] + "…"
+                flash(_msg, "success")
                 if result.get("budget_analytic_fields_ok") is False:
                     flash(
-                        "Les champs x_analytic_account_id sur les budgets financiers n'ont pas tous ete crees "
-                        "(droits Odoo ou modele manquant). Verifiez budget_analytic_fields dans les logs.",
+                        "Certains champs x_analytic_account_id n'ont pas ete crees (droits Odoo ou modele manquant).",
                         "warning",
                     )
             except Exception as e:
-                flash(f"Echec installation wizard CPC : {e!s}", "danger")
+                _err = str(e)
+                if len(_err) > 3500:
+                    _err = _err[:3490] + "…"
+                flash(f"Echec installation wizard CPC : {_err}", "danger")
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
 
         if action == "delete_cpc_wizard":

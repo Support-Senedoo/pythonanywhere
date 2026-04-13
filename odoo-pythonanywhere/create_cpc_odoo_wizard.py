@@ -560,6 +560,23 @@ def ensure_budget_report_analytic_fields(
     )}
 
 
+def _budget_fields_summary_for_user_message(ba: dict[str, Any]) -> str:
+    """Résumé court pour flash UI (éviter cookie de session > 4 Ko avec SecureCookieSession)."""
+    by = (ba or {}).get("by_model") or {}
+    parts: list[str] = []
+    for model_name, entry in by.items():
+        short = (model_name or "").split(".")[-1] or model_name
+        st = entry.get("status") or "?"
+        if st == "error" and entry.get("error"):
+            err = str(entry["error"])[:100].replace("\n", " ").strip()
+            parts.append(f"{short}={st}")
+            if err:
+                parts[-1] += f"({err})"
+        else:
+            parts.append(f"{short}={st}")
+    return ", ".join(parts) if parts else "n/a"
+
+
 # ---------------------------------------------------------------------------
 # Création du wizard dans Odoo
 # ---------------------------------------------------------------------------
@@ -685,16 +702,17 @@ def create_cpc_wizard(
     ba = result.get("budget_analytic_fields") or {}
     result["ok"] = True
     result["budget_analytic_fields_ok"] = bool(ba.get("ok", True))
+    # Ne pas inclure by_model en entier dans message : le flash grossit la session cookie
+    # (limite Werkzeug ~4093 octets) et provoque erreur à la redirection après POST.
+    summary = _budget_fields_summary_for_user_message(ba)
     result["message"] = (
-        f"Wizard CPC cree : modele {WIZARD_MODEL!r}, "
-        f"server action id={sa_id}, menu id={menu_id}. "
-        f"Accessible dans Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL!r}. "
-        f"Champs budget/analytique : {ba.get('by_model', {})}."
+        f"Wizard CPC cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
+        f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL}. "
+        f"Champs budget : {summary}."
     )
     if not result["budget_analytic_fields_ok"]:
         result["message"] += (
-            " Attention : un ou plusieurs champs x_analytic_account_id n'ont pas ete crees "
-            "(voir budget_analytic_fields.by_model)."
+            " Attention : certains champs x_analytic_account_id n'ont pas ete crees (voir detail JSON cote serveur)."
         )
     return result
 
