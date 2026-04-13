@@ -1060,6 +1060,32 @@ def pl_analytic_project_report():
             fh_r = (request.args.get("filter_host") or "").strip()
             return redirect(ru(**_pl_analytic_url_params(client_id=cid_r, filter_host=fh_r)))
 
+    # Pendant qu'un job tourne, on NE se connecte PAS à Odoo (évite 502 concurrent).
+    if job_running:
+        cid_r = (request.args.get("client_id") or "").strip().lower()
+        fh_r = (request.args.get("filter_host") or "").strip()
+        return render_template(
+            "staff/pl_analytic_report.html",
+            clients=reg,
+            clients_sorted=clients_sorted_for_select(reg),
+            clients_for_select=configs_for_same_host(reg, fh_r) if fh_r else clients_sorted_for_select(reg),
+            distinct_odoo_hosts=distinct_odoo_hosts(reg),
+            selected_client=cid_r,
+            filter_host=fh_r,
+            conn_status="idle",
+            conn_detail="",
+            utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
+            utility_version=UTILITY_VERSION,
+            utility_date=UTILITY_DATE,
+            utility_author=UTILITY_AUTHOR,
+            add_base_only=False,
+            financial_budgets=[],
+            cpc_wizard_installed=False,
+            manager_dashboard_installed=False,
+            job_running=True,
+            job_id=jid,
+        )
+
     prefs = _pl_analytic_prefs()
 
     if "client_id" in request.args:
