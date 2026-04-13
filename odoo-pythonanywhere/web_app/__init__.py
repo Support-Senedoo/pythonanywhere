@@ -12,6 +12,15 @@ _ROOT = Path(__file__).resolve().parent.parent
 def create_app() -> Flask:
     _on_pa = any(k.startswith("PYTHONANYWHERE") for k in os.environ)
     _no_jinja_cache = os.environ.get("TOOLBOX_JINJA_NO_CACHE", "").lower() in ("1", "true", "yes")
+    _fs_session_env = os.environ.get("TOOLBOX_FILESYSTEM_SESSION", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    # Sur PA, la session par défaut (cookie signé) embarque toute la charge utile ; après un utilitaire
+    # (flash, préférences, gros messages) le Set-Cookie peut dépasser ce qu’accepte nginx/uWSGI → 502.
+    # Sessions fichiers : seul l’id de session transite dans le cookie.
+    _use_fs_session = _on_pa or _fs_session_env
 
     app = Flask(
         __name__,
@@ -42,6 +51,20 @@ def create_app() -> Flask:
     app.config["TOOLBOX_SMTP_USER"] = (os.environ.get("TOOLBOX_SMTP_USER") or "").strip()
     app.config["TOOLBOX_SMTP_PASSWORD"] = os.environ.get("TOOLBOX_SMTP_PASSWORD") or ""
     app.config["TOOLBOX_MAIL_FROM"] = (os.environ.get("TOOLBOX_MAIL_FROM") or "").strip()
+
+    if _use_fs_session:
+        _sess_dir = _ROOT / ".flask_session"
+        try:
+            _sess_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        app.config["SESSION_TYPE"] = "filesystem"
+        app.config["SESSION_FILE_DIR"] = str(_sess_dir)
+        app.config["SESSION_USE_SIGNER"] = True
+        app.config["SESSION_PERMANENT"] = False
+        from flask_session import Session
+
+        Session(app)
 
     # Relecture des .html si le fichier change (complément au cache_size=0 ci-dessus sur PA).
     _force_tpl = os.environ.get("TOOLBOX_TEMPLATE_AUTO_RELOAD", "").lower() in ("1", "true", "yes")

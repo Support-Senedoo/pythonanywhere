@@ -6,6 +6,9 @@ __pycache__/
 *$py.class
 .Python
 
+# Sessions Flask côté serveur (PythonAnywhere / TOOLBOX_FILESYSTEM_SESSION)
+odoo-pythonanywhere/.flask_session/
+
 # Secrets locaux
 .env
 .env.*

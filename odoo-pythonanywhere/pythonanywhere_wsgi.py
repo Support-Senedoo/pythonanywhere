@@ -11,6 +11,9 @@ Variables utiles (onglet Web PythonAnywhere) :
   TOOLBOX_USERS_PATH    — défaut : toolbox_users.json à la racine du projet
   TOOLBOX_CLIENTS_PATH  — défaut : toolbox_clients.json
 
+Sessions : sur PA (détection PYTHONANYWHERE_*), les sessions sont stockées sous .flask_session/
+(voir create_app) pour éviter les 502 dus à des cookies trop gros après les utilitaires staff.
+
 Fichiers à créer sur le serveur (copier depuis *.example.json) :
   toolbox_users.json, toolbox_clients.json
 
