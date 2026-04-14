@@ -770,7 +770,7 @@ def pl_analytic_project_report():
                 from create_cpc_odoo_wizard import purge_cpc_wizard
 
                 result = purge_cpc_wizard(models, db, uid, pwd)
-                flash(result.get("message") or "Wizard CPC supprime.", "info")
+                flash(result.get("message") or "Wizard Budget par projet supprime.", "info")
             except Exception as e:
                 flash(f"Echec suppression wizard CPC : {e!s}", "danger")
             return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))

@@ -32,6 +32,8 @@ WIZARD_NAME    = "Budget par projet (Senedoo)"
 WIZARD_MENU_LABEL = "Budget par projet (Senedoo)"
 # Anciens libellés de menu (purge pour éviter doublons après renommage)
 WIZARD_MENU_PREVIOUS_NAMES = ("CPC Budget Analytique (Senedoo)",)
+# Motifs ilike sur ir.ui.menu.name (orphelins après suppression Studio / modèle, libellés partiels)
+WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%")
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
 # Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
 CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
@@ -801,7 +803,7 @@ def create_cpc_wizard(
         }
     rep = result.get("cpc_repair") or {}
     result["message"] = (
-        f"Wizard CPC cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
+        f"Wizard Budget par projet cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
         f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL}. "
         f"Champs budget : {summary}."
     )
@@ -849,15 +851,49 @@ def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
 # Suppression du wizard
 # ---------------------------------------------------------------------------
 
+def _collect_cpc_wizard_menu_ids(
+    models: Any, db: str, uid: int, pwd: str
+) -> set[int]:
+    """
+    Tous les ``ir.ui.menu`` à retirer avec le wizard : noms exacts (actuel + historique),
+    menus dont l'action pointe vers une fenêtre ``res_model=x_cpc_budget_wizard``,
+    et entrées orphelines dont le libellé correspond encore aux motifs toolbox.
+    """
+    out: set[int] = set()
+    exact = [WIZARD_MENU_LABEL] + list(WIZARD_MENU_PREVIOUS_NAMES)
+    ids = _ek(models, db, uid, pwd, "ir.ui.menu", "search", [[("name", "in", exact)]]) or []
+    out.update(int(x) for x in ids)
+
+    aw_ids = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.actions.act_window",
+        "search",
+        [[("res_model", "=", WIZARD_MODEL)]],
+    ) or []
+    for aid in aw_ids:
+        astr = f"ir.actions.act_window,{int(aid)}"
+        mids = _ek(
+            models, db, uid, pwd, "ir.ui.menu", "search", [[("action", "=", astr)]]
+        ) or []
+        out.update(int(x) for x in mids)
+
+    for pat in WIZARD_MENU_ILIKE_PATTERNS:
+        mids = _ek(
+            models, db, uid, pwd, "ir.ui.menu", "search", [[("name", "ilike", pat)]]
+        ) or []
+        out.update(int(x) for x in mids)
+
+    return out
+
+
 def purge_cpc_wizard(models: Any, db: str, uid: int, pwd: str) -> dict[str, Any]:
-    """Supprime le wizard CPC (modèle, vues, menus, server actions) s'il existe."""
+    """Supprime le wizard Budget par projet (modèle, vues, menus, actions fenêtre, actions serveur)."""
     purged: list[str] = []
 
-    # Menu
-    _menu_names = [WIZARD_MENU_LABEL] + list(WIZARD_MENU_PREVIOUS_NAMES)
-    menu_ids = _ek(
-        models, db, uid, pwd, "ir.ui.menu", "search", [[("name", "in", _menu_names)]]
-    )
+    menu_ids = sorted(_collect_cpc_wizard_menu_ids(models, db, uid, pwd))
     if menu_ids:
         _ek(models, db, uid, pwd, "ir.ui.menu", "unlink", [menu_ids])
         purged.append(f"menus({menu_ids})")
@@ -892,7 +928,7 @@ def purge_cpc_wizard(models: Any, db: str, uid: int, pwd: str) -> dict[str, Any]
         purged.append(f"model({model_ids})")
 
     return {"purged": purged, "ok": True,
-            "message": f"Wizard CPC supprime : {', '.join(purged) or 'rien trouve'}."}
+            "message": f"Wizard Budget par projet supprime : {', '.join(purged) or 'rien trouve'}."}
 
 
 # ---------------------------------------------------------------------------
