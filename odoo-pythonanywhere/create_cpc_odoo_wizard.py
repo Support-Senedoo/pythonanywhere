@@ -9,8 +9,9 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
       4. Écrit account.report.external.value (colonne Budget du rapport CPC)
       5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
-  - Menu : Comptabilité > Rapports > Assistant budget projet (Senedoo) — action serveur qui ouvre le formulaire ;
-    domain sur le budget selon l'analytique ; bouton « Remplir le rapport CPC » (action serveur Calculer).
+  - Menus : Comptabilité > Rapports > Assistant budget projet (Senedoo) — action serveur → formulaire ;
+    Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo) — ouverture directe du rapport (dépliage par compte).
+    Domain budget selon l'analytique ; bouton « Remplir le rapport CPC » (action serveur Calculer).
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
@@ -38,6 +39,8 @@ WIZARD_MENU_PREVIOUS_NAMES = (
 )
 # Motifs ilike sur ir.ui.menu.name (orphelins après suppression Studio / modèle, libellés partiels)
 WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%", "%Assistant budget%")
+# Menu Reporting distinct du wizard : ouverture directe du rapport (dépliage par compte).
+CPC_REPORT_MENU_LABEL = "CPC SYSCOHADA — rapport budget projet (Senedoo)"
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
 # Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
 CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
@@ -696,10 +699,8 @@ def _install_fresh_toolbox_cpc_budget_report(
     """
     Purge tous les rapports toolbox CPC Senedoo puis recrée un ``account.report`` unique.
 
-    On ne crée pas d'entrée de menu « Reporting » vers ce rapport : un second menu ouvrait
-    le CPC en direct (sans wizard) et prêtait à confusion avec le menu Assistant.
-    Le rapport reste accessible après **Calculer** dans le wizard (URL) ou depuis la liste
-    des rapports financiers Odoo.
+    Le menu **Reporting** vers le rapport est recréé séparément dans ``create_cpc_wizard``
+    (libellé distinct de l'assistant) pour ouvrir le CPC directement avec dépliage par compte.
     """
     import sys
     from pathlib import Path
@@ -764,6 +765,33 @@ def create_cpc_wizard(
             inst.get("error")
             or "Echec creation du rapport CPC toolbox (voir logs / droits Odoo)."
         )
+
+    # ---- Menu Reporting : ouverture directe du rapport (complément de l'assistant) -------
+    result["cpc_report_menu_id"] = None
+    result["cpc_report_client_action_id"] = None
+    _rid_menu = int((inst.get("report_id") or 0))
+    if _rid_menu:
+        try:
+            import sys
+            from pathlib import Path
+
+            _pa_root = Path(__file__).resolve().parent
+            if str(_pa_root) not in sys.path:
+                sys.path.insert(0, str(_pa_root))
+            from web_app.odoo_account_reports import ensure_account_report_reporting_menu
+
+            _aid, _mid = ensure_account_report_reporting_menu(
+                models,
+                db,
+                uid,
+                pwd,
+                _rid_menu,
+                CPC_REPORT_MENU_LABEL,
+            )
+            result["cpc_report_client_action_id"] = _aid
+            result["cpc_report_menu_id"] = _mid
+        except Exception as menu_exc:
+            result["cpc_report_menu_error"] = str(menu_exc)
 
     # ---- 0. Champs analytique sur les budgets financiers (reporting) -------
     result["budget_analytic_fields"] = ensure_budget_report_analytic_fields(
@@ -913,6 +941,19 @@ def create_cpc_wizard(
     )
     if new_rid:
         result["message"] += f" Rapport CPC toolbox recree (account.report id={new_rid})."
+        _gl = int((inst.get("groupby_leaf_lines") or 0))
+        if _gl:
+            result["message"] += f" Detail par compte : {_gl} ligne(s) feuilles (depliage)."
+        _mid_r = result.get("cpc_report_menu_id")
+        if _mid_r:
+            result["message"] += (
+                f" Menu Reporting : {CPC_REPORT_MENU_LABEL!r} (menu id={_mid_r})."
+            )
+        elif result.get("cpc_report_menu_error"):
+            result["message"] += (
+                " Menu rapport Reporting non cree : "
+                f"{str(result['cpc_report_menu_error'])[:180]}."
+            )
     if int(rep.get("formula_writes") or 0):
         result["message"] += (
             f" Colonne % : {rep['formula_writes']} expression(s) avec denominateur securise "

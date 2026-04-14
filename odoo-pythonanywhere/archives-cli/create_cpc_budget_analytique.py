@@ -27,7 +27,7 @@ import re
 from typing import Any
 
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
-from personalize_syscohada_detail import execute_kw
+from personalize_syscohada_detail import execute_kw, leaf_line_ids_with_account_codes
 
 CPC_BUDGET_ANALYTIQUE_NAME = "CPC SYSCOHADA \u2014 Budget par projet (Senedoo)"
 
@@ -98,6 +98,59 @@ def _ek(models: Any, db: str, uid: int, password: str, model: str, method: str,
         args: list | None = None, kw: dict | None = None) -> Any:
     """Raccourci execute_kw avec defaults."""
     return execute_kw(models, db, uid, password, model, method, args or [], kw)
+
+
+def _apply_cpc_leaf_account_groupby(
+    models: Any, db: str, uid: int, password: str, report_id: int
+) -> int:
+    """
+    Sur les lignes feuilles avec moteur ``account_codes`` : regroupement par compte
+    (``user_groupby`` / ``groupby``) + ``foldable``, et ``filter_unfold_all`` désactivé
+    sur le rapport pour permettre le dépliage (rapprochement comptes GL / budget).
+    """
+    line_fg = _ek(
+        models, db, uid, password, "account.report.line", "fields_get", [], {"attributes": ["type"]}
+    )
+    vals: dict[str, Any] = {}
+    if "user_groupby" in line_fg:
+        vals["user_groupby"] = "account_id"
+    elif "groupby" in line_fg:
+        vals["groupby"] = "account_id"
+    if "foldable" in line_fg:
+        vals["foldable"] = True
+    if not vals:
+        return 0
+    leaves = leaf_line_ids_with_account_codes(models, db, uid, password, int(report_id))
+    for lid in leaves:
+        try:
+            _ek(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.line",
+                "write",
+                [[int(lid)], vals],
+            )
+        except Exception:
+            continue
+    rep_fg = _ek(
+        models, db, uid, password, "account.report", "fields_get", [], {"attributes": ["type"]}
+    )
+    if "filter_unfold_all" in rep_fg:
+        try:
+            _ek(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "write",
+                [[int(report_id)], {"filter_unfold_all": False}],
+            )
+        except Exception:
+            pass
+    return len(leaves)
 
 
 def normalize_cpc_account_codes_formula(formula: str | None) -> str:
@@ -573,7 +626,7 @@ def create_toolbox_cpc_budget_analytique(
         "filter_date_range":           True,
         "filter_analytic":             True,
         "filter_journals":             True,
-        "filter_unfold_all":           True,
+        "filter_unfold_all":           False,
         "filter_show_draft":           False,
         "default_opening_date_filter": "this_year",
         "search_bar":                  True,
@@ -807,6 +860,14 @@ def create_toolbox_cpc_budget_analytique(
             "report_id": report_id,
         }
 
+    groupby_leaf_lines = 0
+    try:
+        groupby_leaf_lines = _apply_cpc_leaf_account_groupby(
+            models, db, uid, password, report_id
+        )
+    except Exception:
+        pass
+
     return {
         "report_id":  report_id,
         "col_count":  col_count,
@@ -823,4 +884,5 @@ def create_toolbox_cpc_budget_analytique(
         "budget_pct_meaningful": budget_pct_meaningful,
         "creation_warnings": creation_warnings,
         "verification":  verification,
+        "groupby_leaf_lines": groupby_leaf_lines,
     }
