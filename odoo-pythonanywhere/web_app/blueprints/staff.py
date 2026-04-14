@@ -1349,7 +1349,7 @@ def _accounting_reports_page(accounting_mode: str):
                         f"(anciens id : {', '.join(str(x) for x in prior_ohada)})."
                     )
                 try:
-                    _ba, menu_mid = ensure_account_report_reporting_menu(
+                    _ba, menu_mid, menu_post = ensure_account_report_reporting_menu(
                         models,
                         db,
                         uid,
@@ -1363,6 +1363,15 @@ def _accounting_reports_page(accounting_mode: str):
                             " Une entrée de menu a été ajoutée sous Grands livres "
                             "(selon droits Odoo) — utilisez le lien ci-dessous pour l’analyse."
                         )
+                    if isinstance(menu_post, dict) and not menu_post.get("ok", True):
+                        errs = menu_post.get("errors") or []
+                        if errs:
+                            msg += " Contrôle menu/rapport : " + "; ".join(
+                                str(x) for x in errs[:3]
+                            )
+                            msg += "."
+                        for w in (menu_post.get("warnings") or [])[:2]:
+                            msg += f" ({w})"
                 except Exception:
                     pass
                 flash(msg, "success")
@@ -1789,6 +1798,7 @@ def _accounting_reports_page(accounting_mode: str):
     balance_form_url = ""
     balance_list_url = ""
     balance_menu_id: int | None = None
+    balance_menu_verify: dict[str, Any] | None = None
     if balance_show_links:
         bu = reg[runner_client].url
         brid = int(brid_for_balance_links or 0)
@@ -1803,7 +1813,7 @@ def _accounting_reports_page(accounting_mode: str):
                 .strip()[:240]
                 or f"Rapport {brid}"
             )
-            aid, menu_mid = ensure_account_report_reporting_menu(
+            aid, menu_mid, menu_post = ensure_account_report_reporting_menu(
                 m,
                 dbn,
                 u,
@@ -1813,6 +1823,7 @@ def _accounting_reports_page(accounting_mode: str):
                 under_trial_balance=True,
             )
             balance_menu_id = menu_mid
+            balance_menu_verify = menu_post if isinstance(menu_post, dict) else None
             if aid:
                 balance_exec_url = account_report_execution_url(
                     bu, aid, menu_id=menu_mid
@@ -1860,6 +1871,7 @@ def _accounting_reports_page(accounting_mode: str):
         balance_form_url=balance_form_url,
         balance_list_url=balance_list_url,
         balance_menu_id=balance_menu_id,
+        balance_menu_verify=balance_menu_verify,
         balance_ohada_report_id=balance_ohada_report_id,
         label_picker_rows=label_picker_rows,
         sibling_rows=sibling_rows,

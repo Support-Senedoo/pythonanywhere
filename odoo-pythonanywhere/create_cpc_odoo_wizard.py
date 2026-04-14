@@ -615,6 +615,181 @@ def _ek(
     return models.execute_kw(db, uid, pwd, model, method, args or [], kw or {})
 
 
+def _m2o_id_rpc(val: Any) -> int | None:
+    if val in (False, None):
+        return None
+    if isinstance(val, (list, tuple)) and val:
+        try:
+            return int(val[0])
+        except (TypeError, ValueError):
+            return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def verify_cpc_wizard_ui_install(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+    *,
+    wizard_model: str,
+    model_id: int,
+    server_action_id: int,
+    menu_server_action_id: int,
+    view_id: int,
+    menu_id: int,
+    parent_menu_id: int | None,
+) -> dict[str, Any]:
+    """
+    Contrôle post-création : actions serveur, vue formulaire, menu (lecture + cohérence).
+    Retourne ``{"ok": bool, "checks": [...], "errors": [...], "warnings": [...]}``.
+    """
+    checks: list[dict[str, Any]] = []
+    errors: list[str] = []
+    warnings: list[str] = []
+    mid = int(model_id)
+    sa = int(server_action_id)
+    sa_m = int(menu_server_action_id)
+    vid = int(view_id)
+    mn = int(menu_id)
+    exp_menu_action = f"ir.actions.server,{sa_m}"
+
+    rows_sa = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.actions.server",
+        "read",
+        [[sa]],
+        {"fields": ["id", "model_id", "state"]},
+    )
+    if not rows_sa:
+        errors.append(f"ir.actions.server id={sa} (calcul) introuvable en lecture.")
+    else:
+        r0 = rows_sa[0]
+        got_mid = _m2o_id_rpc(r0.get("model_id"))
+        mid_ok = got_mid == mid
+        checks.append({"step": "server_action_calc_model_id", "ok": mid_ok, "got": got_mid, "expected": mid})
+        if not mid_ok:
+            errors.append(f"Action calcul : model_id attendu {mid}, lu {got_mid!r}.")
+        st = (r0.get("state") or "").strip()
+        st_ok = st == "code"
+        checks.append({"step": "server_action_calc_state", "ok": st_ok, "state": st})
+        if not st_ok:
+            errors.append(f"Action calcul : state attendu code, obtenu {st!r}.")
+
+    rows_sm = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.actions.server",
+        "read",
+        [[sa_m]],
+        {"fields": ["id", "state", "code"]},
+    )
+    if not rows_sm:
+        errors.append(f"ir.actions.server id={sa_m} (menu) introuvable en lecture.")
+    else:
+        r1 = rows_sm[0]
+        st_m = (r1.get("state") or "").strip()
+        st_m_ok = st_m == "code"
+        checks.append({"step": "server_action_menu_state", "ok": st_m_ok, "state": st_m})
+        if not st_m_ok:
+            errors.append(f"Action menu : state attendu code, obtenu {st_m!r}.")
+        code = str(r1.get("code") or "")
+        code_ok = (
+            "ir.actions.act_window" in code
+            and wizard_model in code
+            and str(vid) in code
+        )
+        checks.append(
+            {
+                "step": "server_action_menu_code_window",
+                "ok": code_ok,
+                "has_act_window": "ir.actions.act_window" in code,
+                "has_model": wizard_model in code,
+                "has_view_id": str(vid) in code,
+            }
+        )
+        if not code_ok:
+            errors.append(
+                "Action menu : le code ne semble pas ouvrir la vue formulaire attendue "
+                f"(modele {wizard_model!r}, view_id {vid})."
+            )
+
+    rows_v = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.ui.view",
+        "read",
+        [[vid]],
+        {"fields": ["id", "model", "type"]},
+    )
+    if not rows_v:
+        errors.append(f"ir.ui.view id={vid} introuvable en lecture.")
+    else:
+        rv = rows_v[0]
+        mod_ok = (rv.get("model") or "").strip() == wizard_model
+        typ_ok = (rv.get("type") or "").strip() == "form"
+        checks.append({"step": "view_model", "ok": mod_ok, "model": rv.get("model")})
+        checks.append({"step": "view_type", "ok": typ_ok, "type": rv.get("type")})
+        if not mod_ok:
+            errors.append(f"Vue : model attendu {wizard_model!r}, obtenu {rv.get('model')!r}.")
+        if not typ_ok:
+            errors.append(f"Vue : type attendu form, obtenu {rv.get('type')!r}.")
+
+    rows_mn = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.ui.menu",
+        "read",
+        [[mn]],
+        {"fields": ["id", "name", "action", "parent_id"]},
+    )
+    if not rows_mn:
+        errors.append(f"ir.ui.menu id={mn} introuvable en lecture.")
+    else:
+        rm = rows_mn[0]
+        got_act = (rm.get("action") or "").strip()
+        act_ok = got_act == exp_menu_action
+        checks.append(
+            {"step": "wizard_menu_action", "ok": act_ok, "action": got_act, "expected": exp_menu_action}
+        )
+        if not act_ok:
+            errors.append(f"Menu wizard : action {got_act!r} != {exp_menu_action!r}.")
+        par = _m2o_id_rpc(rm.get("parent_id"))
+        par_ok = par is not None
+        checks.append({"step": "wizard_menu_parent_id", "ok": par_ok, "parent_id": par})
+        if not par_ok:
+            errors.append("Menu wizard : sans parent_id (invisible dans l'arborescence).")
+        elif parent_menu_id is not None and par != int(parent_menu_id):
+            warnings.append(
+                f"Menu wizard : parent_id={par} differ du parent attendu {parent_menu_id} "
+                "(deplacement manuel ou resolution Reporting)."
+            )
+
+    if parent_menu_id is None:
+        warnings.append(
+            "Aucun menu parent Reporting resolu (xmlid) ; le menu wizard peut etre mal place."
+        )
+
+    return {
+        "ok": len(errors) == 0,
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
 def _model_exists(models: Any, db: str, uid: int, pwd: str, model: str) -> bool:
     n = _ek(models, db, uid, pwd, "ir.model", "search_count",
             [[("model", "=", model)]])
@@ -780,7 +955,7 @@ def create_cpc_wizard(
                 sys.path.insert(0, str(_pa_root))
             from web_app.odoo_account_reports import ensure_account_report_reporting_menu
 
-            _aid, _mid = ensure_account_report_reporting_menu(
+            _aid, _mid, _menu_pc = ensure_account_report_reporting_menu(
                 models,
                 db,
                 uid,
@@ -790,6 +965,7 @@ def create_cpc_wizard(
             )
             result["cpc_report_client_action_id"] = _aid
             result["cpc_report_menu_id"] = _mid
+            result["cpc_report_menu_post_checks"] = _menu_pc
         except Exception as menu_exc:
             result["cpc_report_menu_error"] = str(menu_exc)
 
@@ -938,6 +1114,28 @@ def create_cpc_wizard(
     result["menu_id"] = menu_id
     result["wizard_menu_parent_id"] = parent_menu_id
 
+    try:
+        result["wizard_install_post_checks"] = verify_cpc_wizard_ui_install(
+            models,
+            db,
+            uid,
+            pwd,
+            wizard_model=WIZARD_MODEL,
+            model_id=int(model_id),
+            server_action_id=int(sa_id),
+            menu_server_action_id=int(sa_menu_id),
+            view_id=int(view_id),
+            menu_id=int(menu_id),
+            parent_menu_id=parent_menu_id,
+        )
+    except Exception as wiz_v_exc:
+        result["wizard_install_post_checks"] = {
+            "ok": False,
+            "checks": [],
+            "errors": [f"Controle wizard UI : {wiz_v_exc}"],
+            "warnings": [],
+        }
+
     ba = result.get("budget_analytic_fields") or {}
     result["ok"] = True
     result["budget_analytic_fields_ok"] = bool(ba.get("ok", True))
@@ -979,6 +1177,14 @@ def create_cpc_wizard(
                 " Menu rapport Reporting non cree : "
                 f"{str(result['cpc_report_menu_error'])[:180]}."
             )
+        _mpc = result.get("cpc_report_menu_post_checks") or {}
+        if isinstance(_mpc, dict) and not _mpc.get("ok", True):
+            _e = _mpc.get("errors") or []
+            if _e:
+                result["message"] += " Controle menu rapport : " + "; ".join(str(x) for x in _e[:2]) + "."
+            _w = _mpc.get("warnings") or []
+            if _w:
+                result["message"] += " " + "; ".join(str(x) for x in _w[:2]) + "."
     if int(rep.get("formula_writes") or 0):
         result["message"] += (
             f" Colonne % : {rep['formula_writes']} expression(s) avec denominateur securise "
@@ -992,6 +1198,15 @@ def create_cpc_wizard(
         result["message"] += (
             " Attention : certains champs x_analytic_account_id n'ont pas ete crees (voir detail JSON cote serveur)."
         )
+    _wiz_pc = result.get("wizard_install_post_checks") or {}
+    if isinstance(_wiz_pc, dict) and not _wiz_pc.get("ok", True):
+        _we = _wiz_pc.get("errors") or []
+        if _we:
+            result["message"] += (
+                " Controle assistant (menu/vue/actions) : "
+                + "; ".join(str(x) for x in _we[:3])
+                + "."
+            )
     return result
 
 

@@ -1051,6 +1051,131 @@ def account_report_backend_list_url(base_url: str, act_window_id: int) -> str:
     return f"{base}/web#action={int(act_window_id)}"
 
 
+def verify_reporting_menu_and_client_action(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    *,
+    report_id: int,
+    client_action_id: int | None,
+    menu_id: int | None,
+    require_menu: bool = True,
+) -> dict[str, Any]:
+    """
+    Contrôle post-création / post-résolution : action client ``account_report`` + menu pointant dessus.
+
+    Retourne ``{"ok": bool, "checks": [...], "errors": [...], "warnings": [...]}``.
+    """
+    checks: list[dict[str, Any]] = []
+    errors: list[str] = []
+    warnings: list[str] = []
+    rid = int(report_id)
+    ref = (
+        f"ir.actions.client,{int(client_action_id)}"
+        if client_action_id
+        else None
+    )
+
+    if not client_action_id:
+        errors.append("ir.actions.client absente (id non résolu).")
+        return {"ok": False, "checks": checks, "errors": errors, "warnings": warnings}
+
+    try:
+        crows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "ir.actions.client",
+            "read",
+            [[int(client_action_id)]],
+            {"fields": ["tag", "context", "name"]},
+        )
+    except Exception as e:
+        errors.append(f"Lecture ir.actions.client id={client_action_id} : {e}")
+        return {"ok": False, "checks": checks, "errors": errors, "warnings": warnings}
+
+    if not crows:
+        errors.append(f"ir.actions.client id={client_action_id} introuvable en base.")
+        return {"ok": False, "checks": checks, "errors": errors, "warnings": warnings}
+
+    row_c = crows[0]
+    tag = (row_c.get("tag") or "").strip()
+    tag_ok = tag == "account_report"
+    checks.append({"step": "client_action_tag_account_report", "ok": tag_ok, "value": tag})
+    if not tag_ok:
+        errors.append(f"Action client : tag attendu account_report, obtenu {tag!r}.")
+
+    ctx_rid = _report_id_from_account_report_client_context(row_c.get("context"))
+    ctx_ok = ctx_rid == rid
+    checks.append(
+        {
+            "step": "client_action_context_report_id",
+            "ok": ctx_ok,
+            "report_id_in_context": ctx_rid,
+            "expected_report_id": rid,
+        }
+    )
+    if not ctx_ok:
+        errors.append(
+            f"Contexte action client : report_id={ctx_rid!r}, attendu {rid} "
+            f"(chaîne contexte : {(str(row_c.get('context') or '')[:200])!r})."
+        )
+
+    if menu_id:
+        mrows: list[Any] = []
+        menu_read_err: str | None = None
+        try:
+            mrows = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.ui.menu",
+                "read",
+                [[int(menu_id)]],
+                {"fields": ["id", "name", "action", "parent_id"]},
+            ) or []
+        except Exception as e:
+            menu_read_err = str(e)
+        if menu_read_err:
+            errors.append(f"Lecture ir.ui.menu id={menu_id} : {menu_read_err}")
+        elif not mrows:
+            errors.append(f"ir.ui.menu id={menu_id} introuvable après création.")
+        else:
+            row_m = mrows[0]
+            got_act = (row_m.get("action") or "").strip()
+            act_ok = ref is not None and got_act == ref
+            checks.append(
+                {"step": "menu_action_ref", "ok": act_ok, "action": got_act, "expected": ref}
+            )
+            if not act_ok:
+                errors.append(f"Menu : champ action {got_act!r} != {ref!r}.")
+            par = row_m.get("parent_id")
+            pid = par[0] if isinstance(par, (list, tuple)) else par
+            par_ok = pid is not False and pid is not None
+            checks.append({"step": "menu_parent_id", "ok": bool(par_ok), "parent_id": pid})
+            if not par_ok:
+                errors.append("Menu sans parent_id (invisible dans l'arborescence standard).")
+    else:
+        checks.append({"step": "menu", "ok": not require_menu, "skipped": True})
+        if require_menu:
+            errors.append("Aucun ir.ui.menu : entrée non créée ou introuvable.")
+        else:
+            warnings.append(
+                "Pas d'entrée menu (parent Reporting introuvable ou droits) ; "
+                "l'action client reste utilisable via URL directe."
+            )
+
+    return {
+        "ok": len(errors) == 0,
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
 def ensure_account_report_reporting_menu(
     models: Any,
     db: str,
@@ -1060,7 +1185,7 @@ def ensure_account_report_reporting_menu(
     menu_title: str,
     *,
     under_trial_balance: bool = False,
-) -> tuple[int | None, int | None]:
+) -> tuple[int | None, int | None, dict[str, Any]]:
     """
     Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu``.
 
@@ -1068,22 +1193,33 @@ def ensure_account_report_reporting_menu(
     (balance 6 col.) : sous le sous-menu **Grands livres** (parent du **Grand livre général** si
     trouvé ; séquence en fin de groupe), sinon repli après **Balance comptable**.
 
-    Retourne ``(client_action_id, menu_id)``. Si aucun parent menu n’est résolu, retourne
-    ``(action_id, None)`` — l’URL ``web#action=`` peut rester insuffisante selon la version Odoo.
+    Retourne ``(client_action_id, menu_id, post_checks)`` où ``post_checks`` est le résultat de
+    :func:`verify_reporting_menu_and_client_action` (contrôle lecture menu + action + contexte).
     """
     title = (menu_title or f"Rapport {report_id}").strip()
     if len(title) > 120:
         title = title[:117] + "…"
+    rid = int(report_id)
     aid = ensure_account_report_client_action(
         models,
         db,
         uid,
         password,
-        int(report_id),
+        rid,
         action_name=title,
     )
     if not aid:
-        return None, None
+        vfail = verify_reporting_menu_and_client_action(
+            models,
+            db,
+            uid,
+            password,
+            report_id=rid,
+            client_action_id=None,
+            menu_id=None,
+            require_menu=True,
+        )
+        return None, None, vfail
     sync_menu_labels_for_client_action(models, db, uid, password, aid, title)
     ref = f"ir.actions.client,{int(aid)}"
     existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
@@ -1137,9 +1273,29 @@ def ensure_account_report_reporting_menu(
                         )
             except Exception:
                 pass
-        return aid, existing_mid
+        v = verify_reporting_menu_and_client_action(
+            models,
+            db,
+            uid,
+            password,
+            report_id=rid,
+            client_action_id=int(aid),
+            menu_id=int(existing_mid),
+            require_menu=True,
+        )
+        return aid, existing_mid, v
     if not parent_id:
-        return aid, None
+        v = verify_reporting_menu_and_client_action(
+            models,
+            db,
+            uid,
+            password,
+            report_id=rid,
+            client_action_id=int(aid),
+            menu_id=None,
+            require_menu=False,
+        )
+        return aid, None, v
     try:
         new_mid = execute_kw(
             models,
@@ -1157,9 +1313,33 @@ def ensure_account_report_reporting_menu(
                 }
             ],
         )
-        return aid, int(new_mid)
-    except Exception:
-        return aid, None
+        mid_i = int(new_mid)
+        v = verify_reporting_menu_and_client_action(
+            models,
+            db,
+            uid,
+            password,
+            report_id=rid,
+            client_action_id=int(aid),
+            menu_id=mid_i,
+            require_menu=True,
+        )
+        return aid, mid_i, v
+    except Exception as exc:
+        v = verify_reporting_menu_and_client_action(
+            models,
+            db,
+            uid,
+            password,
+            report_id=rid,
+            client_action_id=int(aid),
+            menu_id=None,
+            require_menu=True,
+        )
+        errs = list(v.get("errors") or [])
+        errs.append(f"Création ir.ui.menu refusée : {exc}")
+        v = {**v, "ok": False, "errors": errs}
+        return aid, None, v
 
 
 def format_report_name(val: Any) -> str:

@@ -249,6 +249,13 @@
   {% if not balance_exec_url %}
   <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.82rem;">Ouvrez le rapport depuis Odoo (Reporting / rapports comptables) si l’API n’a pas pu créer l’action client.</p>
   {% endif %}
+  {% if balance_menu_verify and (balance_menu_verify.errors or balance_menu_verify.warnings) %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.82rem;color:#a65c00;">
+    Contrôle menu / action rapport :
+    {% for e in balance_menu_verify.errors %}<br>— {{ e }}{% endfor %}
+    {% for w in balance_menu_verify.warnings %}<br>— {{ w }}{% endfor %}
+  </p>
+  {% endif %}
   <details class="sn-muted" style="margin:0.75rem 0 0;font-size:0.82rem;">
     <summary style="cursor:pointer;">Copier les URL complètes</summary>
     <dl style="margin:0.5rem 0 0;display:grid;gap:0.35rem;">

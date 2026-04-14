@@ -153,6 +153,129 @@ def _apply_cpc_leaf_account_groupby(
     return len(leaves)
 
 
+def verify_cpc_toolbox_report_install(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+    *,
+    expected_line_count: int,
+    expected_col_count: int = 4,
+) -> dict[str, Any]:
+    """
+    Contrôle post-création du rapport CPC toolbox : enregistrement lisible, colonnes, lignes, expressions.
+
+    Retourne ``{"ok": bool, "checks": [...], "errors": [...], "warnings": [...]}``.
+    """
+    checks: list[dict[str, Any]] = []
+    errors: list[str] = []
+    warnings: list[str] = []
+    rid = int(report_id)
+
+    rows = _ek(
+        models,
+        db,
+        uid,
+        password,
+        "account.report",
+        "read",
+        [[rid]],
+        {"fields": ["id", "name", "filter_analytic", "filter_date_range"]},
+    )
+    if not rows:
+        errors.append(f"account.report id={rid} introuvable après create (lecture).")
+        return {"ok": False, "checks": checks, "errors": errors, "warnings": warnings}
+    checks.append({"step": "report_read", "ok": True, "id": rid, "name": rows[0].get("name")})
+
+    n_cols = int(
+        _ek(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.column",
+            "search_count",
+            [[["report_id", "=", rid]]],
+        )
+        or 0
+    )
+    col_ok = n_cols == int(expected_col_count)
+    checks.append(
+        {
+            "step": "column_count",
+            "ok": col_ok,
+            "count": n_cols,
+            "expected": expected_col_count,
+        }
+    )
+    if not col_ok:
+        errors.append(
+            f"Colonnes rapport : {n_cols} obtenues, {expected_col_count} attendues (balance/budget/ecart/pct)."
+        )
+
+    n_lines = int(
+        _ek(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.line",
+            "search_count",
+            [[["report_id", "=", rid], ["code", "!=", False]]],
+        )
+        or 0
+    )
+    line_ok = n_lines == int(expected_line_count)
+    checks.append(
+        {"step": "line_count", "ok": line_ok, "count": n_lines, "expected": expected_line_count}
+    )
+    if not line_ok:
+        errors.append(
+            f"Lignes CPC : {n_lines} obtenues, {expected_line_count} attendues (structure SYSCOHADA)."
+        )
+
+    n_expr = int(
+        _ek(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "search_count",
+            [[["report_line_id.report_id", "=", rid]]],
+        )
+        or 0
+    )
+    min_expr = int(expected_line_count) * 4
+    expr_ok = n_expr >= min_expr
+    checks.append(
+        {
+            "step": "expression_count",
+            "ok": expr_ok,
+            "count": n_expr,
+            "minimum_expected": min_expr,
+        }
+    )
+    if not expr_ok:
+        errors.append(
+            f"Expressions : {n_expr} obtenues, au moins {min_expr} attendues (4 par ligne CPC)."
+        )
+
+    fa = rows[0].get("filter_analytic")
+    if not fa:
+        warnings.append(
+            "filter_analytic est désactivé sur le rapport : le filtre analytique UI peut être absent."
+        )
+
+    return {
+        "ok": len(errors) == 0,
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
 def normalize_cpc_account_codes_formula(formula: str | None) -> str:
     """
     Adapte les formules style SYSCOHADA / ancien XML-RPC (``^601,^6011``) au moteur
@@ -872,6 +995,24 @@ def create_toolbox_cpc_budget_analytique(
     except Exception:
         pass
 
+    report_install_verify: dict[str, Any] = {}
+    try:
+        report_install_verify = verify_cpc_toolbox_report_install(
+            models,
+            db,
+            uid,
+            password,
+            report_id,
+            expected_line_count=len(CPC_BUDGET_STRUCTURE),
+        )
+    except Exception as e:
+        report_install_verify = {
+            "ok": False,
+            "checks": [],
+            "errors": [f"Controle installation rapport : {e}"],
+            "warnings": [],
+        }
+
     return {
         "report_id":  report_id,
         "col_count":  col_count,
@@ -889,4 +1030,5 @@ def create_toolbox_cpc_budget_analytique(
         "creation_warnings": creation_warnings,
         "verification":  verification,
         "groupby_leaf_lines": groupby_leaf_lines,
+        "report_install_verify": report_install_verify,
     }
