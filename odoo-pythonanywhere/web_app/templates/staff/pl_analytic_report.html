@@ -56,8 +56,9 @@
     (1) <strong>Copie P&amp;L pilotage</strong> (optionnel) : si vous connaissez l’id d’un <code>account.report</code> source,
     la toolbox en duplique une copie avec filtres analytique et budgets — pour parcourir les rapports dans un tableau,
     utiliser l’utilitaire <strong>P&amp;L personnalisé</strong>.
-    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : menu <strong>Assistant budget projet (Senedoo)</strong> (formulaire puis
-    <strong>Remplir le rapport CPC</strong>) et, sous <strong>Reporting</strong>, entrée <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>
+    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : sous <strong>Facturation / Comptabilite &gt; Reporting</strong>, menu
+    <strong>Assistant budget projet (Senedoo)</strong> (formulaire puis <strong>Remplir le rapport CPC</strong>) et entree
+    <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>
     pour ouvrir le même rapport directement (dépliage par compte sous chaque rubrique). Après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
     injecte le budget financier sur la colonne externe du CPC et affiche dans le statut du wizard la liste des
     <strong>codes comptes budgétisés</strong> (non nuls). Réinstallez depuis la toolbox après une mise à jour pour
@@ -161,7 +162,8 @@
   {% if cpc_wizard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
     &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.
-    <strong>Lancer le wizard :</strong> Odoo <strong>Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)</strong>
+    <strong>Lancer le wizard :</strong> Odoo app <strong>Facturation</strong> ou <strong>Comptabilite</strong>, menu <strong>Reporting</strong> (ou Rapports),
+    puis <strong>Assistant budget projet (Senedoo)</strong> (apres reinstallation / mise a jour depuis la toolbox si le menu manquait).
     (action serveur → formulaire : analytique, budget, periode, puis <strong>Remplir le rapport CPC</strong>).
     Rapport seul (depliage comptes) : <strong>Reporting</strong> (menu dedie) <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>.
   </p>

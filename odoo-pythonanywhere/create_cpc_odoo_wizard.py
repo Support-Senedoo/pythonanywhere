@@ -9,7 +9,7 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
       4. Écrit account.report.external.value (colonne Budget du rapport CPC)
       5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
-  - Menus : Comptabilité > Rapports > Assistant budget projet (Senedoo) — action serveur → formulaire ;
+  - Menus : Facturation/Comptabilité > Reporting > Assistant budget projet (Senedoo) — action serveur → formulaire ;
     Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo) — ouverture directe du rapport (dépliage par compte).
     Domain budget selon l'analytique ; bouton « Remplir le rapport CPC » (action serveur Calculer).
 
@@ -902,16 +902,41 @@ def create_cpc_wizard(
     }])
     result["menu_server_action_id"] = sa_menu_id
 
-    # ---- 6. Menu sous Comptabilité > Rapports (lié à l'action serveur, pas act_window)
+    # ---- 6. Menu sous Reporting compta (xmlid + repli ; mêmes groupes que le parent si possible)
     parent_menu_id = _find_reports_menu(models, db, uid, pwd)
 
-    menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [{
-        "name":          WIZARD_MENU_LABEL,
-        "parent_id":     parent_menu_id,
-        "action":        f"ir.actions.server,{int(sa_menu_id)}",
-        "sequence":      99,
-    }])
+    menu_vals: dict[str, Any] = {
+        "name":      WIZARD_MENU_LABEL,
+        "parent_id": parent_menu_id,
+        "action":    f"ir.actions.server,{int(sa_menu_id)}",
+        "sequence":  99,
+    }
+    if parent_menu_id:
+        try:
+            pr = _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.ui.menu",
+                "read",
+                [[int(parent_menu_id)]],
+                {"fields": ["groups_id"]},
+            )
+            if pr:
+                raw_g = pr[0].get("groups_id") or []
+                flat_g = [
+                    int(x[0]) if isinstance(x, (list, tuple)) else int(x)
+                    for x in raw_g
+                ]
+                if flat_g:
+                    menu_vals["groups_id"] = [(6, 0, flat_g)]
+        except Exception:
+            pass
+
+    menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [menu_vals])
     result["menu_id"] = menu_id
+    result["wizard_menu_parent_id"] = parent_menu_id
 
     ba = result.get("budget_analytic_fields") or {}
     result["ok"] = True
@@ -936,7 +961,7 @@ def create_cpc_wizard(
     new_rid = int((inst.get("report_id") or 0))
     result["message"] = (
         f"Wizard Budget par projet cree : {WIZARD_MODEL}, action calcul id={sa_id}, menu id={menu_id}. "
-        f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL} (ouvre le formulaire ; bouton Remplir le rapport CPC). "
+        f"Odoo : Facturation/Comptabilite > Reporting > {WIZARD_MENU_LABEL} (ouvre le formulaire ; bouton Remplir le rapport CPC). "
         f"Champs budget : {summary}."
     )
     if new_rid:
@@ -970,13 +995,74 @@ def create_cpc_wizard(
     return result
 
 
+def _menu_id_from_xmlid(
+    models: Any, db: str, uid: int, pwd: str, module: str, xml_name: str
+) -> int | None:
+    """Résout ``ir.ui.menu`` via ``ir.model.data`` (indépendant de la langue d'affichage)."""
+    rows = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.model.data",
+        "search_read",
+        [[["module", "=", module], ["name", "=", xml_name], ["model", "=", "ir.ui.menu"]]],
+        {"fields": ["res_id"], "limit": 1},
+    ) or []
+    if not rows:
+        return None
+    rid = rows[0].get("res_id")
+    return int(rid) if rid else None
+
+
 def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
     """
-    Cherche le menu 'Rapports' sous Comptabilité — 1 ou 2 appels XML-RPC max.
+    Parent pour placer l'assistant sous le menu Rapports / Reporting de la comptabilité.
+
+    Odoo 19 (module ``account``) : ``account.menu_finance_reports`` (« Reporting ») est enfant
+    de ``menu_finance`` (app Facturation / Invoicing) — le nom du parent n'est souvent **pas**
+    « Comptabilité », d'où l'échec de l'ancienne recherche et un menu introuvable ou mal placé.
     """
-    # Recherche directe : menu "Rapports" (ou variante) dont le parent est Comptabilité
+    # 1) Xmlid officiel Community (et EE en général)
+    for mod, xid in (
+        ("account", "menu_finance_reports"),
+        ("account_accountant", "menu_finance_reports"),
+        ("account_reports", "menu_finance_reports"),
+    ):
+        mid = _menu_id_from_xmlid(models, db, uid, pwd, mod, xid)
+        if mid:
+            return mid
+
+    # 2) Enfant de la racine Compta / Facturation (menu_finance)
+    root = _menu_id_from_xmlid(models, db, uid, pwd, "account", "menu_finance")
+    if root:
+        mids = _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.menu",
+            "search",
+            [[
+                ("parent_id", "=", int(root)),
+                ("name", "in", [
+                    "Reporting", "Rapports", "Reports", "Statement Reports",
+                    "Analyse", "Analysis",
+                ]),
+            ]],
+            {"limit": 1, "order": "sequence asc"},
+        ) or []
+        if mids:
+            return int(mids[0])
+
+    # 3) Ancienne heuristique (parent libellé Comptabilité / Accounting)
     ids = _ek(
-        models, db, uid, pwd, "ir.ui.menu", "search",
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.ui.menu",
+        "search",
         [[("name", "in", ["Rapports", "Reports", "Reporting"]),
           "|",
           ("parent_id.name", "ilike", "Comptabilit"),
@@ -985,13 +1071,23 @@ def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
     )
     if ids:
         return int(ids[0])
-    # Fallback : n'importe quel menu "Rapports" / "Reports"
     ids = _ek(
-        models, db, uid, pwd, "ir.ui.menu", "search",
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.ui.menu",
+        "search",
         [[("name", "in", ["Rapports", "Reports", "Reporting"])]],
         {"limit": 1},
     )
-    return int(ids[0]) if ids else None
+    if ids:
+        return int(ids[0])
+
+    # 4) Dernier recours : sous l'app Facturation (mieux que parent_id absent)
+    if root:
+        return int(root)
+    return None
 
 
 # ---------------------------------------------------------------------------
