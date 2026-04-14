@@ -575,7 +575,8 @@ def _make_form_view_arch(sa_id: int, budget_domain_arch: str) -> str:
              placeholder="Compte analytique du projet"/>
       <field name="x_report_budget_id" string="Budget financier du projet"
              domain="{budget_domain_arch}"
-             attrs="{{'invisible': [('x_analytic_account_id', '=', False)], 'required': [('x_analytic_account_id', '!=', False)]}}"
+             invisible="not x_analytic_account_id"
+             required="x_analytic_account_id"
              options="{{'no_create': True, 'no_create_edit': True}}"
              placeholder="Budget rattache a ce projet"/>
     </group>
