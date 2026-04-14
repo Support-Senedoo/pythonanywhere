@@ -8,8 +8,8 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       2. Lit account.move.line (filtré analytique) → réalisé CPC
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
       4. Écrit account.report.external.value (colonne Budget du rapport CPC)
-      5. Ouvre le rapport CPC dans Odoo (priorite au rapport toolbox nom exact, sinon copie la plus recente)
-  - Menu : Comptabilité > Rapports > Budget par projet (Senedoo) — supprime puis recree a chaque install/update wizard
+      5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
+  - Menu : Comptabilité > Rapports > Assistant budget projet (Senedoo) — ouvre le formulaire wizard (pas le rapport seul)
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
@@ -29,16 +29,17 @@ from typing import Any
 
 WIZARD_MODEL   = "x_cpc_budget_wizard"
 WIZARD_NAME    = "Budget par projet (Senedoo)"
-WIZARD_MENU_LABEL = "Budget par projet (Senedoo)"
+WIZARD_MENU_LABEL = "Assistant budget projet (Senedoo)"
 # Anciens libellés de menu (purge pour éviter doublons après renommage)
-WIZARD_MENU_PREVIOUS_NAMES = ("CPC Budget Analytique (Senedoo)",)
+WIZARD_MENU_PREVIOUS_NAMES = (
+    "CPC Budget Analytique (Senedoo)",
+    "Budget par projet (Senedoo)",
+)
 # Motifs ilike sur ir.ui.menu.name (orphelins après suppression Studio / modèle, libellés partiels)
-WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%")
+WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%", "%Assistant budget%")
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
 # Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
 CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
-# Ancien libellé affiché dans Odoo (bases créées avant le renommage « Budget par projet »)
-_LEGACY_CPC_NAME_MARKERS = ("cpc syscohada", "budget analytique", "senedoo")
 EXTERNAL_EXPR_LABEL = "budget_analytique"  # label expression externe à peupler
 
 # Champs créés sur les modèles budget reporting (Many2one vers l’axe analytique)
@@ -531,8 +532,9 @@ def _make_form_view_arch(sa_id: int) -> str:
     <div class="oe_title">
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
-        Choisissez le compte analytique, le budget financier rattache (champs x_analytic_account_id crees par la toolbox),
-        la periode, puis Calculez pour injecter le budget CPC.
+        Ce formulaire s'ouvre depuis le menu Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)
+        (pas depuis le rapport CPC seul). Choisissez le compte analytique, le budget financier rattache
+        (champs x_analytic_account_id crees par la toolbox), la periode, puis Calculez pour injecter le budget CPC.
       </p>
     </div>
     <group>
@@ -646,92 +648,33 @@ def ensure_budget_report_analytic_fields(
     )}
 
 
-def _display_name_is_legacy_cpc_senedoo_budget_analytique(label: str) -> bool:
-    """True si le libellé affiché correspond à l'ancien rapport toolbox « Budget Analytique »."""
-    s = (label or "").strip().lower()
-    if "budget par projet" in s:
-        return False
-    return all(m in s for m in _LEGACY_CPC_NAME_MARKERS)
-
-
-def _rename_legacy_cpc_budget_report_display_name(
+def _install_fresh_toolbox_cpc_budget_report(
     models: Any, db: str, uid: int, pwd: str
-) -> int | None:
+) -> dict[str, Any]:
     """
-    Une seule occurrence « CPC SYSCOHADA … Budget Analytique … Senedoo » : renomme vers
-    :data:`CPC_REPORT_TOOLBOX_EXACT` et aligne actions client + libellés de menu Odoo.
+    Purge tous les rapports toolbox CPC Senedoo puis recrée un ``account.report`` unique.
+
+    On ne crée pas d'entrée de menu « Reporting » vers ce rapport : un second menu ouvrait
+    le CPC en direct (sans wizard) et prêtait à confusion avec le menu Assistant.
+    Le rapport reste accessible après **Calculer** dans le wizard (URL) ou depuis la liste
+    des rapports financiers Odoo.
     """
+    import sys
+    from pathlib import Path
+
+    ac = Path(__file__).resolve().parent / "archives-cli"
+    if ac.is_dir() and str(ac) not in sys.path:
+        sys.path.insert(0, str(ac))
     try:
-        from web_app.odoo_account_reports import (
-            ensure_account_report_client_action,
-            find_all_account_report_client_action_ids,
-            format_report_name,
-            sync_menu_labels_for_client_action,
-            write_account_report_name,
-        )
-    except ImportError:
-        return None
+        from create_cpc_budget_analytique import create_toolbox_cpc_budget_analytique
+    except ImportError as exc:
+        return {"ok": False, "error": str(exc)}
     try:
-        rids = _ek(
-            models,
-            db,
-            uid,
-            pwd,
-            "account.report",
-            "search",
-            [[("name", "ilike", "CPC SYSCOHADA"), ("name", "ilike", "Budget Analytique")]],
-            {"limit": 60},
-        ) or []
-    except Exception:
-        return None
-    legacy: list[int] = []
-    seen: set[int] = set()
-    for rid in rids:
-        ri = int(rid)
-        if ri in seen:
-            continue
-        rows = _ek(models, db, uid, pwd, "account.report", "read", [[ri]], {"fields": ["name"]})
-        if not rows:
-            continue
-        lab = format_report_name(rows[0].get("name"))
-        if not _display_name_is_legacy_cpc_senedoo_budget_analytique(lab):
-            continue
-        legacy.append(ri)
-        seen.add(ri)
-    if len(legacy) != 1:
-        return None
-    rid = legacy[0]
-    try:
-        new_hits = _ek(
-            models,
-            db,
-            uid,
-            pwd,
-            "account.report",
-            "search",
-            [[("name", "=", CPC_REPORT_TOOLBOX_EXACT)]],
-            {"limit": 20},
-        ) or []
-    except Exception:
-        new_hits = []
-    nhset = {int(x) for x in new_hits}
-    if nhset and rid not in nhset:
-        return None
-    try:
-        write_account_report_name(models, db, uid, pwd, rid, CPC_REPORT_TOOLBOX_EXACT)
-    except Exception:
-        return None
-    try:
-        ensure_account_report_client_action(
-            models, db, uid, pwd, rid, action_name=CPC_REPORT_TOOLBOX_EXACT
-        )
-        for aid in find_all_account_report_client_action_ids(models, db, uid, pwd, rid):
-            sync_menu_labels_for_client_action(
-                models, db, uid, pwd, int(aid), CPC_REPORT_TOOLBOX_EXACT
-            )
-    except Exception:
-        pass
-    return rid
+        out = create_toolbox_cpc_budget_analytique(models, db, uid, pwd)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    out["ok"] = True
+    return out
 
 
 def _budget_fields_summary_for_user_message(ba: dict[str, Any]) -> str:
@@ -766,10 +709,19 @@ def create_cpc_wizard(
 
     Retourne un dict avec les IDs créés et des messages de diagnostic.
     Idempotent : purge l'instance existante avant de recréer.
+    Recrée aussi le rapport ``account.report`` toolbox (un seul en base après installation).
     """
     purge_cpc_wizard(models, db, uid, pwd)
 
     result: dict[str, Any] = {}
+
+    inst = _install_fresh_toolbox_cpc_budget_report(models, db, uid, pwd)
+    result["cpc_toolbox_install"] = inst
+    if not inst.get("ok"):
+        raise RuntimeError(
+            inst.get("error")
+            or "Echec creation du rapport CPC toolbox (voir logs / droits Odoo)."
+        )
 
     # ---- 0. Champs analytique sur les budgets financiers (reporting) -------
     result["budget_analytic_fields"] = ensure_budget_report_analytic_fields(
@@ -892,18 +844,15 @@ def create_cpc_wizard(
             "error": str(pct_exc),
         }
     rep = result.get("cpc_repair") or {}
-    renamed_rid = _rename_legacy_cpc_budget_report_display_name(models, db, uid, pwd)
-    if renamed_rid is not None:
-        result["cpc_legacy_report_renamed_id"] = renamed_rid
+    inst = result.get("cpc_toolbox_install") or {}
+    new_rid = int((inst.get("report_id") or 0))
     result["message"] = (
         f"Wizard Budget par projet cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
         f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL}. "
         f"Champs budget : {summary}."
     )
-    if renamed_rid is not None:
-        result["message"] += (
-            f" Rapport CPC Odoo renomme (Budget Analytique -> Budget par projet), id={renamed_rid}."
-        )
+    if new_rid:
+        result["message"] += f" Rapport CPC toolbox recree (account.report id={new_rid})."
     if int(rep.get("formula_writes") or 0):
         result["message"] += (
             f" Colonne % : {rep['formula_writes']} expression(s) avec denominateur securise "
