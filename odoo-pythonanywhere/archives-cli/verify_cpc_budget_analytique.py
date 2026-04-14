@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Contrôle du rapport « CPC SYSCOHADA — Budget Analytique (Senedoo) » sur une base Odoo.
+Contrôle du rapport « CPC SYSCOHADA — Budget par projet (Senedoo) » sur une base Odoo.
 
 Vérifie :
   - présence du account.report (nom exact ou --report-id) ;
@@ -112,7 +112,7 @@ def verify_cpc_budget_analytique_report(
         if not ids:
             errors.append(
                 f"Aucun rapport trouvé pour le nom exact « {name} ». "
-                "Créez-le via l’outillage d’intégration (ex. « Créer / recréer le CPC Budget Analytique ») "
+                "Créez-le via l’outillage d’intégration (ex. « Créer / recréer le CPC Budget par projet ») "
                 "ou passez --report-id."
             )
             return {
@@ -445,7 +445,7 @@ def verify_cpc_budget_analytique_report(
 
 def _print_report(result: dict[str, Any], base_url: str, *, verbose: bool = False) -> None:
     print("=" * 72)
-    print("  Contrôle — CPC SYSCOHADA — Budget Analytique (Senedoo)")
+    print("  Contrôle — CPC SYSCOHADA — Budget par projet (Senedoo)")
     print("=" * 72)
 
     rid = result.get("report_id")
@@ -511,7 +511,7 @@ def _print_report(result: dict[str, Any], base_url: str, *, verbose: bool = Fals
 
 def main() -> int:
     p = argparse.ArgumentParser(
-        description="Vérifie que le rapport CPC Budget Analytique toolbox est bien créé."
+        description="Vérifie que le rapport CPC Budget par projet (toolbox) est bien créé."
     )
     p.add_argument("--report-id", type=int, default=None, help="ID account.report (sinon recherche par nom)")
     p.add_argument(

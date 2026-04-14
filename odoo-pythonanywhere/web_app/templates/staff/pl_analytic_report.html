@@ -56,7 +56,7 @@
     (1) <strong>Copie P&amp;L pilotage</strong> (optionnel) : si vous connaissez l’id d’un <code>account.report</code> source,
     la toolbox en duplique une copie avec filtres analytique et budgets — pour parcourir les rapports dans un tableau,
     utiliser l’utilitaire <strong>P&amp;L personnalisé</strong>.
-    (2) <strong>Wizard CPC SYSCOHADA</strong> : après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
+    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
     injecte le budget financier sur la colonne externe du CPC et affiche dans le statut du wizard la liste des
     <strong>codes comptes budgétisés</strong> (non nuls). Réinstallez le wizard depuis la toolbox après une mise à jour pour
     appliquer les correctifs d’expressions « % » (évite la division par zéro si budget = 0).
@@ -155,11 +155,11 @@
 </div>
 
 <div class="sn-card">
-  <h2 style="margin-top:0;font-size:1.05rem;">Wizard CPC Budget Analytique — installation dans Odoo</h2>
+  <h2 style="margin-top:0;font-size:1.05rem;">Budget par projet (CPC) — installation dans Odoo</h2>
   {% if cpc_wizard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
     &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.
-    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; CPC Budget Analytique (Senedoo)</strong>.
+    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; Budget par projet (Senedoo)</strong>.
   </p>
   {% endif %}
   <details class="sn-doc" style="margin:0 0 0.75rem;">
@@ -179,7 +179,7 @@
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="create_cpc_wizard">
       <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>
-        {% if cpc_wizard_installed %}Mettre a jour le Wizard CPC{% else %}Installer le Wizard CPC (Odoo){% endif %}
+        {% if cpc_wizard_installed %}Mettre a jour Budget par projet{% else %}Installer Budget par projet (Odoo){% endif %}
       </button>
     </form>
     {% if cpc_wizard_installed %}

@@ -1,5 +1,5 @@
 """
-Crée dans Odoo (via XML-RPC) un wizard natif « CPC Budget Analytique ».
+Crée dans Odoo (via XML-RPC) un wizard natif « Budget par projet » (CPC SYSCOHADA).
 
 Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
   - Compte analytique, budget financier (account.report.budget), période Du/Au
@@ -9,7 +9,7 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
       4. Écrit account.report.external.value (colonne Budget du rapport CPC)
       5. Ouvre le rapport CPC dans Odoo (priorite au rapport toolbox nom exact, sinon copie la plus recente)
-  - Menu : Comptabilité > Rapports > CPC Budget Analytique (Senedoo) — supprime puis recree a chaque install/update wizard
+  - Menu : Comptabilité > Rapports > Budget par projet (Senedoo) — supprime puis recree a chaque install/update wizard
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
@@ -28,11 +28,13 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 WIZARD_MODEL   = "x_cpc_budget_wizard"
-WIZARD_NAME    = "CPC Budget Analytique"
-WIZARD_MENU_LABEL = "CPC Budget Analytique (Senedoo)"
+WIZARD_NAME    = "Budget par projet (Senedoo)"
+WIZARD_MENU_LABEL = "Budget par projet (Senedoo)"
+# Anciens libellés de menu (purge pour éviter doublons après renommage)
+WIZARD_MENU_PREVIOUS_NAMES = ("CPC Budget Analytique (Senedoo)",)
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
-# Nom exact de la copie créée par la toolbox (aligné sur create_cpc_budget_analytique)
-CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget Analytique (Senedoo)"
+# Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
+CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
 EXTERNAL_EXPR_LABEL = "budget_analytique"  # label expression externe à peupler
 
 # Champs créés sur les modèles budget reporting (Many2one vers l’axe analytique)
@@ -230,7 +232,7 @@ if not cpc_report:
     _cands = env['account.report'].search([('name', 'ilike', ''' + repr(CPC_REPORT_NAME_LIKE) + ")], order='id desc', limit=30)" + r'''
     for r in _cands:
         _nm = r.name or ''
-        if ('Budget Analytique' in _nm) or ('Senedoo' in _nm):
+        if ('Budget par projet' in _nm) or ('Budget Analytique' in _nm) or ('Senedoo' in _nm):
             cpc_report = r
             break
     if not cpc_report and _cands:
@@ -668,7 +670,7 @@ def create_cpc_wizard(
     pwd: str,
 ) -> dict[str, Any]:
     """
-    Crée le wizard CPC Budget Analytique dans Odoo via XML-RPC.
+    Crée le wizard Budget par projet dans Odoo via XML-RPC.
 
     Retourne un dict avec les IDs créés et des messages de diagnostic.
     Idempotent : purge l'instance existante avant de recréer.
@@ -740,7 +742,7 @@ def create_cpc_wizard(
 
     # ---- 3. Server action (Python code) — model_id déjà connu ---------------
     sa_id = _ek(models, db, uid, pwd, "ir.actions.server", "create", [{
-        "name":     f"Calculer CPC Budget ({WIZARD_NAME})",
+        "name":     f"Calculer budget projet ({WIZARD_NAME})",
         "model_id": model_id,
         "state":    "code",
         "code":     _SERVER_ACTION_CODE,
@@ -852,8 +854,10 @@ def purge_cpc_wizard(models: Any, db: str, uid: int, pwd: str) -> dict[str, Any]
     purged: list[str] = []
 
     # Menu
-    menu_ids = _ek(models, db, uid, pwd, "ir.ui.menu", "search",
-                   [[("name", "=", WIZARD_MENU_LABEL)]])
+    _menu_names = [WIZARD_MENU_LABEL] + list(WIZARD_MENU_PREVIOUS_NAMES)
+    menu_ids = _ek(
+        models, db, uid, pwd, "ir.ui.menu", "search", [[("name", "in", _menu_names)]]
+    )
     if menu_ids:
         _ek(models, db, uid, pwd, "ir.ui.menu", "unlink", [menu_ids])
         purged.append(f"menus({menu_ids})")

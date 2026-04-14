@@ -57,7 +57,7 @@ USERNAME = "admin@exemple.com"
 API_KEY  = "VOTRE_CLE_API"
 
 # Nom du rapport à créer
-REPORT_NAME = "CPC SYSCOHADA — Budget Analytique"
+REPORT_NAME = "CPC SYSCOHADA — Budget par projet (Senedoo)"
 
 # Exercice fiscal en cours (pour initialisation des budgets de démonstration)
 FISCAL_YEAR_START = "2025-01-01"

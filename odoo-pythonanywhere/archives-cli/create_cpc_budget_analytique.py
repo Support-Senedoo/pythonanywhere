@@ -29,7 +29,7 @@ from typing import Any
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
 from personalize_syscohada_detail import execute_kw
 
-CPC_BUDGET_ANALYTIQUE_NAME = "CPC SYSCOHADA \u2014 Budget Analytique (Senedoo)"
+CPC_BUDGET_ANALYTIQUE_NAME = "CPC SYSCOHADA \u2014 Budget par projet (Senedoo)"
 
 # Structure CPC SYSCOHADA \u2014 Plan comptable OHADA / S\u00e9n\u00e9gal
 # Format : (code, libell\u00e9, nature, formule_account_codes, formule_aggregation)

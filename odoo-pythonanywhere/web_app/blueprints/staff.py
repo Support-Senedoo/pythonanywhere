@@ -374,7 +374,7 @@ def _staff_financial_budgets_for_odoo(
 
 
 def _staff_cpc_wizard_installed(models: Any, db: str, uid: int, pwd: str) -> bool:
-    """True si le wizard CPC Budget Analytique est installé sur cette base Odoo."""
+    """True si le wizard Budget par projet (x_cpc_budget_wizard) est installé sur cette base Odoo."""
     try:
         from create_cpc_odoo_wizard import cpc_wizard_exists
 
@@ -396,7 +396,7 @@ def _staff_manager_dashboard_installed(models: Any, db: str, uid: int, pwd: str)
 def pl_analytic_project_report():
     """
     Utilitaire staff : budgets financiers visibles, copie P&L pilotage (id ``account.report`` saisi),
-    wizard CPC Budget Analytique, Tableau de Bord Manager.
+    wizard Budget par projet (CPC), Tableau de Bord Manager.
 
     La liste des rapports Odoo n’est plus affichée ici (rapport CPC autonome via le wizard) ;
     pour parcourir et dupliquer depuis un tableau, utiliser « P&L personnalisé ».
@@ -748,7 +748,7 @@ def pl_analytic_project_report():
                 from create_cpc_odoo_wizard import create_cpc_wizard
 
                 result = create_cpc_wizard(models, db, uid, pwd)
-                _msg = result.get("message") or "Wizard CPC Budget Analytique installe dans Odoo."
+                _msg = result.get("message") or "Wizard Budget par projet installe dans Odoo."
                 # La session Flask (flash) vit dans le cookie si pas de flask-session : garder un message court.
                 if len(_msg) > 3500:
                     _msg = _msg[:3490] + "…"
