@@ -37,6 +37,8 @@ WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%")
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
 # Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
 CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
+# Ancien libellé affiché dans Odoo (bases créées avant le renommage « Budget par projet »)
+_LEGACY_CPC_NAME_MARKERS = ("cpc syscohada", "budget analytique", "senedoo")
 EXTERNAL_EXPR_LABEL = "budget_analytique"  # label expression externe à peupler
 
 # Champs créés sur les modèles budget reporting (Many2one vers l’axe analytique)
@@ -644,6 +646,94 @@ def ensure_budget_report_analytic_fields(
     )}
 
 
+def _display_name_is_legacy_cpc_senedoo_budget_analytique(label: str) -> bool:
+    """True si le libellé affiché correspond à l'ancien rapport toolbox « Budget Analytique »."""
+    s = (label or "").strip().lower()
+    if "budget par projet" in s:
+        return False
+    return all(m in s for m in _LEGACY_CPC_NAME_MARKERS)
+
+
+def _rename_legacy_cpc_budget_report_display_name(
+    models: Any, db: str, uid: int, pwd: str
+) -> int | None:
+    """
+    Une seule occurrence « CPC SYSCOHADA … Budget Analytique … Senedoo » : renomme vers
+    :data:`CPC_REPORT_TOOLBOX_EXACT` et aligne actions client + libellés de menu Odoo.
+    """
+    try:
+        from web_app.odoo_account_reports import (
+            ensure_account_report_client_action,
+            find_all_account_report_client_action_ids,
+            format_report_name,
+            sync_menu_labels_for_client_action,
+            write_account_report_name,
+        )
+    except ImportError:
+        return None
+    try:
+        rids = _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "account.report",
+            "search",
+            [[("name", "ilike", "CPC SYSCOHADA"), ("name", "ilike", "Budget Analytique")]],
+            {"limit": 60},
+        ) or []
+    except Exception:
+        return None
+    legacy: list[int] = []
+    seen: set[int] = set()
+    for rid in rids:
+        ri = int(rid)
+        if ri in seen:
+            continue
+        rows = _ek(models, db, uid, pwd, "account.report", "read", [[ri]], {"fields": ["name"]})
+        if not rows:
+            continue
+        lab = format_report_name(rows[0].get("name"))
+        if not _display_name_is_legacy_cpc_senedoo_budget_analytique(lab):
+            continue
+        legacy.append(ri)
+        seen.add(ri)
+    if len(legacy) != 1:
+        return None
+    rid = legacy[0]
+    try:
+        new_hits = _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "account.report",
+            "search",
+            [[("name", "=", CPC_REPORT_TOOLBOX_EXACT)]],
+            {"limit": 20},
+        ) or []
+    except Exception:
+        new_hits = []
+    nhset = {int(x) for x in new_hits}
+    if nhset and rid not in nhset:
+        return None
+    try:
+        write_account_report_name(models, db, uid, pwd, rid, CPC_REPORT_TOOLBOX_EXACT)
+    except Exception:
+        return None
+    try:
+        ensure_account_report_client_action(
+            models, db, uid, pwd, rid, action_name=CPC_REPORT_TOOLBOX_EXACT
+        )
+        for aid in find_all_account_report_client_action_ids(models, db, uid, pwd, rid):
+            sync_menu_labels_for_client_action(
+                models, db, uid, pwd, int(aid), CPC_REPORT_TOOLBOX_EXACT
+            )
+    except Exception:
+        pass
+    return rid
+
+
 def _budget_fields_summary_for_user_message(ba: dict[str, Any]) -> str:
     """Résumé court pour flash UI (éviter cookie de session > 4 Ko avec SecureCookieSession)."""
     by = (ba or {}).get("by_model") or {}
@@ -802,11 +892,18 @@ def create_cpc_wizard(
             "error": str(pct_exc),
         }
     rep = result.get("cpc_repair") or {}
+    renamed_rid = _rename_legacy_cpc_budget_report_display_name(models, db, uid, pwd)
+    if renamed_rid is not None:
+        result["cpc_legacy_report_renamed_id"] = renamed_rid
     result["message"] = (
         f"Wizard Budget par projet cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
         f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL}. "
         f"Champs budget : {summary}."
     )
+    if renamed_rid is not None:
+        result["message"] += (
+            f" Rapport CPC Odoo renomme (Budget Analytique -> Budget par projet), id={renamed_rid}."
+        )
     if int(rep.get("formula_writes") or 0):
         result["message"] += (
             f" Colonne % : {rep['formula_writes']} expression(s) avec denominateur securise "
