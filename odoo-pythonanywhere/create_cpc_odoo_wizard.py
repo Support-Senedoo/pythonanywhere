@@ -227,7 +227,7 @@ LINE_SIGN = ''' + repr(_LINE_SIGN) + r'''
 TOOLBOX_EXACT = ''' + repr(CPC_REPORT_TOOLBOX_EXACT) + r'''
 cpc_report = env['account.report'].search([('name', '=', TOOLBOX_EXACT)], limit=1)
 if not cpc_report:
-    _cands = env['account.report'].search([('name', 'ilike', ''' + repr(CPC_REPORT_NAME_LIKE) + "')], order='id desc', limit=30)" + r'''
+    _cands = env['account.report'].search([('name', 'ilike', ''' + repr(CPC_REPORT_NAME_LIKE) + ")], order='id desc', limit=30)" + r'''
     for r in _cands:
         _nm = r.name or ''
         if ('Budget Analytique' in _nm) or ('Senedoo' in _nm):
