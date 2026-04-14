@@ -310,15 +310,18 @@ def cpc_budget_pct_aggregation_formula(
     currency_code: str = "XOF",
 ) -> str:
     """
-    Formule moteur ``aggregation`` pour la colonne %.
-    Epsilon numerique ``+0.0001`` sur le budget (Odoo n'accepte pas ``XOF(0.0001)``
-    dans la formule d'agrégation — seuls nombres et ``code.label``).
+    Formule moteur ``aggregation`` pour la colonne % (rapport Réalisé / Budget).
+
+    Le quotient ``balance/budget`` n'est évalué que lorsque ``budget > 1`` unité de
+    devise (voir :func:`cpc_budget_pct_subformula`) : sans budget sélectionné ou à zéro,
+    la colonne % reste nulle au lieu d'exploser (``+0.0001`` au dénominateur produisait
+    des pourcentages astronomiques en CFA).
     """
     if not budget_pct_meaningful:
         return "0"
     _ = currency_code
     c = (line_code or "").strip()
-    return f"{c}.balance*100/({c}.budget+0.0001)"
+    return f"{c}.balance*100/{c}.budget"
 
 
 def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
@@ -348,62 +351,187 @@ def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
 
 def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
     """
-    Sous-formule du moteur \u00ab Aggregate Other Formulas \u00bb : le r\u00e9sultat de la formule
-    (``balance/budget*100``) n'est renvoy\u00e9 que si ``budget > 0``, sinon 0 \u2014 \u00e9vite la
-    division par z\u00e9ro. Voir doc Odoo 19 : ``if_other_expr_above(LINE.LABEL, CUR(amount))``.
+    Sous-formule du moteur « agrégation » : n'évalue le % que si le budget dépasse
+    1 unité de la devise de la société (seuil monétaire, pas un epsilon infinitésimal).
+    Voir Odoo : ``if_other_expr_above(LINE.LABEL, CUR(amount))``.
     """
     c = (line_code or "").strip()
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(0.0001))"
+    return f"if_other_expr_above({c}.budget, {cur}(1))"
 
 
 # ---------------------------------------------------------------------------
 # API publique
 # ---------------------------------------------------------------------------
 
+def _report_display_label(raw: Any) -> str:
+    """Libellé affichable depuis ``account.report.name`` (chaîne ou traductions)."""
+    if isinstance(raw, dict):
+        for k in ("fr_FR", "fr_BE", "fr_CA", "en_US", "en_GB"):
+            v = raw.get(k)
+            if v:
+                return str(v)
+        for v in raw.values():
+            if v:
+                return str(v)
+        return ""
+    return str(raw or "")
+
+
+def is_toolbox_cpc_senedoo_report_label(label: str) -> bool:
+    """
+    True pour les rapports créés par la toolbox Senedoo (CPC + SYSCOHADA + Senedoo
+    + Budget par projet ou Budget analytique). Exclut les autres rapports « cpc ».
+    """
+    s = (label or "").strip().lower()
+    if "senedoo" not in s:
+        return False
+    if "syscohada" not in s:
+        return False
+    if "cpc" not in s:
+        return False
+    return "budget par projet" in s or "budget analytique" in s
+
+
+def collect_toolbox_cpc_senedoo_budget_report_ids(
+    models: Any, db: str, uid: int, password: str
+) -> list[int]:
+    """Tous les ``account.report`` toolbox CPC Senedoo (doublons, anciens libellés)."""
+    seen: set[int] = set()
+    candidates: list[int] = []
+    domains: list[list[Any]] = [
+        [("name", "=", CPC_BUDGET_ANALYTIQUE_NAME)],
+        [
+            "&",
+            "&",
+            ("name", "ilike", "Senedoo"),
+            ("name", "ilike", "SYSCOHADA"),
+            "|",
+            ("name", "ilike", "Budget par projet"),
+            ("name", "ilike", "Budget Analytique"),
+        ],
+    ]
+    for domain in domains:
+        try:
+            chunk = _ek(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "search",
+                [domain],
+                {"limit": 200},
+            ) or []
+        except Exception:
+            continue
+        for x in chunk:
+            ri = int(x)
+            if ri not in seen:
+                seen.add(ri)
+                candidates.append(ri)
+    out: list[int] = []
+    for ri in candidates:
+        try:
+            rows = _ek(
+                models,
+                db,
+                uid,
+                password,
+                "account.report",
+                "read",
+                [[ri]],
+                {"fields": ["name"]},
+            )
+        except Exception:
+            continue
+        if not rows:
+            continue
+        lab = _report_display_label(rows[0].get("name"))
+        if is_toolbox_cpc_senedoo_report_label(lab):
+            out.append(ri)
+    return out
+
+
+def _delete_account_report_structure_only(
+    models: Any, db: str, uid: int, password: str, rid: int
+) -> None:
+    """Supprime colonnes, lignes, expressions puis le rapport (sans menus / actions client)."""
+    ri = int(rid)
+    cols = _ek(
+        models, db, uid, password, "account.report.column", "search",
+        [[["report_id", "=", ri]]],
+    )
+    if cols:
+        _ek(models, db, uid, password, "account.report.column", "unlink", [cols])
+    lines = _ek(
+        models, db, uid, password, "account.report.line", "search",
+        [[["report_id", "=", ri]]],
+    )
+    if lines:
+        exprs = _ek(
+            models, db, uid, password, "account.report.expression", "search",
+            [[["report_line_id", "in", lines]]],
+        )
+        if exprs:
+            _ek(models, db, uid, password, "account.report.expression", "unlink", [exprs])
+        _ek(models, db, uid, password, "account.report.line", "unlink", [lines])
+    _ek(models, db, uid, password, "account.report", "unlink", [[ri]])
+
+
+def purge_toolbox_cpc_senedoo_budget_reports(
+    models: Any, db: str, uid: int, password: str
+) -> list[int]:
+    """
+    Supprime toutes les instances toolbox CPC Senedoo (menus + actions client si
+    ``web_app`` importable, sinon structure ``account.report`` seule).
+    """
+    ids = collect_toolbox_cpc_senedoo_budget_report_ids(models, db, uid, password)
+    purged: list[int] = []
+    unlink_fn = None
+    try:
+        from web_app.odoo_account_reports import unlink_account_report
+
+        unlink_fn = unlink_account_report
+    except ImportError:
+        pass
+    for rid in ids:
+        ri = int(rid)
+        try:
+            if unlink_fn is not None:
+                unlink_fn(models, db, uid, password, ri)
+            else:
+                _delete_account_report_structure_only(models, db, uid, password, ri)
+            purged.append(ri)
+        except Exception:
+            if unlink_fn is not None:
+                try:
+                    _delete_account_report_structure_only(models, db, uid, password, ri)
+                    purged.append(ri)
+                except Exception:
+                    pass
+    return purged
+
+
 def collect_cpc_budget_report_ids_for_cleanup(
     models: Any, db: str, uid: int, password: str
 ) -> list[int]:
     """
-    Retourne les IDs des rapports toolbox CPC budget analytique existants
-    (identifi\u00e9s par le nom exact ``CPC_BUDGET_ANALYTIQUE_NAME``).
+    Retourne les IDs des rapports toolbox CPC Senedoo (même jeu que la purge complète).
     """
-    try:
-        ids = _ek(models, db, uid, password, "account.report", "search",
-                  [[["name", "=", CPC_BUDGET_ANALYTIQUE_NAME]]])
-        return [int(i) for i in (ids or [])]
-    except Exception:
-        return []
+    return collect_toolbox_cpc_senedoo_budget_report_ids(models, db, uid, password)
 
 
 def purge_cpc_budget_analytique_instances(
     models: Any, db: str, uid: int, password: str
 ) -> list[int]:
     """
-    Supprime toutes les instances toolbox CPC budget analytique (colonnes, expressions,
-    lignes, rapport). Retourne les IDs supprim\u00e9s.
+    Supprime toutes les instances toolbox CPC Senedoo (colonnes, expressions,
+    lignes, rapport, menus et actions client lorsque disponible). Retourne les IDs supprimés.
     """
-    prior = collect_cpc_budget_report_ids_for_cleanup(models, db, uid, password)
-    for rid in prior:
-        try:
-            cols = _ek(models, db, uid, password, "account.report.column", "search",
-                       [[["report_id", "=", rid]]])
-            if cols:
-                _ek(models, db, uid, password, "account.report.column", "unlink", [cols])
-            lines = _ek(models, db, uid, password, "account.report.line", "search",
-                        [[["report_id", "=", rid]]])
-            if lines:
-                exprs = _ek(models, db, uid, password, "account.report.expression", "search",
-                            [[["report_line_id", "in", lines]]])
-                if exprs:
-                    _ek(models, db, uid, password, "account.report.expression", "unlink", [exprs])
-                _ek(models, db, uid, password, "account.report.line", "unlink", [lines])
-            _ek(models, db, uid, password, "account.report", "unlink", [[rid]])
-        except Exception:
-            pass
-    return prior
+    return purge_toolbox_cpc_senedoo_budget_reports(models, db, uid, password)
 
 
 def create_toolbox_cpc_budget_analytique(
@@ -413,7 +541,7 @@ def create_toolbox_cpc_budget_analytique(
     Cr\u00e9e le rapport CPC SYSCOHADA \u2014 Budget Analytique sur la base Odoo indiqu\u00e9e.
 
     Op\u00e9rations :
-      1. Supprime les instances toolbox pr\u00e9existantes (m\u00eame nom).
+      1. Supprime toutes les instances toolbox CPC Senedoo (un seul jeu autoris\u00e9 apr\u00e8s cr\u00e9ation).
       2. Cr\u00e9e l'enregistrement account.report avec filter_analytic=True.
       3. Active filter_budgets / filter_budget sur le rapport si le mod\u00e8le les expose.
       4. Cr\u00e9e 4 colonnes : R\u00e9alis\u00e9 / Budget / \u00c9cart / % R\u00e9alisation.
@@ -602,7 +730,7 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        f"{code}.budget - {code}.balance",
                 "date_scope":     "strict_range",
             })
-            # % R\u00e9alisation (d\u00e9nominateur budget + devise epsilon, sans subformula)
+            # % Réalisation (quotient balance/budget, masqué si budget ≤ 1 unité devise)
             _pct_vals: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
@@ -615,6 +743,8 @@ def create_toolbox_cpc_budget_analytique(
                 ),
                 "date_scope":     "strict_range",
             }
+            if budget_pct_meaningful:
+                _pct_vals["subformula"] = cpc_budget_pct_subformula(code, currency_code)
             _push_expr(_pct_vals)
 
         elif nature == "aggregate":
@@ -645,7 +775,7 @@ def create_toolbox_cpc_budget_analytique(
                 "formula":        f"{code}.budget - {code}.balance",
                 "date_scope":     "strict_range",
             })
-            # % R\u00e9alisation (d\u00e9nominateur budget + devise epsilon, sans subformula)
+            # % Réalisation (quotient balance/budget, masqué si budget ≤ 1 unité devise)
             _pct_vals_b: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
@@ -658,6 +788,8 @@ def create_toolbox_cpc_budget_analytique(
                 ),
                 "date_scope":     "strict_range",
             }
+            if budget_pct_meaningful:
+                _pct_vals_b["subformula"] = cpc_budget_pct_subformula(code, currency_code)
             _push_expr(_pct_vals_b)
 
     verification: dict[str, Any] = {}

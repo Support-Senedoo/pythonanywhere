@@ -9,7 +9,8 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
       4. Écrit account.report.external.value (colonne Budget du rapport CPC)
       5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
-  - Menu : Comptabilité > Rapports > Assistant budget projet (Senedoo) — ouvre le formulaire wizard (pas le rapport seul)
+  - Menu : Comptabilité > Rapports > Assistant budget projet (Senedoo) — action serveur qui ouvre le formulaire ;
+    domain sur le budget selon l'analytique ; bouton « Remplir le rapport CPC » (action serveur Calculer).
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
@@ -525,28 +526,43 @@ action = {
 '''
 
 def _make_form_view_arch(sa_id: int) -> str:
-    """Vue formulaire avec bouton Calculer pointant sur le server action (type=action)."""
+    """Vue formulaire : analytique → budgets filtres → période ; bouton serveur dans l'en-tête et le pied."""
     return f"""<?xml version="1.0"?>
 <form string="{WIZARD_NAME}">
+  <header>
+    <button name="{sa_id}" type="action" string="Remplir le rapport CPC"
+            class="oe_highlight" icon="fa-calculator"
+            title="Injecte le budget sur le CPC et ouvre le rapport pour la periode choisie"/>
+  </header>
   <sheet>
     <div class="oe_title">
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
-        Ce formulaire s'ouvre depuis le menu Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)
-        (pas depuis le rapport CPC seul). Choisissez le compte analytique, le budget financier rattache
-        (champs x_analytic_account_id crees par la toolbox), la periode, puis Calculez pour injecter le budget CPC.
+        1) Choisissez le <strong>compte analytique du projet</strong>.
+        2) Choisissez le <strong>budget financier</strong> (liste limitee aux budgets ou la toolbox ou Studio a renseigne
+        x_analytic_account_id ou analytic_account_id sur ce projet).
+        3) Ajustez la <strong>periode</strong> si besoin, puis <strong>Remplir le rapport CPC</strong>.
       </p>
     </div>
-    <group>
-      <field name="x_analytic_account_id" required="1"/>
-      <field name="x_report_budget_id" required="1"
-             options="{{'no_create': True, 'no_create_edit': True}}"/>
+    <group string="Projet">
+      <field name="x_analytic_account_id" required="1"
+             options="{{'no_create': True, 'no_create_edit': True}}"
+             placeholder="Compte analytique du projet"/>
+      <field name="x_report_budget_id" string="Budget financier du projet"
+             domain="['|', ('x_analytic_account_id', '=', x_analytic_account_id), ('analytic_account_id', '=', x_analytic_account_id)]"
+             attrs="{{'invisible': [('x_analytic_account_id', '=', False)], 'required': [('x_analytic_account_id', '!=', False)]}}"
+             options="{{'no_create': True, 'no_create_edit': True}}"
+             placeholder="Budget rattache a ce projet"/>
+    </group>
+    <group string="Periode">
       <field name="x_date_from" required="1"/>
       <field name="x_date_to" required="1"/>
-      <field name="x_status" readonly="1"/>
+    </group>
+    <group string="Resultat">
+      <field name="x_status" readonly="1" nolabel="1"/>
     </group>
     <footer>
-      <button name="{sa_id}" type="action" string="Calculer"
+      <button name="{sa_id}" type="action" string="Remplir le rapport CPC"
               class="btn-primary" icon="fa-calculator"/>
       <button special="cancel" string="Fermer"/>
     </footer>
@@ -803,24 +819,41 @@ def create_cpc_wizard(
     }])
     result["view_id"] = view_id
 
-    # ---- 5. Action window ---------------------------------------------------
-    aw_id = _ek(models, db, uid, pwd, "ir.actions.act_window", "create", [{
-        "name":       WIZARD_NAME,
-        "res_model":  WIZARD_MODEL,
-        "view_mode":  "form",
-        "target":     "new",
-        "binding_model_id": model_id,
+    # ---- 5. Action serveur « menu » : ouvre le formulaire (pleine page + dates par défaut)
+    _vid = int(view_id)
+    menu_opener_code = (
+        "_ctx = {}\n"
+        "try:\n"
+        "    _today = context_today()\n"
+        "    _first = _today.replace(day=1)\n"
+        "    _ctx = {'default_x_date_from': str(_first), 'default_x_date_to': str(_today)}\n"
+        "except Exception:\n"
+        "    pass\n"
+        "action = {\n"
+        '    "type": "ir.actions.act_window",\n'
+        f'    "name": {repr(WIZARD_NAME)},\n'
+        f'    "res_model": {repr(WIZARD_MODEL)},\n'
+        '    "view_mode": "form",\n'
+        f'    "views": [[{_vid}, "form"]],\n'
+        '    "target": "current",\n'
+        '    "context": _ctx,\n'
+        "}\n"
+    )
+    sa_menu_id = _ek(models, db, uid, pwd, "ir.actions.server", "create", [{
+        "name":     f"Ouvrir {WIZARD_MENU_LABEL}",
+        "model_id": model_id,
+        "state":    "code",
+        "code":     menu_opener_code,
     }])
-    result["act_window_id"] = aw_id
+    result["menu_server_action_id"] = sa_menu_id
 
-    # ---- 6. Menu sous Comptabilité > Rapports -------------------------------
-    # Chercher le menu parent "Rapports" sous Comptabilité
+    # ---- 6. Menu sous Comptabilité > Rapports (lié à l'action serveur, pas act_window)
     parent_menu_id = _find_reports_menu(models, db, uid, pwd)
 
     menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [{
         "name":          WIZARD_MENU_LABEL,
         "parent_id":     parent_menu_id,
-        "action":        f"ir.actions.act_window,{aw_id}",
+        "action":        f"ir.actions.server,{int(sa_menu_id)}",
         "sequence":      99,
     }])
     result["menu_id"] = menu_id
@@ -847,8 +880,8 @@ def create_cpc_wizard(
     inst = result.get("cpc_toolbox_install") or {}
     new_rid = int((inst.get("report_id") or 0))
     result["message"] = (
-        f"Wizard Budget par projet cree : {WIZARD_MODEL}, action id={sa_id}, menu id={menu_id}. "
-        f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL}. "
+        f"Wizard Budget par projet cree : {WIZARD_MODEL}, action calcul id={sa_id}, menu id={menu_id}. "
+        f"Odoo : Comptabilite > Rapports > {WIZARD_MENU_LABEL} (ouvre le formulaire ; bouton Remplir le rapport CPC). "
         f"Champs budget : {summary}."
     )
     if new_rid:

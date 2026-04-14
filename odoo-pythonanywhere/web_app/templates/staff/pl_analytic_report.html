@@ -160,15 +160,15 @@
   {% if cpc_wizard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
     &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.
-    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)</strong> (formulaire avec bouton Calculer), pas le rapport CPC seul.
+    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)</strong> (formulaire pleine page : analytique, budget filtre, periode, bouton <strong>Remplir le rapport CPC</strong>).
   </p>
   {% endif %}
   <details class="sn-doc" style="margin:0 0 0.75rem;">
     <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ca marche ?</summary>
     <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
-      Installe un wizard natif Odoo (<code>x_cpc_budget_wizard</code>). Menu Odoo dedie
-      <strong>Assistant budget projet (Senedoo)</strong>. Le client saisit l'axe analytique
-      et la periode, clique <strong>Calculer</strong> : le CPC SYSCOHADA s'ouvre avec
+      Installe un wizard natif Odoo (<code>x_cpc_budget_wizard</code>). Menu dedie
+      <strong>Assistant budget projet (Senedoo)</strong> (action serveur → formulaire). Le client choisit l'axe analytique
+      (les budgets proposes sont filtres sur ce projet), la periode, puis <strong>Remplir le rapport CPC</strong> : le CPC SYSCOHADA s'ouvre avec
       Realise / Budget / Ecart / % et propose l'export PDF et Excel natifs.
       Si le wizard est deja present, le bouton l'ecrase (mise a jour).
     </p>

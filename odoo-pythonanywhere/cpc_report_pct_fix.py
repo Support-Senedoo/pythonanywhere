@@ -59,26 +59,33 @@ def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
     return "XOF"
 
 
-def pct_formula_epsilon(line_code: str, currency_code: str) -> str:
+def pct_formula_ratio(line_code: str, currency_code: str) -> str:
     """
-    Formule % avec epsilon numérique sur le budget (dénominateur jamais nul).
-
-    Odoo valide les formules « Aggregate Other Formulas » avec uniquement des
-    littéraux décimaux ou ``code.label`` — pas ``EUR(0.0001)`` etc. (ValidationError).
-    Le paramètre ``currency_code`` reste pour compatibilité d’appel avec la réparation RPC.
+    Formule % = balance*100/budget (agrégation). L’affichage n’a lieu que si le budget
+    dépasse 1 unité de devise — voir :func:`pct_subformula_budget_gate`.
     """
     _ = currency_code
     c = (line_code or "").strip()
-    return f"{c}.balance*100/({c}.budget+0.0001)"
+    return f"{c}.balance*100/{c}.budget"
 
 
-def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
-    """Conservé pour compatibilité archives ; la toolbox privilégie :func:`pct_formula_epsilon`."""
+def pct_subformula_budget_gate(line_code: str, currency_code: str) -> str:
+    """N’évalue le % que lorsque ``budget`` est strictement supérieur à 1 unité monétaire."""
     c = (line_code or "").strip()
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(0.0001))"
+    return f"if_other_expr_above({c}.budget, {cur}(1))"
+
+
+def pct_formula_epsilon(line_code: str, currency_code: str) -> str:
+    """Rétrocompat : utilise :func:`pct_formula_ratio` (l’ancien epsilon +0.0001 est abandonné)."""
+    return pct_formula_ratio(line_code, currency_code)
+
+
+def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
+    """Alias de :func:`pct_subformula_budget_gate` (même logique que ``create_cpc_budget_analytique``)."""
+    return pct_subformula_budget_gate(line_code, currency_code)
 
 
 def search_cpc_like_report_ids(
@@ -114,8 +121,8 @@ def rewrite_pct_formulas_safe_denominator(
     currency_code: str,
 ) -> int:
     """
-    Réécrit chaque expression ``pct`` en aggregation : formule epsilon + ``subformula`` vidée.
-    Ignore les formules déjà identiques ou la constante ``0``.
+    Réécrit chaque expression ``pct`` en agrégation : ``balance*100/budget`` avec
+    ``subformula`` ``if_other_expr_above(..., devise(1))`` pour masquer le % sans budget.
     """
     expr_ids = execute_kw(
         models,
@@ -163,12 +170,13 @@ def rewrite_pct_formulas_safe_denominator(
         code = (lines[0].get("code") or "").strip()
         if not code:
             continue
-        new_f = pct_formula_epsilon(code, currency_code)
+        new_f = pct_formula_ratio(code, currency_code)
+        new_sub = pct_subformula_budget_gate(code, currency_code)
         if old_raw.replace(" ", "") == new_f.replace(" ", ""):
             sub_old = (row.get("subformula") or "").strip()
-            if not sub_old:
+            if sub_old.replace(" ", "") == new_sub.replace(" ", ""):
                 continue
-        wvals: dict[str, Any] = {"formula": new_f, "subformula": False}
+        wvals: dict[str, Any] = {"formula": new_f, "subformula": new_sub}
         execute_kw(
             models,
             db,
