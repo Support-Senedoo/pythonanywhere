@@ -8,8 +8,8 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       2. Lit account.move.line (filtré analytique) → réalisé CPC
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
       4. Écrit account.report.external.value (colonne Budget du rapport CPC)
-      5. Ouvre le rapport CPC dans Odoo
-  - Menu : Comptabilité > Rapports > CPC Budget Analytique (Senedoo)
+      5. Ouvre le rapport CPC dans Odoo (priorite au rapport toolbox nom exact, sinon copie la plus recente)
+  - Menu : Comptabilité > Rapports > CPC Budget Analytique (Senedoo) — supprime puis recree a chaque install/update wizard
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
@@ -30,8 +30,10 @@ from typing import Any
 WIZARD_MODEL   = "x_cpc_budget_wizard"
 WIZARD_NAME    = "CPC Budget Analytique"
 WIZARD_MENU_LABEL = "CPC Budget Analytique (Senedoo)"
-CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike dans account.report
-EXTERNAL_EXPR_LABEL  = "budget_analytique"    # label expression externe à peupler
+CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
+# Nom exact de la copie créée par la toolbox (aligné sur create_cpc_budget_analytique)
+CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget Analytique (Senedoo)"
+EXTERNAL_EXPR_LABEL = "budget_analytique"  # label expression externe à peupler
 
 # Champs créés sur les modèles budget reporting (Many2one vers l’axe analytique)
 BUDGET_ANALYTIC_FIELD_NAME = "x_analytic_account_id"
@@ -221,14 +223,23 @@ for fname in ('x_analytic_account_id', 'analytic_account_id'):
 CPC_STRUCTURE = ''' + repr(_CPC_STRUCTURE) + r'''
 LINE_SIGN = ''' + repr(_LINE_SIGN) + r'''
 
-# ------------------------------------------------------------------ find CPC report
-cpc_reports = env['account.report'].search([('name', 'ilike', '''' + CPC_REPORT_NAME_LIKE + r'''')], limit=5)
-if not cpc_reports:
+# ------------------------------------------------------------------ find CPC report (eviter cpc_reports[0] imprevisible si plusieurs rapports)
+TOOLBOX_EXACT = ''' + repr(CPC_REPORT_TOOLBOX_EXACT) + r'''
+cpc_report = env['account.report'].search([('name', '=', TOOLBOX_EXACT)], limit=1)
+if not cpc_report:
+    _cands = env['account.report'].search([('name', 'ilike', ''' + repr(CPC_REPORT_NAME_LIKE) + "')], order='id desc', limit=30)" + r'''
+    for r in _cands:
+        _nm = r.name or ''
+        if ('Budget Analytique' in _nm) or ('Senedoo' in _nm):
+            cpc_report = r
+            break
+    if not cpc_report and _cands:
+        cpc_report = _cands[0]
+if not cpc_report:
     raise UserError(
         "Rapport CPC SYSCOHADA introuvable dans Odoo. "
         "Utilisez la toolbox Senedoo pour installer le rapport CPC d'abord."
     )
-cpc_report = cpc_reports[0]
 cpc_report_id = cpc_report.id
 
 # Récuperer les expressions externes (label='budget_analytique') par code de ligne

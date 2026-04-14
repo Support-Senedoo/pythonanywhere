@@ -2,10 +2,9 @@
 Réparation des rapports « CPC » sur Odoo SaaS (toolbox).
 
 1) Colonne % (moteur aggregation, label ``pct``) : remplace les formules du type
-   ``TA.balance/TA.budget*100`` par ``TA.balance*100/(TA.budget+XOF(0.0001))`` avec la
-   devise société — évite la division par zéro au niveau ligne **et** au dépliage par
-   compte (la ``subformula`` seule ne suffit pas toujours selon versions / chemins
-   d’évaluation Odoo).
+   ``TA.balance/TA.budget*100`` par ``TA.balance*100/(TA.budget+0.0001)`` — seuls les
+   nombres et les références ``code.label`` sont valides dans la formule Odoo (pas
+   ``XOF(…)`` dans l’agrégation) ; l’epsilon évite la division par zéro au dépliage compte.
 
 2) Détail par compte : sur les lignes feuilles avec moteur ``account_codes``, active
    ``user_groupby=account_id`` et ``foldable`` (comme ``personalize_syscohada_detail``),
@@ -61,12 +60,16 @@ def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
 
 
 def pct_formula_epsilon(line_code: str, currency_code: str) -> str:
-    """Formule % avec epsilon monétaire sur le budget (dénominateur jamais nul)."""
+    """
+    Formule % avec epsilon numérique sur le budget (dénominateur jamais nul).
+
+    Odoo valide les formules « Aggregate Other Formulas » avec uniquement des
+    littéraux décimaux ou ``code.label`` — pas ``EUR(0.0001)`` etc. (ValidationError).
+    Le paramètre ``currency_code`` reste pour compatibilité d’appel avec la réparation RPC.
+    """
+    _ = currency_code
     c = (line_code or "").strip()
-    cur = (currency_code or "XOF").strip().upper()
-    if len(cur) != 3 or not cur.isalpha():
-        cur = "XOF"
-    return f"{c}.balance*100/({c}.budget+{cur}(0.0001))"
+    return f"{c}.balance*100/({c}.budget+0.0001)"
 
 
 def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:

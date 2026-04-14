@@ -311,16 +311,14 @@ def cpc_budget_pct_aggregation_formula(
 ) -> str:
     """
     Formule moteur ``aggregation`` pour la colonne %.
-    Denominateur ``budget + DEVISE(epsilon)`` pour eviter la division par zero
-    (y compris au depliage par compte).
+    Epsilon numerique ``+0.0001`` sur le budget (Odoo n'accepte pas ``XOF(0.0001)``
+    dans la formule d'agrégation — seuls nombres et ``code.label``).
     """
     if not budget_pct_meaningful:
         return "0"
+    _ = currency_code
     c = (line_code or "").strip()
-    cur = (currency_code or "XOF").strip().upper()
-    if len(cur) != 3 or not cur.isalpha():
-        cur = "XOF"
-    return f"{c}.balance*100/({c}.budget+{cur}(0.0001))"
+    return f"{c}.balance*100/({c}.budget+0.0001)"
 
 
 def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
