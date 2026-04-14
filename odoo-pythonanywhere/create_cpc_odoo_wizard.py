@@ -525,7 +525,32 @@ action = {
 }
 '''
 
-def _make_form_view_arch(sa_id: int) -> str:
+def _report_budget_domain_arch(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> str:
+    """
+    Attribut ``domain`` pour ``x_report_budget_id`` dans la vue : Odoo valide les noms
+    de champs sur ``account.report.budget`` ; ``analytic_account_id`` n'existe pas sur
+    toutes les versions / bases (erreur « Champ inconnu » si on le référence à tort).
+    """
+    has_x = _field_exists(models, db, uid, pwd, "account.report.budget", BUDGET_ANALYTIC_FIELD_NAME)
+    has_std = _field_exists(models, db, uid, pwd, "account.report.budget", "analytic_account_id")
+    if has_x and has_std:
+        return (
+            "['|', ('x_analytic_account_id', '=', x_analytic_account_id), "
+            "('analytic_account_id', '=', x_analytic_account_id)]"
+        )
+    if has_x:
+        return "[('x_analytic_account_id', '=', x_analytic_account_id)]"
+    if has_std:
+        return "[('analytic_account_id', '=', x_analytic_account_id)]"
+    return "[]"
+
+
+def _make_form_view_arch(sa_id: int, budget_domain_arch: str) -> str:
     """Vue formulaire : analytique → budgets filtres → période ; bouton serveur dans l'en-tête et le pied."""
     return f"""<?xml version="1.0"?>
 <form string="{WIZARD_NAME}">
@@ -539,8 +564,8 @@ def _make_form_view_arch(sa_id: int) -> str:
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
         1) Choisissez le <strong>compte analytique du projet</strong>.
-        2) Choisissez le <strong>budget financier</strong> (liste limitee aux budgets ou la toolbox ou Studio a renseigne
-        x_analytic_account_id ou analytic_account_id sur ce projet).
+        2) Choisissez le <strong>budget financier</strong> (liste filtree sur l'axe lorsque le modele budget
+        expose un champ analytique reconnu par la toolbox).
         3) Ajustez la <strong>periode</strong> si besoin, puis <strong>Remplir le rapport CPC</strong>.
       </p>
     </div>
@@ -549,7 +574,7 @@ def _make_form_view_arch(sa_id: int) -> str:
              options="{{'no_create': True, 'no_create_edit': True}}"
              placeholder="Compte analytique du projet"/>
       <field name="x_report_budget_id" string="Budget financier du projet"
-             domain="['|', ('x_analytic_account_id', '=', x_analytic_account_id), ('analytic_account_id', '=', x_analytic_account_id)]"
+             domain="{budget_domain_arch}"
              attrs="{{'invisible': [('x_analytic_account_id', '=', False)], 'required': [('x_analytic_account_id', '!=', False)]}}"
              options="{{'no_create': True, 'no_create_edit': True}}"
              placeholder="Budget rattache a ce projet"/>
@@ -811,11 +836,12 @@ def create_cpc_wizard(
     result["server_action_id"] = sa_id
 
     # ---- 4. Vue formulaire (bouton référence le sa_id réel) -----------------
+    budget_dom = _report_budget_domain_arch(models, db, uid, pwd)
     view_id = _ek(models, db, uid, pwd, "ir.ui.view", "create", [{
         "name":    f"{WIZARD_MODEL}.form",
         "model":   WIZARD_MODEL,
         "type":    "form",
-        "arch":    _make_form_view_arch(sa_id),
+        "arch":    _make_form_view_arch(int(sa_id), budget_dom),
     }])
     result["view_id"] = view_id
 
