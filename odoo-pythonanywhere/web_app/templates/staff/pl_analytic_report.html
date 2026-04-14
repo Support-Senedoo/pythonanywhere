@@ -161,8 +161,9 @@
   {% if cpc_wizard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
     &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.
-    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)</strong> (formulaire : analytique, budget, periode, <strong>Remplir le rapport CPC</strong>)
-    et <strong>Reporting &gt; … &gt; CPC SYSCOHADA — rapport budget projet (Senedoo)</strong> pour le rapport seul (depliage comptes).
+    <strong>Lancer le wizard :</strong> Odoo <strong>Comptabilite &gt; Rapports &gt; Assistant budget projet (Senedoo)</strong>
+    (action serveur → formulaire : analytique, budget, periode, puis <strong>Remplir le rapport CPC</strong>).
+    Rapport seul (depliage comptes) : <strong>Reporting</strong> (menu dedie) <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>.
   </p>
   {% endif %}
   <details class="sn-doc" style="margin:0 0 0.75rem;">
@@ -203,7 +204,7 @@
       <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="repair_cpc_budget_reports">
-      <button type="submit" class="sn-btn sn-btn--ghost" title="Sans reinstaller le wizard : corrige la colonne % (division par zero) et active le depliage par compte sur les lignes CPC."
+      <button type="submit" class="sn-btn sn-btn--ghost" title="Met a jour les expressions % (ignore_zero_division + formule) et le groupby compte sur les rapports CPC existants."
               {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Reparer rapports CPC (% + comptes)</button>
     </form>
   </div>

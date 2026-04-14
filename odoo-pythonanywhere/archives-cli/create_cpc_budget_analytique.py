@@ -404,15 +404,19 @@ def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
 
 def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
     """
-    Sous-formule du moteur « agrégation » : n'évalue le % que si le budget dépasse
-    1 unité de la devise de la société (seuil monétaire, pas un epsilon infinitésimal).
-    Voir Odoo : ``if_other_expr_above(LINE.LABEL, CUR(amount))``.
+    Sous-formules du moteur « agrégation » (séparées par ``;``, Odoo Comptabilité) :
+
+    - ``if_other_expr_above(LINE.budget, CUR(1))`` : masquer le % quand le budget est
+      négligeable (seuil monétaire).
+    - ``ignore_zero_division`` : évite l'erreur « division par zéro » lorsque le budget
+      est 0 (ex. ligne dépliée par compte sous une rubrique TA) — ``if_other`` seul ne
+      suffit pas dans tous les chemins d'évaluation Odoo 19.
     """
     c = (line_code or "").strip()
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(1))"
+    return f"if_other_expr_above({c}.budget, {cur}(1));ignore_zero_division"
 
 
 # ---------------------------------------------------------------------------

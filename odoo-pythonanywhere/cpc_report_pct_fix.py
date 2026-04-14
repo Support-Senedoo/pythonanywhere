@@ -70,12 +70,14 @@ def pct_formula_ratio(line_code: str, currency_code: str) -> str:
 
 
 def pct_subformula_budget_gate(line_code: str, currency_code: str) -> str:
-    """N’évalue le % que lorsque ``budget`` est strictement supérieur à 1 unité monétaire."""
+    """
+    Seuil budget + ``ignore_zero_division`` (Odoo) pour éviter division par zéro au dépliage compte.
+    """
     c = (line_code or "").strip()
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(1))"
+    return f"if_other_expr_above({c}.budget, {cur}(1));ignore_zero_division"
 
 
 def pct_formula_epsilon(line_code: str, currency_code: str) -> str:
@@ -122,7 +124,7 @@ def rewrite_pct_formulas_safe_denominator(
 ) -> int:
     """
     Réécrit chaque expression ``pct`` en agrégation : ``balance*100/budget`` avec
-    ``subformula`` ``if_other_expr_above(..., devise(1))`` pour masquer le % sans budget.
+    sous-formule ``if_other_expr_above(..., devise(1));ignore_zero_division``.
     """
     expr_ids = execute_kw(
         models,
