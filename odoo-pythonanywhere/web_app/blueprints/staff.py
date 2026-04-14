@@ -335,26 +335,6 @@ def _pl_analytic_prefs_merge_save(**kwargs: Any) -> None:
     session.modified = True
 
 
-def _pl_analytic_highlight_info(
-    prefs: dict[str, Any],
-    selected: str,
-    reports: list[dict[str, Any]],
-) -> tuple[int | None, bool]:
-    """Dernière copie toolbox pour cette base : id + indique si absent du filtre courant."""
-    cid = (prefs.get("last_created_client_id") or "").strip().lower()
-    rid = prefs.get("last_created_report_id")
-    try:
-        rid_i = int(rid) if rid is not None else 0
-    except (TypeError, ValueError):
-        rid_i = 0
-    if not selected or not cid or cid != selected or rid_i <= 0:
-        return None, False
-    ids_in = {int(r["id"]) for r in reports}
-    if rid_i in ids_in:
-        return rid_i, False
-    return rid_i, True
-
-
 def _staff_financial_budgets_for_odoo(
     models: Any, db: str, uid: int, pwd: str
 ) -> list[dict[str, Any]]:
@@ -415,12 +395,11 @@ def _staff_manager_dashboard_installed(models: Any, db: str, uid: int, pwd: str)
 @login_required_staff
 def pl_analytic_project_report():
     """
-    Compte de résultat analytique (réalisé / budget / %) : tableau généré à la volée
-    via l’API (sans toucher aux rapports Odoo pour ce tableau).
+    Utilitaire staff : budgets financiers visibles, copie P&L pilotage (id ``account.report`` saisi),
+    wizard CPC Budget Analytique, Tableau de Bord Manager.
 
-    Sur la même page : copie personnalisée d’un ``account.report`` (comme « P&L analytique / budget ») :
-    duplication, options analytique/budget, renommage et suppression de la copie.
-    Période du tableau API = année civile en cours jusqu’à aujourd’hui (calcul serveur).
+    La liste des rapports Odoo n’est plus affichée ici (rapport CPC autonome via le wizard) ;
+    pour parcourir et dupliquer depuis un tableau, utiliser « P&L personnalisé ».
     """
     reg = _registry()
 
@@ -897,14 +876,9 @@ def pl_analytic_project_report():
             distinct_odoo_hosts=distinct_odoo_hosts(reg),
             selected_client=cid_r,
             filter_host=fh_r,
-            filter_q="",
             analytic_q="",
-            reports=[],
-            report_open_urls={},
             prefill_report_id=None,
             prefill_report_name="",
-            highlight_report_id=None,
-            highlight_report_missing=False,
             conn_status="idle",
             conn_detail="",
             utility_title=UTILITY_TITLE_PL_ANALYTIC_API,
@@ -953,10 +927,6 @@ def pl_analytic_project_report():
     if add_base_only:
         selected = ""
 
-    if "q" in request.args:
-        filter_q = (request.args.get("q") or "").strip()
-    else:
-        filter_q = (prefs.get("filter_q") or "").strip()
     if "aq" in request.args:
         analytic_q = (request.args.get("aq") or "").strip()
     else:
@@ -970,10 +940,6 @@ def pl_analytic_project_report():
         except ValueError:
             prefill_report_id = None
 
-    reports: list[dict[str, Any]] = []
-    report_open_urls: dict[int, str] = {}
-    highlight_report_id: int | None = None
-    highlight_report_missing = False
     prefill_report_name = ""
 
     conn_status = "idle"
@@ -994,19 +960,6 @@ def pl_analytic_project_report():
                     manager_dashboard_installed = _staff_manager_dashboard_installed(
                         models, db, uid, pwd
                     )
-                    reports = search_account_reports(models, db, uid, pwd, filter_q) or []
-                    report_open_urls = {}
-                    if reports and selected in reg:
-                        bu = reg[selected].url
-                        for r in reports:
-                            report_open_urls[int(r["id"])] = account_report_odoo_form_url(
-                                bu, int(r["id"])
-                            )
-                    hp_id, hp_miss = _pl_analytic_highlight_info(
-                        _pl_analytic_prefs(), selected, reports
-                    )
-                    highlight_report_id = hp_id
-                    highlight_report_missing = hp_miss
                     if prefill_report_id:
                         try:
                             prefill_report_name = read_account_report_label(
@@ -1018,8 +971,6 @@ def pl_analytic_project_report():
                     financial_budgets = []
                     cpc_wizard_installed = False
                     manager_dashboard_installed = False
-                    reports = []
-                    report_open_urls = {}
         except Exception as e:
             conn_status = "error"
             conn_detail = str(e)
@@ -1034,7 +985,7 @@ def pl_analytic_project_report():
         _pl_analytic_prefs_merge_save(
             client_id=selected,
             filter_host=filter_host,
-            filter_q=filter_q,
+            filter_q="",
             analytic_q=analytic_q,
         )
 
@@ -1046,14 +997,9 @@ def pl_analytic_project_report():
         distinct_odoo_hosts=distinct_odoo_hosts(reg),
         selected_client=selected,
         filter_host=filter_host,
-        filter_q=filter_q,
         analytic_q=analytic_q,
-        reports=reports,
-        report_open_urls=report_open_urls,
         prefill_report_id=prefill_report_id,
         prefill_report_name=prefill_report_name,
-        highlight_report_id=highlight_report_id,
-        highlight_report_missing=highlight_report_missing,
         conn_status=conn_status,
         conn_detail=conn_detail,
         utility_title=UTILITY_TITLE_PL_ANALYTIC_API,

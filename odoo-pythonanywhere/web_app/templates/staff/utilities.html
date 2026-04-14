@@ -17,8 +17,11 @@
       — crée sur la base un rapport <strong>Balance OHADA</strong> (six colonnes débit/crédit initiaux et finaux) ou le supprime ; pas de liste de rapports sur cette page.
     </li>
     <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique (réalisé / budget / %)</strong></a>
-      — <strong>tableau API</strong> par compte pour un axe analytique (réalisé / budget / %, export Excel) ; sur la même page : <strong>copie Odoo</strong> du P&amp;L avec <code>filter_analytic</code> / <code>filter_budgets</code>, liste des <code>account.report</code>, sonde budget / analytique, renommage / suppression des copies.
+      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique</strong></a>
+      — budgets financiers (<code>account.report.budget</code>), copie P&amp;L pilotage par <strong>id</strong> de rapport,
+      wizard <strong>CPC Budget Analytique</strong>, <strong>Tableau de Bord Manager</strong>, sonde budget × analytique.
+      Pas de liste des <code>account.report</code> (le CPC est autonome via le wizard) ; parcours complet avec tableau sur
+      <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L personnalisé</a>.
     </li>
     <li style="margin-bottom:0.65rem;">
       <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Tableau de Bord Manager (Odoo natif)</strong></a>

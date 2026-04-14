@@ -13,7 +13,7 @@
 <p class="sn-muted" style="margin:-0.35rem 0 0.85rem;">
   <a href="{{ url_for('staff_admin.clients_list') }}">← Clients Odoo (administration)</a>
   · <a href="{{ url_for('staff.utilities_home') }}">Utilitaires</a>
-  · <a href="{{ url_for('staff.pl_analytic_project_report') }}">Compte de résultat analytique (API)</a>
+  · <a href="{{ url_for('staff.pl_analytic_project_report') }}">Compte de résultat analytique</a>
 </p>
 <div class="sn-card sn-card--accent">
   <h2 style="margin-top:0;font-size:1.05rem;">Nouvelle base</h2>
@@ -53,8 +53,9 @@
   <summary>Mode d’emploi — budget financier, analytique et CPC (Odoo)</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
     <strong>Deux leviers dans Odoo.</strong>
-    (1) <strong>Copie P&amp;L pilotage</strong> : duplique un <code>account.report</code>, active filtres analytique et budgets ;
-    vous choisissez le budget financier dans l’interface Odoo.
+    (1) <strong>Copie P&amp;L pilotage</strong> (optionnel) : si vous connaissez l’id d’un <code>account.report</code> source,
+    la toolbox en duplique une copie avec filtres analytique et budgets — pour parcourir les rapports dans un tableau,
+    utiliser l’utilitaire <strong>P&amp;L personnalisé</strong>.
     (2) <strong>Wizard CPC SYSCOHADA</strong> : après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
     injecte le budget financier sur la colonne externe du CPC et affiche dans le statut du wizard la liste des
     <strong>codes comptes budgétisés</strong> (non nuls). Réinstallez le wizard depuis la toolbox après une mise à jour pour
@@ -100,7 +101,7 @@
 
 {% if selected_client and conn_status == 'ok' %}
 <div class="sn-card" style="margin-top:1rem;">
-  <h2 style="margin-top:0;font-size:1.05rem;">Connexion et listes</h2>
+  <h2 style="margin-top:0;font-size:1.05rem;">Connexion et budgets</h2>
   <div class="sn-status" style="margin:0 0 0.75rem;">
     <span class="sn-dot sn-dot--ok" title="OK"></span>
     <span><strong>Opérationnel</strong> — {{ conn_detail }}</span>
@@ -118,19 +119,10 @@
   {% else %}
   <p class="sn-muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Aucun <code>account.report.budget</code> listable (droits ou édition sans reporting budgets).</p>
   {% endif %}
-  <form method="get" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0 0 0.75rem;">
-    <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <label for="pl-q">Filtre noms de rapports (<code>account.report</code>)</label>
-    <input type="text" id="pl-q" name="q" value="{{ filter_q }}" autocomplete="off" spellcheck="false" style="margin-top:0.25rem;">
-    <div class="sn-rapports-toolbar" style="margin-top:0.65rem;">
-      <button type="submit">Actualiser la liste des rapports</button>
-    </div>
-  </form>
   <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="margin:0;">
     <input type="hidden" name="client_id" value="{{ selected_client }}">
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="filter_q" value="">
     <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
     <input type="hidden" name="action" value="budget_probe">
     <button type="submit" class="sn-btn sn-btn--ghost">Sonde budget × analytique (lecture seule)</button>
@@ -140,94 +132,18 @@
 <div class="sn-card" style="margin-top:1rem;" id="sn-pl-odoo-copy">
   <h2 style="margin-top:0;font-size:1.05rem;">Copie P&amp;L dans Odoo (budget financier + analytique)</h2>
   <p class="sn-muted" style="margin:0 0 0.65rem;line-height:1.45;font-size:0.88rem;">
-    Duplique un rapport existant, active <code>filter_analytic</code> et le filtre budgets, ajuste le % si possible.
-    Ouvrez ensuite la copie dans Odoo et sélectionnez <strong>compte analytique</strong> + <strong>budget financier</strong> dans les options du rapport.
+    Duplication d’un <code>account.report</code> existant par <strong>identifiant numérique</strong> : la copie active
+    <code>filter_analytic</code> et le filtre budgets, ajuste le % si possible.
+    Ouvrez la copie dans Odoo et sélectionnez <strong>compte analytique</strong> + <strong>budget financier</strong>.
+    Pour parcourir les rapports dans un tableau avec renommage / suppression, utiliser
+    <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L personnalisé</a>.
   </p>
-  {% if highlight_report_id and highlight_report_missing %}
-  <p class="sn-flash warning" style="margin:0 0 0.65rem;font-size:0.88rem;">
-    Dernière copie toolbox (id <code>{{ highlight_report_id }}</code>) absente du filtre de liste actuel — élargissez le filtre « q » ou préparez depuis la ligne ci-dessous.
-  </p>
-  {% endif %}
   {% if prefill_report_id %}
   <p class="sn-muted" style="margin:0 0 0.5rem;font-size:0.85rem;">Rapport <code>{{ prefill_report_id }}</code> présélectionné{% if prefill_report_name %} ({{ prefill_report_name }}){% endif %}.</p>
   {% endif %}
-  {% if not reports %}
-  <p class="sn-muted">Aucun <code>account.report</code> ne correspond au filtre.</p>
-  {% else %}
-  <div class="sn-scroll-x">
-  <table class="sn-table" style="font-size:0.88rem;">
-    <thead>
-      <tr>
-        <th>Id</th>
-        <th>Nom</th>
-        <th>Odoo</th>
-        <th style="min-width:11rem;">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in reports %}
-      <tr {% if highlight_report_id == r.id %}style="background:rgba(111,45,168,0.1);"{% endif %}>
-        <td><code>{{ r.id }}</code></td>
-        <td>{{ r.name }}</td>
-        <td>
-          {% if report_open_urls.get(r.id) %}
-          <a class="sn-btn sn-btn--odoo sn-btn--odoo-ghost" style="padding:0.3rem 0.55rem;font-size:0.82rem;" href="{{ report_open_urls[r.id] }}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
-          {% else %}<span class="sn-muted">—</span>{% endif %}
-        </td>
-        <td>
-          <div class="sn-report-btn-row sn-report-btn-row--compact" style="flex-wrap:wrap;gap:0.35rem;">
-            <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" style="display:inline;margin:0;">
-              <input type="hidden" name="client_id" value="{{ selected_client }}">
-              <input type="hidden" name="filter_q" value="{{ filter_q }}">
-              <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
-              <input type="hidden" name="filter_host" value="{{ filter_host }}">
-              <input type="hidden" name="action" value="prefill">
-              <input type="hidden" name="report_id" value="{{ r.id }}">
-              <button type="submit" class="sn-btn" style="margin:0;padding:0.32rem 0.55rem;font-size:0.82rem;">Préparer copie</button>
-            </form>
-            <details style="display:inline-block;vertical-align:middle;">
-              <summary class="sn-btn sn-btn--ghost" style="display:inline-block;list-style:none;padding:0.32rem 0.55rem;font-size:0.82rem;cursor:pointer;">Renommer</summary>
-              <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
-                <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
-                  <input type="hidden" name="client_id" value="{{ selected_client }}">
-                  <input type="hidden" name="filter_q" value="{{ filter_q }}">
-                  <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
-                  <input type="hidden" name="filter_host" value="{{ filter_host }}">
-                  <input type="hidden" name="action" value="rename_report">
-                  <input type="hidden" name="report_id" value="{{ r.id }}">
-                  <label for="rename-pl-{{ r.id }}">Nouveau nom</label>
-                  <input type="text" id="rename-pl-{{ r.id }}" name="new_report_name" value="{{ r.name }}" required style="margin-top:0.35rem;">
-                  <button type="submit" class="sn-btn" style="margin-top:0.5rem;">Enregistrer</button>
-                </form>
-              </div>
-            </details>
-            <details style="display:inline-block;vertical-align:middle;">
-              <summary class="sn-btn sn-btn--ghost" style="display:inline-block;list-style:none;padding:0.32rem 0.55rem;font-size:0.82rem;cursor:pointer;color:var(--sn-danger);">Supprimer</summary>
-              <div class="sn-card" style="margin-top:0.5rem;max-width:22rem;padding:0.85rem;">
-                <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate>
-                  <input type="hidden" name="client_id" value="{{ selected_client }}">
-                  <input type="hidden" name="filter_q" value="{{ filter_q }}">
-                  <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
-                  <input type="hidden" name="filter_host" value="{{ filter_host }}">
-                  <input type="hidden" name="action" value="unlink">
-                  <input type="hidden" name="report_id" value="{{ r.id }}">
-                  <p class="sn-muted" style="font-size:0.82rem;margin:0 0 0.5rem;">Confirmer : <code>SUPPRIMER-{{ r.id }}</code></p>
-                  <input type="text" name="confirm_delete" placeholder="SUPPRIMER-{{ r.id }}" autocomplete="off">
-                  <button type="submit" style="margin-top:0.5rem;background:linear-gradient(165deg,#f87171,#dc2626);">Supprimer</button>
-                </form>
-              </div>
-            </details>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  {% endif %}
-  <form id="form-personalize-pl-budget-pl" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin-top:1rem;">
+  <form id="form-personalize-pl-budget-pl" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin-top:0.5rem;">
     <input type="hidden" name="client_id" value="{{ selected_client }}">
-    <input type="hidden" name="filter_q" value="{{ filter_q }}">
+    <input type="hidden" name="filter_q" value="">
     <input type="hidden" name="analytic_q" value="{{ analytic_q }}">
     <input type="hidden" name="filter_host" value="{{ filter_host }}">
     <input type="hidden" name="action" value="personalize_pl_budget">
@@ -258,7 +174,7 @@
   <div class="sn-report-btn-row">
     <form id="form-create-cpc-wizard" class="form-sn-long-post" method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="filter_q" value="">
       <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="create_cpc_wizard">
@@ -269,7 +185,7 @@
     {% if cpc_wizard_installed %}
     <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="filter_q" value="">
       <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="delete_cpc_wizard">
@@ -278,7 +194,7 @@
     {% endif %}
     <form method="post" action="{{ url_for('staff.pl_analytic_project_report') }}" novalidate style="margin:0;display:inline;">
       <input type="hidden" name="client_id" value="{{ selected_client }}">
-      <input type="hidden" name="filter_q" value="{{ filter_q or '' }}">
+      <input type="hidden" name="filter_q" value="">
       <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="repair_cpc_budget_reports">
