@@ -763,7 +763,16 @@ def pl_analytic_project_report():
                 if len(_err) > 3500:
                     _err = _err[:3490] + "…"
                 flash(f"Echec installation wizard CPC : {_err}", "danger")
-            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
 
         if action == "delete_cpc_wizard":
             try:
@@ -773,7 +782,16 @@ def pl_analytic_project_report():
                 flash(result.get("message") or "Wizard Budget par projet supprime.", "info")
             except Exception as e:
                 flash(f"Echec suppression wizard CPC : {e!s}", "danger")
-            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
 
         if action == "repair_cpc_budget_reports":
             try:
@@ -798,7 +816,16 @@ def pl_analytic_project_report():
                 )
             except Exception as e:
                 flash(f"Echec reparation rapports CPC : {e!s}", "danger")
-            return redirect(ru(**_pl_analytic_url_params(client_id=cid, filter_host=fl_save)))
+            return redirect(
+                ru(
+                    **_pl_analytic_url_params(
+                        client_id=cid,
+                        filter_host=fl_save,
+                        analytic_q=analytic_q_post,
+                        filter_q=filter_q_post,
+                    ),
+                ),
+            )
 
         if action == "create_manager_dashboard":
             jid = _uuid.uuid4().hex[:12]

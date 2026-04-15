@@ -37,6 +37,12 @@ import sys
 import json
 import re
 from datetime import date, datetime
+from pathlib import Path
+
+# Même résolution de chemin que create_cpc_odoo_wizard : le module vit sous archives-cli/.
+_ac = Path(__file__).resolve().parent / "archives-cli"
+if _ac.is_dir() and str(_ac) not in sys.path:
+    sys.path.insert(0, str(_ac))
 
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
 from create_cpc_budget_analytique import (
