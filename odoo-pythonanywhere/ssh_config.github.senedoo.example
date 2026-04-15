@@ -1,0 +1,12 @@
+# À fusionner dans ~/.ssh/config (Mac / Linux) pour pousser vers GitHub sans mot de passe.
+# Prérequis : clé dédiée créée (ex. scripts/setup_github_push_mac.sh) et deploy key « Allow write access »
+# sur https://github.com/Support-Senedoo/pythonanywhere/settings/keys
+#
+# Ne jamais committer la clé privée.
+
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_github_senedoo
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new

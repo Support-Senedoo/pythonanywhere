@@ -59,6 +59,16 @@ Fichiers : `odoo-pythonanywhere/install_pa_ssh_key.ps1`, `deploy_pa.ps1`, `deplo
 - Utile pour reload webapp, arbre de fichiers API, etc. — jamais de token dans le chat ou le dépôt : variable d’environnement uniquement.
 - Si un token a fuité : **régénérer** sur l’onglet Account → API token.
 
+## Push GitHub depuis le Mac / Cursor (agent sans mot de passe)
+
+L’agent Cursor **n’a pas** vos identifiants HTTPS GitHub. Il faut **une identité SSH dédiée au dépôt**, séparée de la clé **PA** (`id_ed25519_pa_cursor`).
+
+1. **Une fois sur la machine** : `bash odoo-pythonanywhere/scripts/setup_github_push_mac.sh` (crée `~/.ssh/id_ed25519_github_senedoo`, configure `~/.ssh/config`, passe `origin` en `git@github.com:Support-Senedoo/pythonanywhere.git`). Modèle manuel : **`odoo-pythonanywhere/ssh_config.github.senedoo.example`**.
+2. **Une fois sur GitHub** : dépôt **Support-Senedoo/pythonanywhere** → **Settings** → **Deploy keys** → **Add deploy key** → coller le **`.pub`** → cocher **Allow write access** (sinon `git push` refusé).
+3. Vérifier : `git ls-remote origin HEAD` puis `git push origin master`.
+
+**Alternative** : variable d’environnement **`GITHUB_TOKEN`** (PAT scope `repo`) définie dans l’environnement Cursor / le shell, et `origin` en HTTPS avec aide-mémoire credential — **ne pas** mettre le token dans le dépôt.
+
 ## Secrets et Git
 
 - Ne jamais committer : clés **privées** SSH, **`toolbox_users.json`**, **`toolbox_clients.json`**, tokens (voir `.gitignore`).
