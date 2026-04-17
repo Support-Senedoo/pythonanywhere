@@ -1,10 +1,9 @@
 """
 Réparation des rapports « CPC » sur Odoo SaaS (toolbox).
 
-1) Colonne % (moteur aggregation, label ``pct``) : remplace les formules du type
-   ``TA.balance/TA.budget*100`` par ``TA.balance*100/(TA.budget+0.0001)`` — seuls les
-   nombres et les références ``code.label`` sont valides dans la formule Odoo (pas
-   ``XOF(…)`` dans l’agrégation) ; l’epsilon évite la division par zéro au dépliage compte.
+1) Colonne % (moteur aggregation, label ``pct``) : formule ``balance*100/(budget+1)``
+   (évite la division par zéro au dépliage par compte sur Odoo 19). Sous-formule
+   ``if_other_expr_above`` + ``ignore_zero_division`` lorsque supporté.
 
 2) Détail par compte : sur les lignes feuilles avec moteur ``account_codes``, active
    ``user_groupby=account_id`` et ``foldable`` (comme ``personalize_syscohada_detail``),
@@ -61,12 +60,12 @@ def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
 
 def pct_formula_ratio(line_code: str, currency_code: str) -> str:
     """
-    Formule % = balance*100/budget (agrégation). L’affichage n’a lieu que si le budget
-    dépasse 1 unité de devise — voir :func:`pct_subformula_budget_gate`.
+    Formule % = balance*100/(budget+1) (agrégation). Le ``+1`` évite la division par zéro
+    au dépliage par compte ; voir :func:`pct_subformula_budget_gate` pour le seuil d’affichage.
     """
     _ = currency_code
     c = (line_code or "").strip()
-    return f"{c}.balance*100/{c}.budget"
+    return f"{c}.balance*100/({c}.budget+1)"
 
 
 def pct_subformula_budget_gate(line_code: str, currency_code: str) -> str:
@@ -123,7 +122,7 @@ def rewrite_pct_formulas_safe_denominator(
     currency_code: str,
 ) -> int:
     """
-    Réécrit chaque expression ``pct`` en agrégation : ``balance*100/budget`` avec
+    Réécrit chaque expression ``pct`` en agrégation : ``balance*100/(budget+1)`` avec
     sous-formule ``if_other_expr_above(..., devise(1));ignore_zero_division``.
     """
     expr_ids = execute_kw(

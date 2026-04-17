@@ -488,16 +488,15 @@ def cpc_budget_pct_aggregation_formula(
     """
     Formule moteur ``aggregation`` pour la colonne % (rapport Réalisé / Budget).
 
-    Le quotient ``balance/budget`` n'est évalué que lorsque ``budget > 1`` unité de
-    devise (voir :func:`cpc_budget_pct_subformula`) : sans budget sélectionné ou à zéro,
-    la colonne % reste nulle au lieu d'exploser (``+0.0001`` au dénominateur produisait
-    des pourcentages astronomiques en CFA).
+    Dénominateur ``(budget + 1)`` : une unité de devise est négligeable si le budget est
+    grand, mais évite la division par zéro au dépliage par compte (sous-ligne budget 0).
+    Le masquage des % peu significatifs reste géré par :func:`cpc_budget_pct_subformula`.
     """
     if not budget_pct_meaningful:
         return "0"
     _ = currency_code
     c = (line_code or "").strip()
-    return f"{c}.balance*100/{c}.budget"
+    return f"{c}.balance*100/({c}.budget+1)"
 
 
 def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
