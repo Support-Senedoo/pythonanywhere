@@ -502,7 +502,7 @@ def cpc_budget_pct_aggregation_formula(
 def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
     """
     Code ISO 4217 (3 lettres) de la devise de la soci\u00e9t\u00e9 de l'utilisateur connect\u00e9.
-    Utilis\u00e9 dans ``if_other_expr_above(..., XXX(0))`` pour la colonne %.
+    Utilis\u00e9 dans ``if_other_expr_above(..., XXX(1))`` pour la colonne %.
     """
     try:
         users = _ek(models, db, uid, password, "res.users", "read", [[uid]], {"fields": ["company_id"]})
@@ -526,19 +526,19 @@ def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
 
 def cpc_budget_pct_subformula(line_code: str, currency_code: str) -> str:
     """
-    Sous-formules du moteur « agrégation » (séparées par ``;``, Odoo Comptabilité) :
+    Sous-formule du moteur « agrégation » pour la colonne %.
 
-    - ``if_other_expr_above(LINE.budget, CUR(1))`` : masquer le % quand le budget est
-      négligeable (seuil monétaire).
-    - ``ignore_zero_division`` : évite l'erreur « division par zéro » lorsque le budget
-      est 0 (ex. ligne dépliée par compte sous une rubrique TA) — ``if_other`` seul ne
-      suffit pas dans tous les chemins d'évaluation Odoo 19.
+    ``if_other_expr_above(LINE.budget, CUR(1))`` masque le % quand le budget est
+    négligeable (seuil 1 unité de devise). Ne pas chaîner ``ignore_zero_division`` ici :
+    Odoo renvoie « Mauvais format pour la formule » sur ``...;ignore_zero_division``.
+    La division par zéro au dépliage compte est déjà évitée par ``(budget+1)`` dans
+    :func:`cpc_budget_pct_aggregation_formula`.
     """
     c = (line_code or "").strip()
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(1));ignore_zero_division"
+    return f"if_other_expr_above({c}.budget, {cur}(1))"
 
 
 # ---------------------------------------------------------------------------

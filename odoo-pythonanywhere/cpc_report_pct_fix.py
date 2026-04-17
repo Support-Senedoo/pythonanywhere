@@ -2,8 +2,9 @@
 Réparation des rapports « CPC » sur Odoo SaaS (toolbox).
 
 1) Colonne % (moteur aggregation, label ``pct``) : formule ``balance*100/(budget+1)``
-   (évite la division par zéro au dépliage par compte sur Odoo 19). Sous-formule
-   ``if_other_expr_above`` + ``ignore_zero_division`` lorsque supporté.
+   (évite la division par zéro au dépliage par compte). Sous-formule seule
+   ``if_other_expr_above(LINE.budget, DEVISE(1))`` (sans ``ignore_zero_division`` :
+   chaînage refusé par Odoo — erreur « Mauvais format pour la formule »).
 
 2) Détail par compte : sur les lignes feuilles avec moteur ``account_codes``, active
    ``user_groupby=account_id`` et ``foldable`` (comme ``personalize_syscohada_detail``),
@@ -70,13 +71,14 @@ def pct_formula_ratio(line_code: str, currency_code: str) -> str:
 
 def pct_subformula_budget_gate(line_code: str, currency_code: str) -> str:
     """
-    Seuil budget + ``ignore_zero_division`` (Odoo) pour éviter division par zéro au dépliage compte.
+    Seuil budget : n'affiche le % que si le budget dépasse 1 unité de devise.
+    (La division par zéro est gérée par ``(budget+1)`` dans :func:`pct_formula_ratio`.)
     """
     c = (line_code or "").strip()
     cur = (currency_code or "XOF").strip().upper()
     if len(cur) != 3 or not cur.isalpha():
         cur = "XOF"
-    return f"if_other_expr_above({c}.budget, {cur}(1));ignore_zero_division"
+    return f"if_other_expr_above({c}.budget, {cur}(1))"
 
 
 def pct_formula_epsilon(line_code: str, currency_code: str) -> str:
@@ -123,7 +125,7 @@ def rewrite_pct_formulas_safe_denominator(
 ) -> int:
     """
     Réécrit chaque expression ``pct`` en agrégation : ``balance*100/(budget+1)`` avec
-    sous-formule ``if_other_expr_above(..., devise(1));ignore_zero_division``.
+    sous-formule ``if_other_expr_above(..., devise(1))`` (sans ``ignore_zero_division``).
     """
     expr_ids = execute_kw(
         models,
