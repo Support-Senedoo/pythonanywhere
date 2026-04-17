@@ -806,7 +806,10 @@ def pl_analytic_project_report():
                         f"{nw} expression(s) % avec denominateur securise ({rep.get('currency_code') or '?'})"
                     )
                 if ng:
-                    parts.append(f"{ng} ligne(s) feuilles : detail par compte (groupby)")
+                    parts.append(
+                        f"{ng} ligne(s) feuilles : detail par compte + presentation P&L "
+                        "(sans tout deplier, hierarchie groupes de comptes)"
+                    )
                 rids = rep.get("report_ids") or []
                 if rids:
                     parts.append(f"rapport(s) touches : {rids}")

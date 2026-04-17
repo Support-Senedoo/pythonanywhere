@@ -207,7 +207,7 @@
       <input type="hidden" name="analytic_q" value="{{ analytic_q or '' }}">
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="repair_cpc_budget_reports">
-      <button type="submit" class="sn-btn sn-btn--ghost" title="Met a jour les expressions % (budget+1 + if_other_expr_above) et le groupby compte sur les rapports CPC existants."
+      <button type="submit" class="sn-btn sn-btn--ghost" title="Met a jour les expressions %, le detail par compte (groupby) et la presentation type P&L (sans tout deplier + hierarchie groupes de comptes) sur les rapports CPC existants."
               {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>Reparer rapports CPC (% + comptes)</button>
     </form>
   </div>

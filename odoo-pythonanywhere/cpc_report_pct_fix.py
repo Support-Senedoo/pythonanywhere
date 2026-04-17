@@ -8,12 +8,14 @@ Réparation des rapports « CPC » sur Odoo SaaS (toolbox).
 
 2) Détail par compte : sur les lignes feuilles avec moteur ``account_codes``, active
    ``user_groupby=account_id`` et ``foldable`` (comme ``personalize_syscohada_detail``),
-   et désactive ``filter_unfold_all`` sur le rapport pour permettre le dépliage.
+   désactive ``filter_unfold_all`` sur le rapport, et applique ``filter_hierarchy`` comme
+   le P&L personnalisé (groupes de comptes, comptes repliés sous les rubriques).
 """
 from __future__ import annotations
 
 from typing import Any
 
+from personalize_pl_analytic_budget import apply_filter_hierarchy_like_syscohada_pl
 from personalize_syscohada_detail import execute_kw, leaf_line_ids_with_account_codes
 
 
@@ -258,6 +260,10 @@ def apply_cpc_leaf_account_groupby(
             "write",
             [[int(report_id)], {"filter_unfold_all": False}],
         )
+    try:
+        apply_filter_hierarchy_like_syscohada_pl(models, db, uid, password, int(report_id))
+    except Exception:
+        pass
     return len(leaves)
 
 

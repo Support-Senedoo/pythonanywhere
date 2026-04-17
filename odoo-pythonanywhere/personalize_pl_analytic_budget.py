@@ -103,6 +103,63 @@ def personalize_pl_analytic_budget_options(
     return {"written": vals, "writable_boolean_filters": filters}
 
 
+def apply_filter_hierarchy_like_syscohada_pl(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> str | None:
+    """
+    Active ``filter_hierarchy`` sur ``account.report`` comme ``personalize_syscohada_detail``
+    (P&L SYSCOHADA personnalisé) : structure du plan / groupes de comptes, lecture ligne à ligne
+    avec les comptes repliés sous les rubriques lorsque ``filter_unfold_all`` est désactivé.
+
+    Retourne la valeur écrite (ex. ``by_default``), ou ``None`` si le champ est absent ou non modifiable.
+    """
+    try:
+        fg = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "fields_get",
+            [],
+            {"attributes": ["type", "readonly", "selection"]},
+        )
+    except Exception:
+        return None
+    meta = fg.get("filter_hierarchy") or {}
+    if not meta or meta.get("readonly"):
+        return None
+    sel = meta.get("selection") or []
+    keys: list[str] = []
+    for row in sel:
+        if isinstance(row, (list, tuple)) and len(row) >= 1 and row[0] is not False:
+            keys.append(str(row[0]))
+    choice: str | None = None
+    for prefer in ("by_default", "optional", "always"):
+        if prefer in keys:
+            choice = prefer
+            break
+    if choice is None:
+        return None
+    try:
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[int(report_id)], {"filter_hierarchy": choice}],
+        )
+    except Exception:
+        return None
+    return choice
+
+
 def probe_financial_budget_analytic_summary(
     models: Any,
     db: str,

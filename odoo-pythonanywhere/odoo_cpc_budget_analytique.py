@@ -44,6 +44,7 @@ _ac = Path(__file__).resolve().parent / "archives-cli"
 if _ac.is_dir() and str(_ac) not in sys.path:
     sys.path.insert(0, str(_ac))
 
+from cpc_report_pct_fix import apply_cpc_leaf_account_groupby
 from personalize_pl_analytic_budget import personalize_pl_analytic_budget_options
 from create_cpc_budget_analytique import (
     cpc_account_report_budget_item_available,
@@ -253,7 +254,7 @@ def create_main_report(models, uid, parent_id):
         "filter_date_range"           : True,
         "filter_analytic"             : True,        # ← FILTRE ANALYTIQUE ACTIF
         "filter_journals"             : True,
-        "filter_unfold_all"           : True,
+        "filter_unfold_all"           : False,
         "filter_show_draft"           : False,
         "default_opening_date_filter" : "this_year",
         "search_bar"                  : True,
@@ -907,6 +908,13 @@ def main():
             print(f"\n  ✅ Filtres rapport : {written}\n")
     except Exception as e:
         print(f"\n  ⚠️  Filtres budgets / analytique : {e}\n")
+
+    # 8b. Présentation type P&L personnalisé : comptes repliés sous les rubriques (groupby + hiérarchie)
+    try:
+        n = apply_cpc_leaf_account_groupby(models, DB, uid, API_KEY, report_id)
+        print(f"\n  ✅ Détail par compte (feuilles CPC) : {n} ligne(s) — filter_hierarchy / sans tout déplier.\n")
+    except Exception as e:
+        print(f"\n  ⚠️  Présentation repliée / groupby : {e}\n")
 
     # 9. Budget de démonstration
     budget_id, analytic_id = create_demo_analytic_budget(models, uid, info)
