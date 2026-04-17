@@ -758,6 +758,15 @@ def pl_analytic_project_report():
                         "Certains champs x_analytic_account_id n'ont pas ete crees (droits Odoo ou modele manquant).",
                         "warning",
                     )
+                if result.get("wizard_menu_parent_source") == "none" and not result.get(
+                    "wizard_menu_parent_reattached_to"
+                ):
+                    flash(
+                        "Menu assistant : aucun parent Reporting resolu et rattachement racine impossible. "
+                        "Dans Odoo : Parametres > Interface utilisateur > Menus, rechercher « Assistant budget projet (Senedoo) » "
+                        "et definir un parent (ex. Reporting). Puis reinstaller depuis la toolbox.",
+                        "warning",
+                    )
             except Exception as e:
                 _err = str(e)
                 if len(_err) > 3500:

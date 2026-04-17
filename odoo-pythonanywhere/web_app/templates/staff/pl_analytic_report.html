@@ -174,7 +174,9 @@
     <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
       Installe un wizard natif Odoo (<code>x_cpc_budget_wizard</code>). Menu dedie
       <strong>Assistant budget projet (Senedoo)</strong> (action serveur → formulaire) et un second menu sous <strong>Reporting</strong>
-      pour le rapport seul. Le client choisit l'axe analytique (budgets filtres), la periode, puis <strong>Remplir le rapport CPC</strong> :
+      pour le rapport seul. Si le menu n'apparait pas apres installation : bouton <strong>Mettre a jour</strong> ci-dessus,
+      ou dans Odoo <strong>Parametres &gt; Interface utilisateur &gt; Menus</strong>, rechercher « Assistant budget projet » et verifier le <strong>parent</strong> (Reporting / Comptabilite).
+      Le client choisit l'axe analytique (budgets filtres), la periode, puis <strong>Remplir le rapport CPC</strong> :
       le CPC SYSCOHADA s'ouvre avec Realise / Budget / Ecart / % ; les lignes feuilles se deplient par <strong>compte</strong> (rapprochement GL / budget).
       Export PDF et Excel natifs.
       Si le wizard est deja present, le bouton l'ecrase (mise a jour).

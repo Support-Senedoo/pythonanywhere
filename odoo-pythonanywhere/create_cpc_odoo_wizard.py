@@ -1078,8 +1078,10 @@ def create_cpc_wizard(
     }])
     result["menu_server_action_id"] = sa_menu_id
 
-    # ---- 6. Menu sous Reporting compta (xmlid + repli ; mêmes groupes que le parent si possible)
-    parent_menu_id = _find_reports_menu(models, db, uid, pwd)
+    # ---- 6. Menu sous Reporting (même parent que les rapports comptables Senedoo ; pas de copie
+    #     groups_id du parent : sur certaines bases Enterprise cela masquait l'entrée pour les utilisateurs.)
+    parent_menu_id, parent_menu_src = _resolve_wizard_parent_menu(models, db, uid, pwd)
+    result["wizard_menu_parent_source"] = parent_menu_src
 
     menu_vals: dict[str, Any] = {
         "name":      WIZARD_MENU_LABEL,
@@ -1087,32 +1089,18 @@ def create_cpc_wizard(
         "action":    f"ir.actions.server,{int(sa_menu_id)}",
         "sequence":  99,
     }
-    if parent_menu_id:
-        try:
-            pr = _ek(
-                models,
-                db,
-                uid,
-                pwd,
-                "ir.ui.menu",
-                "read",
-                [[int(parent_menu_id)]],
-                {"fields": ["groups_id"]},
-            )
-            if pr:
-                raw_g = pr[0].get("groups_id") or []
-                flat_g = [
-                    int(x[0]) if isinstance(x, (list, tuple)) else int(x)
-                    for x in raw_g
-                ]
-                if flat_g:
-                    menu_vals["groups_id"] = [(6, 0, flat_g)]
-        except Exception:
-            pass
 
     menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [menu_vals])
     result["menu_id"] = menu_id
     result["wizard_menu_parent_id"] = parent_menu_id
+    if not parent_menu_id:
+        re_root = _reattach_wizard_menu_under_finance_root(
+            models, db, uid, pwd, int(menu_id)
+        )
+        result["wizard_menu_parent_reattached_to"] = re_root
+        if re_root:
+            result["wizard_menu_parent_id"] = re_root
+            parent_menu_id = re_root
 
     try:
         result["wizard_install_post_checks"] = verify_cpc_wizard_ui_install(
@@ -1157,10 +1145,24 @@ def create_cpc_wizard(
     rep = result.get("cpc_repair") or {}
     inst = result.get("cpc_toolbox_install") or {}
     new_rid = int((inst.get("report_id") or 0))
+    if result.get("wizard_menu_parent_reattached_to"):
+        _parent_hint = (
+            f" Odoo : app Facturation ou Comptabilite — en bas du menu principal : {WIZARD_MENU_LABEL}"
+        )
+    elif parent_menu_src != "none":
+        _parent_hint = (
+            f" Odoo : Facturation/Comptabilite > Reporting > {WIZARD_MENU_LABEL}"
+        )
+    else:
+        _parent_hint = (
+            f" Odoo : chercher « {WIZARD_MENU_LABEL} » (Parametres > Menus) si l'entree ne s'affiche pas."
+        )
     result["message"] = (
-        f"Wizard Budget par projet cree : {WIZARD_MODEL}, action calcul id={sa_id}, menu id={menu_id}. "
-        f"Odoo : Facturation/Comptabilite > Reporting > {WIZARD_MENU_LABEL} (ouvre le formulaire ; bouton Remplir le rapport CPC). "
-        f"Champs budget : {summary}."
+        f"Wizard Budget par projet cree : {WIZARD_MODEL}, action calcul id={sa_id}, menu id={menu_id}."
+        f"{_parent_hint}"
+        f" (formulaire : analytique, budget, periode ; bouton Remplir le rapport CPC). "
+        f"Parent technique : {parent_menu_src!r}."
+        f" Champs budget : {summary}."
     )
     if new_rid:
         result["message"] += f" Rapport CPC toolbox recree (account.report id={new_rid})."
@@ -1230,6 +1232,49 @@ def _menu_id_from_xmlid(
     return int(rid) if rid else None
 
 
+def _resolve_wizard_parent_menu(
+    models: Any, db: str, uid: int, pwd: str
+) -> tuple[int | None, str]:
+    """
+    Parent ``ir.ui.menu`` pour l'assistant : même résolution que les menus « rapports comptables »
+    (``resolve_parent_menu_for_account_report``), puis repli sur ``_find_reports_menu``.
+    """
+    try:
+        from web_app.odoo_account_reports import resolve_parent_menu_for_account_report
+
+        rid = resolve_parent_menu_for_account_report(models, db, uid, pwd)
+        if rid:
+            return int(rid), "resolve_parent_menu_for_account_report"
+    except Exception:
+        pass
+    rid = _find_reports_menu(models, db, uid, pwd)
+    if rid:
+        return int(rid), "_find_reports_menu"
+    return None, "none"
+
+
+def _reattach_wizard_menu_under_finance_root(
+    models: Any, db: str, uid: int, pwd: str, menu_id: int
+) -> int | None:
+    """Dernier recours : rattacher le menu sous l'app Facturation (``menu_finance``) pour le rendre visible."""
+    root = _menu_id_from_xmlid(models, db, uid, pwd, "account", "menu_finance")
+    if not root:
+        return None
+    try:
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.menu",
+            "write",
+            [[int(menu_id)], {"parent_id": int(root), "sequence": 950}],
+        )
+        return int(root)
+    except Exception:
+        return None
+
+
 def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
     """
     Parent pour placer l'assistant sous le menu Rapports / Reporting de la comptabilité.
@@ -1238,8 +1283,10 @@ def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
     de ``menu_finance`` (app Facturation / Invoicing) — le nom du parent n'est souvent **pas**
     « Comptabilité », d'où l'échec de l'ancienne recherche et un menu introuvable ou mal placé.
     """
-    # 1) Xmlid officiel Community (et EE en général)
+    # 1) Xmlid officiels (EE : états légaux / rapports ; CE : menu_finance_reports)
     for mod, xid in (
+        ("account", "account_reports_legal_statements_menu"),
+        ("account_reports", "account_reports_legal_statements_menu"),
         ("account", "menu_finance_reports"),
         ("account_accountant", "menu_finance_reports"),
         ("account_reports", "menu_finance_reports"),
