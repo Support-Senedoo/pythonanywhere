@@ -20,7 +20,7 @@ Dès qu’il y a une **modification** dans le dépôt sous **`odoo-pythonanywher
 
 1. **`git add`** les fichiers concernés, **`git commit`** avec un message clair (en français si besoin).
 2. **`git push origin master`** (dépôt `Support-Senedoo/pythonanywhere`).
-3. Sur la machine où la clé SSH PA fonctionne : depuis **`odoo-pythonanywhere/`**, lancer **`.\deploy_pa.ps1 -SkipGitPush`** (pull sur PA + pip + reload API si token).
+3. Sur la machine où la clé SSH PA fonctionne : depuis **`odoo-pythonanywhere/`**, lancer **`.\deploy_pa.ps1 -SkipGitPush`** (Windows), ou **`bash deploy_to_pa.sh -SkipGitPush`** (Mac / Linux / terminal Cursor sur la même machine que la clé). Même effet : pull sur PA + pip + reload API si token.
 
 Ne pas attendre une phrase du type « fais le » : **enchaîner commit + push + déploiement** dans la même session dès que les changements sont cohérents, sauf si l’utilisateur a explicitement demandé de ne pas pousser / pas déployer. Si le push ou le déploiement échoue, diagnostiquer et réessayer ou le signaler clairement.
 
@@ -31,8 +31,8 @@ Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **j
 1. **`setup_pa_automation_key.ps1`** → crée `%USERPROFILE%\.ssh\id_ed25519_pa_cursor` (+ `.pub`).
 2. **`install_pa_ssh_key.ps1 -IdentityFile "%USERPROFILE%\.ssh\id_ed25519_pa_cursor"`** → mot de passe **compte PA une dernière fois** pour ajouter cette `.pub` dans `authorized_keys`.
 3. **`deploy_pa.ps1`** choisit **automatiquement** `id_ed25519_pa_cursor` s’il existe (sinon `id_ed25519`).
-4. Après **`git push`**, l’agent sur le **PC développeur** peut exécuter **`deploy_pa.ps1 -SkipGitPush`** pour **`git pull`** sur PA + **`pip`** + reload (si token `~/.pythonanywhere_api_token` sur PA). Voir **`DEPLOY_PYTHONANYWHERE.md`** (mémoire de reprise à tenir à jour en parallèle des évolutions toolbox).
-5. **MCP** `execute_command` : `privateKeyPath` = **`C:\Users\<user>\.ssh\id_ed25519_pa_cursor`** (adapter `<user>` ; clé **non** chiffrée sinon erreur « passphrase »).
+4. Après **`git push`**, l’agent peut exécuter **`deploy_pa.ps1 -SkipGitPush`** (Windows) ou **`bash deploy_to_pa.sh -SkipGitPush`** (Mac/Linux) depuis **`odoo-pythonanywhere/`** pour **`git pull`** sur PA + **`pip`** + reload (si token `~/.pythonanywhere_api_token` sur PA). Le script bash utilise **`StrictHostKeyChecking=accept-new`** (évite l’erreur **Host key verification failed** sans `ssh-keyscan` préalable). Compte **EU** : variable **`DEPLOY_PA_SSH=senedoo@ssh.eu.pythonanywhere.com`**. Voir **`DEPLOY_PYTHONANYWHERE.md`**.
+5. **MCP** `execute_command` : `privateKeyPath` = **`C:\Users\<user>\.ssh\id_ed25519_pa_cursor`** (Windows) ou **`/Users/<user>/.ssh/id_ed25519_pa_cursor`** (macOS) — adapter `<user>` ; clé **non** chiffrée sinon erreur « passphrase ».
 6. Si **`deploy_pa.ps1`** échoue avec **ParserError** : le script dans le dépôt utilise des **messages ASCII** pour éviter l’encodage sur Mon Drive ; si ça persiste, **`git pull`** sur PA (Bash) ou **MCP SSH** (voir **`DEPLOY_PYTHONANYWHERE.md`**) ; puis **Reload** Web.
 
 ## Connexion SSH « comme la dernière fois » (PC utilisateur)
@@ -41,7 +41,7 @@ Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **j
 2. Déploiement / mise à jour : **`deploy_pa.ps1`** (scp + ssh, script en LF ; `-i` + `IdentitiesOnly=yes`).
 3. **Persistance** : fusionner **`ssh_config.pythonanywhere.example`** dans `%USERPROFILE%\.ssh\config`, puis utiliser **`deploy_pa.ps1 -UserHost pa`** (alias `pa`).
 
-Fichiers : `odoo-pythonanywhere/install_pa_ssh_key.ps1`, `deploy_pa.ps1`, `deploy_pa.sh`, `ssh_config.pythonanywhere.example`, `mcp-pythonanywhere.example.json`, dossier **`mcp-pa-ssh/`** (serveur MCP SSH corrigé).
+Fichiers : `odoo-pythonanywhere/install_pa_ssh_key.ps1`, **`deploy_to_pa.sh`** (Mac/Linux, équivalent `deploy_pa.ps1`), `deploy_pa.ps1`, `deploy_pa.sh` (exécuté **sur** PA), `ssh_config.pythonanywhere.example`, `mcp-pythonanywhere.example.json`, dossier **`mcp-pa-ssh/`** (serveur MCP SSH corrigé).
 
 ## MCP Cursor `pythonanywhere-ssh`
 

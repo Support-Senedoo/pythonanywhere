@@ -37,6 +37,25 @@
         "focus": true
       },
       "group": "build"
+    },
+    {
+      "label": "PythonAnywhere deploy (bash)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/odoo-pythonanywhere/deploy_to_pa.sh",
+        "-SkipGitPush"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/odoo-pythonanywhere"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "group": "build"
     }
   ]
 }

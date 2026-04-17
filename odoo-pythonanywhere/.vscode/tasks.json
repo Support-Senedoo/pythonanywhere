@@ -18,6 +18,22 @@
         "kind": "build",
         "isDefault": false
       }
+    },
+    {
+      "label": "PythonAnywhere deploy (bash)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/deploy_to_pa.sh", "-SkipGitPush"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "group": "build"
     }
   ]
 }

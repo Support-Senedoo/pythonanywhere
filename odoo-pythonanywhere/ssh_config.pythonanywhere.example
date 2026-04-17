@@ -1,5 +1,6 @@
 # À fusionner dans %USERPROFILE%\.ssh\config (créer le dossier .ssh et le fichier si besoin).
-# Ensuite : ssh pa   ou   .\deploy_pa.ps1 -UserHost pa
+# Ensuite : ssh pa   ou   .\deploy_pa.ps1 -UserHost pa   ou   DEPLOY_PA_SSH=senedoo@pa bash deploy_to_pa.sh -SkipGitPush
+# (deploy_to_pa.sh : voir odoo-pythonanywhere/deploy_to_pa.sh ; alias SSH non lu par le script sans DEPLOY_PA_SSH)
 #
 # EU : HostName ssh.eu.pythonanywhere.com
 

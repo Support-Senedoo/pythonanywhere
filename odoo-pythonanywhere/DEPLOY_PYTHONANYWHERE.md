@@ -66,7 +66,7 @@ Les pages staff affichent aussi une **révision dépôt** (hash git lu sur le di
 
 **À chaque publication** : **commit** + **push**, puis sur votre PC **`.\deploy_pa.ps1`** (ou **`.\deploy.ps1`** depuis la racine du dépôt). Cela pousse le code sur GitHub, se connecte en SSH à PA et lance **`deploy_pa.sh`** : **`git pull`**, **`pip`**, puis **reload du site** (voir paragraphe précédent : fichier **`~/.pythonanywhere_api_token`** sur PA). Sans ce fichier token, le script vous le rappelle : il faut alors cliquer **Reload** à la main dans l’onglet **Web**.
 
-**Assistant Cursor (règle projet)** : après des changements livrables sous **`odoo-pythonanywhere/`**, **enchaîner systématiquement** commit + push + **`deploy_pa.ps1 -SkipGitPush`** (sans attendre une demande explicite « déploie »), tant que l’environnement local le permet.
+**Assistant Cursor (règle projet)** : après des changements livrables sous **`odoo-pythonanywhere/`**, **enchaîner systématiquement** commit + push + **`deploy_pa.ps1 -SkipGitPush`** ou **`bash deploy_to_pa.sh -SkipGitPush`** (sans attendre une demande explicite « déploie »), tant que l’environnement (clé **`~/.ssh/id_ed25519_pa_cursor`**, accès réseau) le permet.
 
 **Sur la machine du développeur** (PC avec Git + clé SSH PA sans passphrase, ex. `%USERPROFILE%\.ssh\id_ed25519_pa_cursor`) : l’assistant Cursor peut lancer **`.\deploy_pa.ps1 -SkipGitPush`** depuis `odoo-pythonanywhere/` après un **`git push`** — cela exécute sur PA **`deploy_pa.sh`** : **`git pull`**, **`pip`**, **reload API** si `~/.pythonanywhere_api_token` existe. **Sans** cette machine / cette clé, seul **vous** (PowerShell local, Bash PA, ou bouton Reload) déclenchez la mise à jour effective du worker WSGI.
 
@@ -94,7 +94,7 @@ Le script **`deploy_pa.ps1` du dépôt** utilise des **messages ASCII** dans le 
 4. **Contournement PC** : enregistrer `deploy_pa.ps1` en **UTF-8 avec BOM**, ou copier le script sur un disque local (ex. `C:\temp`) et l’exécuter depuis là.
 
 **Option A — Git (recommandé)**  
-Depuis `odoo-pythonanywhere/` : **`.\deploy_pa.ps1`**. Depuis la **racine du dépôt** : **`.\deploy.ps1`**. Push déjà fait ailleurs : **`.\deploy_pa.ps1 -SkipGitPush`**. Sous Cursor : tâche **« Publier sur PythonAnywhere »** (Terminal → Exécuter la tâche…).
+Depuis `odoo-pythonanywhere/` : **`.\deploy_pa.ps1`** (Windows) ou **`bash deploy_to_pa.sh`** (Mac / Linux — même logique que le `.ps1`, dont **`StrictHostKeyChecking=accept-new`** pour éviter *Host key verification failed*). Depuis la **racine du dépôt** : **`.\deploy.ps1`**. Push déjà fait ailleurs : **`.\deploy_pa.ps1 -SkipGitPush`** ou **`bash deploy_to_pa.sh -SkipGitPush`**. Compte **EU** : `DEPLOY_PA_SSH=senedoo@ssh.eu.pythonanywhere.com bash deploy_to_pa.sh -SkipGitPush`. Sous Cursor : tâches **« Publier sur PythonAnywhere »** (PowerShell) ou **« PythonAnywhere deploy (bash) »**.
 
 ### Déploiement sans saisie de phrase secrète (agent / MCP)
 
@@ -125,7 +125,7 @@ scp -i $key -o StrictHostKeyChecking=accept-new .\deploy_pa.sh senedoo@ssh.pytho
 ssh -i $key -o StrictHostKeyChecking=accept-new senedoo@ssh.pythonanywhere.com "chmod +x ~/deploy_pa_run.sh && bash ~/deploy_pa_run.sh; rm -f ~/deploy_pa_run.sh"
 ```
 
-**Note** : un assistant lancé dans un environnement **sans** accès à votre agent SSH / votre session Windows peut échouer avec `Permission denied` même avec `-i` ; dans ce cas exécutez **`deploy_pa.ps1` vous-même** dans PowerShell ou le terminal intégré Cursor **sur votre machine**.
+**Note** : un assistant lancé dans un environnement **sans** accès à votre **`~/.ssh`** (bac à sable distant, etc.) échouera avec `Permission denied` ou sans clé ; exécutez **`deploy_pa.ps1`** ou **`bash deploy_to_pa.sh`** dans le terminal Cursor **sur votre Mac/PC** où la clé **`id_ed25519_pa_cursor`** est installée, ou configurez le **MCP SSH** avec `privateKeyPath` vers cette clé.
 
 *(Si le dépôt GitHub est **privé**, configurez d’abord un accès `git` sur PA : token HTTPS ou clé déployée — sinon le `git clone`/`pull` échouera.)*
 
