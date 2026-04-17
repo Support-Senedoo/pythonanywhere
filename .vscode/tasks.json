@@ -21,6 +21,22 @@
         "panel": "dedicated"
       },
       "group": "build"
+    },
+    {
+      "label": "Toolbox Flask (local)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/odoo-pythonanywhere/run_toolbox_local.sh"],
+      "options": {
+        "cwd": "${workspaceFolder}/odoo-pythonanywhere"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "group": "build"
     }
   ]
 }
