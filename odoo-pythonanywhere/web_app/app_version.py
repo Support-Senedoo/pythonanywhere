@@ -2,15 +2,20 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+# Heure légale du Sénégal (sans heure d’été) : alignée sur UTC — zone IANA standard.
+_SENEGAL_TZ = ZoneInfo("Africa/Dakar")
 
 # Référence unique : à mettre à jour à chaque livraison utilisateur (nouvelle fonctionnalité ou correctif majeur).
 # Convention suggérée (semver léger) :
 #   - patch (1.3.x → 1.3.y) : correctifs sans changement de comportement visible ;
 #   - minor (1.3.x → 1.4.0) : nouvelle fonctionnalité ou évolution d’écran / API toolbox ;
 #   - adapter _DEFAULT_DATE au jour de la livraison (YYYY-MM-DD).
-_DEFAULT_VERSION = "1.8.3"
-_DEFAULT_DATE = "2026-04-15"
+_DEFAULT_VERSION = "1.8.4"
+_DEFAULT_DATE = "2026-04-17"
 _DEFAULT_TIME = "20:45"
 
 # Valeurs souvent mises par erreur dans l’onglet Web PA (ne reflètent pas la livraison réelle).
@@ -34,6 +39,21 @@ TOOLBOX_APP_DATE = (os.environ.get("TOOLBOX_APP_DATE") or _DEFAULT_DATE).strip()
 TOOLBOX_APP_TIME = (os.environ.get("TOOLBOX_APP_TIME") or _DEFAULT_TIME).strip() or _DEFAULT_TIME
 TOOLBOX_APP_LABEL = (os.environ.get("TOOLBOX_APP_LABEL") or "Toolbox Senedoo").strip() or "Toolbox Senedoo"
 TOOLBOX_APP_AUTHOR = (os.environ.get("TOOLBOX_APP_AUTHOR") or "Senedoo").strip() or "Senedoo"
+
+
+def toolbox_senegal_datetime_display() -> str:
+    """
+    Date et heure **actuelles** au Sénégal (fuseau Africa/Dakar), recalculées à chaque appel.
+
+    À utiliser dans les gabarits pour l’horodatage « maintenant » ; distinct des champs
+    TOOLBOX_APP_DATE / TIME qui documentent la **livraison** de la version.
+    """
+    try:
+        now = datetime.now(_SENEGAL_TZ)
+    except Exception:
+        now = datetime.now(timezone.utc)
+    return now.strftime("%d/%m/%Y %H:%M:%S")
+
 
 # Un seul `git rev-parse` par worker WSGI (le context_processor l’appelait à **chaque** requête → sous-processus
 # répétés, disque, risque de lenteur / 502 sur PythonAnywhere). Après un git pull sans Reload, la valeur peut être

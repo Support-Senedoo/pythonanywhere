@@ -110,6 +110,7 @@ def create_app() -> Flask:
             "toolbox_app_time": app_version.TOOLBOX_APP_TIME,
             "toolbox_app_label": app_version.TOOLBOX_APP_LABEL,
             "toolbox_git_revision": app_version.git_head_short(),
+            "toolbox_senegal_datetime": app_version.toolbox_senegal_datetime_display(),
         }
 
     return app
