@@ -38,8 +38,8 @@ Objectif : une clé **dédiée sans passphrase** sur la machine utilisateur, **j
 ## Connexion SSH « comme la dernière fois » (PC utilisateur)
 
 1. **Une fois** si mot de passe demandé à chaque fois : depuis `odoo-pythonanywhere`, lancer **`install_pa_ssh_key.ps1`** (mot de passe compte PA une fois ; `PubkeyAuthentication=no` pour éviter les essais de clés inutiles).
-2. Déploiement / mise à jour : **`deploy_pa.ps1`** (scp + ssh, script en LF ; `-i` + `IdentitiesOnly=yes`).
-3. **Persistance** : fusionner **`ssh_config.pythonanywhere.example`** dans `%USERPROFILE%\.ssh\config`, puis utiliser **`deploy_pa.ps1 -UserHost pa`** (alias `pa`).
+2. Déploiement / mise à jour : **`deploy_pa.ps1`** (Windows) ou **`bash deploy_to_pa.sh`** (Mac/Linux ; `-i` + `IdentitiesOnly=yes` + `accept-new`).
+3. **Persistance** : fusionner **`ssh_config.pythonanywhere.example`** dans `~/.ssh/config` (Mac/Linux) ou `%USERPROFILE%\.ssh\config` (Windows), puis **`deploy_pa.ps1 -UserHost pa`** ou **`DEPLOY_PA_SSH=senedoo@ssh.eu.pythonanywhere.com`** pour le script bash.
 
 Fichiers : `odoo-pythonanywhere/install_pa_ssh_key.ps1`, **`deploy_to_pa.sh`** (Mac/Linux, équivalent `deploy_pa.ps1`), `deploy_pa.ps1`, `deploy_pa.sh` (exécuté **sur** PA), `ssh_config.pythonanywhere.example`, `mcp-pythonanywhere.example.json`, dossier **`mcp-pa-ssh/`** (serveur MCP SSH corrigé).
 
