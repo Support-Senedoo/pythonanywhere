@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 Active sur un account.report (typiquement une copie de P&L) les options utiles pour
-piloter budget + analytique dans l’UI Odoo : ``filter_analytic``, et le filtre budget
+piloter budget + analytique dans l’UI Odoo : ``filter_analytic`` (optionnel), et le filtre budget
 (``filter_budgets`` sur Odoo 17+, ou ``filter_budget`` sur d’anciennes bases).
+
+Paramètre ``enable_analytic_filter=False`` : ne pas activer ``filter_analytic`` (rapport CPC
+« budget par projet » : réalisé analytique via colonne ``realise_axe`` / assistant).
 
 Les champs réellement écrits dépendent de fields_get (Odoo SaaS / Enterprise).
 Sans le bon nom de champ, la colonne budget / % ne se comporte pas comme le P&L d’origine
@@ -67,18 +70,26 @@ def personalize_pl_analytic_budget_options(
     report_id: int,
     *,
     enable_budget_filter: bool = True,
+    enable_analytic_filter: bool = True,
 ) -> dict[str, Any]:
     """
-    Écrit ``filter_analytic=True`` ; et le filtre budgets si présent sur le modèle.
+    Optionnellement écrit ``filter_analytic=True`` ; et le filtre budgets si présent sur le modèle.
 
     Odoo Enterprise récent expose en général ``filter_budgets`` (pluriel), pas ``filter_budget``.
-    On active le premier nom disponible pour que les colonnes budget / % restent pilotables
-    avec le filtre analytique, comme sur le P&L standard.
+    Avec ``enable_analytic_filter=False`` (rapport CPC « budget par projet »), on **n’active pas**
+    le filtre analytique du rapport : il entre en conflit avec le calcul d’écart vs budget ; le
+    réalisé analytique est porté par une colonne dédiée (valeurs externes / assistant).
+
     Retourne {written, writable_boolean_filters} pour message utilisateur / logs.
     """
     filters = _writable_boolean_filter_fields(models, db, uid, password)
     vals: dict[str, Any] = {}
-    if "filter_analytic" in filters:
+    if enable_analytic_filter:
+        if "filter_analytic" not in filters:
+            raise ValueError(
+                "Le champ modifiable « filter_analytic » est absent sur account.report "
+                "(édition comptable / version Odoo ?)."
+            )
         vals["filter_analytic"] = True
     if enable_budget_filter:
         # Ordre : nom courant Odoo 17+ puis rétrocompatibilité.
@@ -86,11 +97,8 @@ def personalize_pl_analytic_budget_options(
             vals["filter_budgets"] = True
         elif "filter_budget" in filters:
             vals["filter_budget"] = True
-    if "filter_analytic" not in vals:
-        raise ValueError(
-            "Le champ modifiable « filter_analytic » est absent sur account.report "
-            "(édition comptable / version Odoo ?)."
-        )
+    if not vals:
+        return {"written": {}, "writable_boolean_filters": filters}
     execute_kw(
         models,
         db,

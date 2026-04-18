@@ -18,11 +18,12 @@ Stratégie colonne Budget (données 100 % Odoo pour les utilisateurs qui filtren
     fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
     Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
     ne plus piloter correctement les colonnes budget / % avec l’analytique.
-  - Présentation comme le P&L personnalisé SYSCOHADA : ``filter_unfold_all=False``,
-    ``user_groupby`` / ``foldable`` sur les feuilles ``account_codes``, et
-    ``filter_hierarchy`` (groupes de comptes) pour lire réalisé et budget ligne à ligne avec
-    les comptes repliés sous chaque rubrique.
-  - Les totaux (codes X*) : engine ``aggregation`` sur les .budget des lignes de détail.
+  - ``filter_analytic=False`` : le filtre analytique Odoo empêche un écart cohérent avec le
+    budget sélectionné ; le **réalisé sur l’axe** est une colonne ``realise_axe`` (external),
+    remplie par l’assistant « Budget par projet ».
+  - ``filter_unfold_all=False`` et ``filter_hierarchy`` pour la hiérarchie des comptes si des
+    lignes utilisent encore ``account_codes``.
+  - Les totaux (codes X*) : engine ``aggregation`` sur ``.realise_axe`` et ``.budget``.
   - Formules ``account_codes`` / ``budget`` : normalisation Odoo 19 (``^601,^6011`` → ``601+6011``).
 """
 from __future__ import annotations
@@ -37,6 +38,8 @@ from personalize_pl_analytic_budget import (
 from personalize_syscohada_detail import execute_kw, leaf_line_ids_with_account_codes
 
 CPC_BUDGET_ANALYTIQUE_NAME = "CPC SYSCOHADA \u2014 Budget par projet (Senedoo)"
+# Colonne « réalisé analytique » : moteur external, remplie par l’assistant (pas le filtre analytique Odoo).
+CPC_REALISE_ANALYTIC_EXPR_LABEL = "realise_axe"
 
 # Structure CPC SYSCOHADA \u2014 Plan comptable OHADA / S\u00e9n\u00e9gal
 # Format : (code, libell\u00e9, nature, formule_account_codes, formule_aggregation)
@@ -111,10 +114,11 @@ def _apply_cpc_leaf_account_groupby(
     models: Any, db: str, uid: int, password: str, report_id: int
 ) -> int:
     """
-    Sur les lignes feuilles avec moteur ``account_codes`` : regroupement par compte
+    Si des lignes feuilles ont encore le moteur ``account_codes`` : regroupement par compte
     (``user_groupby`` / ``groupby``) + ``foldable``, ``filter_unfold_all`` désactivé
-    sur le rapport, et ``filter_hierarchy`` comme le P&L SYSCOHADA personnalisé (comptes
-    repliés sous les rubriques, lecture ligne à ligne du budget / réalisé).
+    sur le rapport, et ``filter_hierarchy`` comme le P&L SYSCOHADA personnalisé.
+    (Sur le CPC « budget par projet » actuel, le réalisé est en ``external`` : ce réglage
+    peut ne toucher aucune ligne.)
     """
     line_fg = _ek(
         models, db, uid, password, "account.report.line", "fields_get", [], {"attributes": ["type"]}
@@ -223,7 +227,7 @@ def verify_cpc_toolbox_report_install(
     )
     if not col_ok:
         errors.append(
-            f"Colonnes rapport : {n_cols} obtenues, {expected_col_count} attendues (balance/budget/ecart/pct)."
+            f"Colonnes rapport : {n_cols} obtenues, {expected_col_count} attendues (realise_axe/budget/ecart/pct)."
         )
 
     n_lines = int(
@@ -275,9 +279,10 @@ def verify_cpc_toolbox_report_install(
         )
 
     fa = rows[0].get("filter_analytic")
-    if not fa:
+    if fa:
         warnings.append(
-            "filter_analytic est désactivé sur le rapport : le filtre analytique UI peut être absent."
+            "filter_analytic est activé sur ce rapport CPC : attendu False (écart vs budget ; "
+            "réalisé analytique via colonne realise_axe / assistant)."
         )
 
     return {
@@ -498,17 +503,16 @@ def cpc_budget_pct_aggregation_formula(
     currency_code: str = "XOF",
 ) -> str:
     """
-    Formule moteur ``aggregation`` pour la colonne % (rapport Réalisé / Budget).
+    Formule moteur ``aggregation`` pour la colonne % (rapport Réalisé analytique / Budget).
 
-    Dénominateur ``(budget + 1)`` : une unité de devise est négligeable si le budget est
-    grand, mais évite la division par zéro au dépliage par compte (sous-ligne budget 0).
-    Le masquage des % peu significatifs reste géré par :func:`cpc_budget_pct_subformula`.
+    Le réalisé analytique est l’expression ``realise_axe`` (valeurs externes remplies par l’assistant).
+    Dénominateur ``(budget + 1)`` : évite la division par zéro au dépliage par compte.
     """
     if not budget_pct_meaningful:
         return "0"
     _ = currency_code
     c = (line_code or "").strip()
-    return f"{c}.balance*100/({c}.budget+1)"
+    return f"{c}.realise_axe*100/({c}.budget+1)"
 
 
 def company_currency_code(models: Any, db: str, uid: int, password: str) -> str:
@@ -762,7 +766,8 @@ def create_toolbox_cpc_budget_analytique(
     report_id = int(_ek(models, db, uid, password, "account.report", "create", [{
         "name":                        CPC_BUDGET_ANALYTIQUE_NAME,
         "filter_date_range":           True,
-        "filter_analytic":             True,
+        # Filtre analytique Odoo désactivé : incompatible écart vs budget (moteur comptable).
+        "filter_analytic":             False,
         "filter_journals":             True,
         "filter_unfold_all":           False,
         "filter_show_draft":           False,
@@ -775,7 +780,13 @@ def create_toolbox_cpc_budget_analytique(
     filter_personalization_error: str | None = None
     try:
         opt = personalize_pl_analytic_budget_options(
-            models, db, uid, password, report_id, enable_budget_filter=True
+            models,
+            db,
+            uid,
+            password,
+            report_id,
+            enable_budget_filter=True,
+            enable_analytic_filter=False,
         )
         filter_written = dict(opt.get("written") or {})
     except Exception as e:
@@ -783,7 +794,8 @@ def create_toolbox_cpc_budget_analytique(
 
     # \u00c9tape 3 \u2014 4 colonnes
     col_defs = [
-        {"name": "R\u00e9alis\u00e9",       "expression_label": "balance", "figure_type": "monetary",
+        {"name": "R\u00e9alis\u00e9 (axe)", "expression_label": CPC_REALISE_ANALYTIC_EXPR_LABEL,
+         "figure_type": "monetary",
          "report_id": report_id, "sequence": 10, "blank_if_zero": False, "sortable": True},
         {"name": "Budget",        "expression_label": "budget",  "figure_type": "monetary",
          "report_id": report_id, "sequence": 20, "blank_if_zero": False, "sortable": True},
@@ -837,9 +849,9 @@ def create_toolbox_cpc_budget_analytique(
         )
     elif budget_mode == "external" and budget_external_source == "report_budget_item":
         creation_warnings.append(
-            "Colonne Budget = moteur « external » (``account.report.budget.item``). "
-            "Renseigner les montants via l’assistant Senedoo « Budget par projet » (wizard) : "
-            "même analytique, période et ``account.report.budget`` que dans le rapport."
+            "Colonnes « Réalisé (axe) » et Budget = external : exécuter l’assistant "
+            "« Budget par projet » (même analytique, période et ``account.report.budget``) "
+            "pour remplir ``account.report.external.value`` ; sinon montants vides."
         )
     elif budget_mode == "external":
         creation_warnings.append(
@@ -872,13 +884,14 @@ def create_toolbox_cpc_budget_analytique(
         line_count += 1
 
         if nature == "account":
-            # R\u00e9alis\u00e9 : engine account_codes respecte filter_analytic
+            # R\u00e9alis\u00e9 analytique : external (assistant toolbox ; pas le filtre analytique du rapport)
             _push_expr({
                 "_line_code":     code,
                 "report_line_id": line_id,
-                "label":          "balance",
-                "engine":         "account_codes",
-                "formula":        formula_ac,
+                "label":          CPC_REALISE_ANALYTIC_EXPR_LABEL,
+                "engine":         "external",
+                "formula":        "sum",
+                "figure_type":    "monetary",
                 "date_scope":     "strict_range",
             })
             # Budget : natif, external (crossovered), ou repli GL
@@ -910,16 +923,16 @@ def create_toolbox_cpc_budget_analytique(
                     "formula":        formula_ac,
                     "date_scope":     "strict_range",
                 })
-            # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9
+            # \u00c9cart : Budget \u2212 R\u00e9alis\u00e9 (axe)
             _push_expr({
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          "ecart",
                 "engine":         "aggregation",
-                "formula":        f"{code}.budget - {code}.balance",
+                "formula":        f"{code}.budget - {code}.{CPC_REALISE_ANALYTIC_EXPR_LABEL}",
                 "date_scope":     "strict_range",
             })
-            # % Réalisation (quotient balance/budget, masqué si budget ≤ 1 unité devise)
+            # % Réalisation (quotient realise_axe/budget, masqué si budget ≤ 1 unité devise)
             _pct_vals: dict[str, Any] = {
                 "_line_code":     code,
                 "report_line_id": line_id,
@@ -937,13 +950,13 @@ def create_toolbox_cpc_budget_analytique(
             _push_expr(_pct_vals)
 
         elif nature == "aggregate":
-            # Odoo 19+ : la regex d'agr\u00e9gation exige code.libell\u00e9 (ex. TA.balance), pas seul TA.
+            # Odoo 19+ : la regex d'agr\u00e9gation exige code.libell\u00e9 (ex. TA.realise_axe), pas seul TA.
             _push_expr({
                 "_line_code":     code,
                 "report_line_id": line_id,
-                "label":          "balance",
+                "label":          CPC_REALISE_ANALYTIC_EXPR_LABEL,
                 "engine":         "aggregation",
-                "formula":        _agg_formula_with_suffix(formula_agg, "balance"),
+                "formula":        _agg_formula_with_suffix(formula_agg, CPC_REALISE_ANALYTIC_EXPR_LABEL),
                 "date_scope":     "strict_range",
             })
             # Budget (m\u00eame formule mais sur .budget de chaque code)
@@ -961,7 +974,7 @@ def create_toolbox_cpc_budget_analytique(
                 "report_line_id": line_id,
                 "label":          "ecart",
                 "engine":         "aggregation",
-                "formula":        f"{code}.budget - {code}.balance",
+                "formula":        f"{code}.budget - {code}.{CPC_REALISE_ANALYTIC_EXPR_LABEL}",
                 "date_scope":     "strict_range",
             })
             # % Réalisation (quotient balance/budget, masqué si budget ≤ 1 unité devise)

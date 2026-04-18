@@ -11,9 +11,9 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
   - Menus : Facturation/Comptabilité > Reporting > Assistant budget projet (Senedoo) — action serveur → formulaire ;
     Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo).
-  - Dans le rapport Odoo : activer le filtre analytique (même axe que le wizard) pour que la colonne
-    « Réalisé » et l’« Écart » (agrégations .balance / .budget) s’appuient sur cet axe ; les lignes
-    feuilles sont regroupées par compte (dépliage sous chaque rubrique).
+  - Rapport CPC : **pas** de filtre analytique Odoo (incompatible avec l’écart vs budget). La colonne
+    « Réalisé (axe) » est ``realise_axe`` (valeurs externes) ; l’« Écart » = ``budget − realise_axe``.
+    Le wizard injecte ``realise_axe`` et le budget (external) pour la même période et le même axe.
   - Colonne Budget (hors moteur natif ``budget``) : remplie depuis le budget financier choisi dans le
     wizard (pas de saisie manuelle au crayon).
 
@@ -257,8 +257,10 @@ if not cpc_report:
     )
 cpc_report_id = cpc_report.id
 
-# Expressions colonne Budget (moteur external uniquement — pas les .budget en aggregation)
+# Expressions colonne Budget (moteur external uniquement)
 expr_by_code = {}
+# Colonne Réalisé (axe) — external ; alimentée comme le budget (pas le filtre analytique du rapport)
+expr_realise_by_code = {}
 for line in env['account.report.line'].search([('report_id', '=', cpc_report_id)]):
     if not line.code:
         continue
@@ -268,6 +270,12 @@ for line in env['account.report.line'].search([('report_id', '=', cpc_report_id)
         ('engine', '=', 'external'),
     ]):
         expr_by_code[line.code] = expr.id
+    for expr in env['account.report.expression'].search([
+        ('report_line_id', '=', line.id),
+        ('label', '=', 'realise_axe'),
+        ('engine', '=', 'external'),
+    ]):
+        expr_realise_by_code[line.code] = expr.id
 
 # ------------------------------------------------------------------ realized (analytic filtered)
 domain_ml = [
@@ -473,13 +481,11 @@ for code, label, nature, formula_ac, formula_agg in CPC_STRUCTURE:
         line_realized[code] = _eval_aggregate(formula_agg, line_realized)
         line_budget[code]   = _eval_aggregate(formula_agg, line_budget)
 
-# ------------------------------------------------------------------ ecriture external values
+# ------------------------------------------------------------------ ecriture external values (realise axe + budget external)
 company_id = env.company.id
 
-for code, expr_id in expr_by_code.items():
-    budget_val = float(line_budget.get(code, 0.0))
-
-    # Supprimer les valeurs existantes sur la periode
+for code, expr_id in expr_realise_by_code.items():
+    val = float(line_realized.get(code, 0.0))
     old = env['account.report.external.value'].search([
         ('expression_id', '=', expr_id),
         ('date', '>=', date_from),
@@ -487,11 +493,26 @@ for code, expr_id in expr_by_code.items():
         ('company_id', '=', company_id),
     ])
     old.unlink()
-
-    # Créer la nouvelle valeur
     env['account.report.external.value'].create({
         'expression_id':    expr_id,
-        'value':            budget_val,
+        'value':            val,
+        'date':             date_to,
+        'target_report_id': cpc_report_id,
+        'company_id':       company_id,
+    })
+
+for code, expr_id in expr_by_code.items():
+    val = float(line_budget.get(code, 0.0))
+    old = env['account.report.external.value'].search([
+        ('expression_id', '=', expr_id),
+        ('date', '>=', date_from),
+        ('date', '<=', date_to),
+        ('company_id', '=', company_id),
+    ])
+    old.unlink()
+    env['account.report.external.value'].create({
+        'expression_id':    expr_id,
+        'value':            val,
         'date':             date_to,
         'target_report_id': cpc_report_id,
         'company_id':       company_id,
@@ -516,11 +537,13 @@ except Exception:
     codes_diag = ''
 
 # ------------------------------------------------------------------ mise a jour statut wizard
-written = len(expr_by_code)
+written_r = len(expr_realise_by_code)
+written_b = len(expr_by_code)
 wizard.write({
     'x_status': (
-        "OK - " + str(written) + " ligne(s) CPC mise(s) a jour. "
-        "Ouvrez le rapport CPC dans Odoo avec le filtre analytique = compte " + str(analytic_id) + "."
+        "OK - realise axe " + str(written_r) + " ligne(s), budget external " + str(written_b) + ". "
+        "Ne pas activer le filtre analytique du rapport Odoo (desactive sur ce CPC). "
+        "Analytique utilise : " + str(analytic_id) + "."
         + codes_diag
     )
 })
@@ -1135,20 +1158,6 @@ def create_cpc_wizard(
     # Ne pas inclure by_model en entier dans message : le flash grossit la session cookie
     # (limite Werkzeug ~4093 octets) et provoque erreur à la redirection après POST.
     summary = _budget_fields_summary_for_user_message(ba)
-    try:
-        from cpc_report_pct_fix import repair_cpc_budget_reports_on_odoo
-
-        rep = repair_cpc_budget_reports_on_odoo(models, db, uid, pwd, limit=40)
-        result["cpc_repair"] = rep
-    except Exception as pct_exc:
-        result["cpc_repair"] = {
-            "formula_writes": 0,
-            "groupby_leaf_lines": 0,
-            "external_budget_sub_cleared": 0,
-            "report_ids": [],
-            "error": str(pct_exc),
-        }
-    rep = result.get("cpc_repair") or {}
     inst = result.get("cpc_toolbox_install") or {}
     new_rid = int((inst.get("report_id") or 0))
     if result.get("wizard_menu_parent_reattached_to"):
@@ -1193,15 +1202,6 @@ def create_cpc_wizard(
             _w = _mpc.get("warnings") or []
             if _w:
                 result["message"] += " " + "; ".join(str(x) for x in _w[:2]) + "."
-    if int(rep.get("formula_writes") or 0):
-        result["message"] += (
-            f" Colonne % : {rep['formula_writes']} expression(s) avec denominateur securise "
-            f"({rep.get('currency_code', '')})."
-        )
-    if int(rep.get("groupby_leaf_lines") or 0):
-        result["message"] += (
-            f" Detail comptes : {rep['groupby_leaf_lines']} ligne(s) feuilles en groupby compte."
-        )
     if not result["budget_analytic_fields_ok"]:
         result["message"] += (
             " Attention : certains champs x_analytic_account_id n'ont pas ete crees (voir detail JSON cote serveur)."

@@ -1220,9 +1220,7 @@ def ensure_account_report_reporting_menu(
             require_menu=True,
         )
         return None, None, vfail
-    sync_menu_labels_for_client_action(models, db, uid, password, aid, title)
     ref = f"ir.actions.client,{int(aid)}"
-    existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
 
     if under_trial_balance:
         placement = resolve_parent_menu_in_grands_livres_group(models, db, uid, password)
@@ -1234,6 +1232,49 @@ def ensure_account_report_reporting_menu(
     else:
         parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
         menu_sequence = 500
+
+    # Réinstall rapport : nouvel ir.actions.client — rattacher le menu Reporting existant (même titre / parent)
+    if parent_id:
+        try:
+            stale_mids = execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "ir.ui.menu",
+                "search",
+                [[("name", "=", title), ("parent_id", "=", int(parent_id))]],
+                {"limit": 12, "order": "id asc"},
+            ) or []
+            if stale_mids:
+                primary = int(stale_mids[0])
+                execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "ir.ui.menu",
+                    "write",
+                    [[primary], {"action": ref}],
+                )
+                for extra in stale_mids[1:]:
+                    try:
+                        execute_kw(
+                            models,
+                            db,
+                            uid,
+                            password,
+                            "ir.ui.menu",
+                            "unlink",
+                            [[int(extra)]],
+                        )
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    sync_menu_labels_for_client_action(models, db, uid, password, aid, title)
+    existing_mid = find_menu_id_for_client_action(models, db, uid, password, aid)
 
     if existing_mid:
         if parent_id:

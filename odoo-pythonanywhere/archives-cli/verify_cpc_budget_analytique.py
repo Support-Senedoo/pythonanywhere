@@ -6,9 +6,9 @@ Contrôle du rapport « CPC SYSCOHADA — Budget par projet (Senedoo) » sur une
 Vérifie :
   - présence du account.report (nom exact ou --report-id) ;
   - filtres utiles (filter_analytic, filter_budgets / filter_budget si le modèle les a) ;
-  - 4 colonnes (expression_label balance / budget / ecart / pct) ;
+  - 4 colonnes (expression_label realise_axe / budget / ecart / pct) ;
   - nombre de lignes et codes attendus (structure CPC toolbox) ;
-  - pour chaque ligne : 4 expressions avec les bons moteurs (account_codes / budget / aggregation).
+  - pour chaque ligne : 4 expressions avec les bons moteurs (external / budget|external / aggregation).
 
 Variables d'environnement (ou options CLI) : comme personalize_syscohada_detail / .env
 
@@ -35,6 +35,7 @@ except ImportError:
 from create_cpc_budget_analytique import (
     CPC_BUDGET_ANALYTIQUE_NAME,
     CPC_BUDGET_STRUCTURE,
+    CPC_REALISE_ANALYTIC_EXPR_LABEL,
     _agg_formula_with_suffix,
     cpc_account_report_budget_item_available,
     cpc_budget_pct_aggregation_formula,
@@ -46,7 +47,7 @@ from create_cpc_budget_analytique import (
 )
 from personalize_syscohada_detail import connect, execute_kw
 
-EXPECTED_COLUMN_LABELS = ("balance", "budget", "ecart", "pct")
+EXPECTED_COLUMN_LABELS = ("realise_axe", "budget", "ecart", "pct")
 STRUCT_BY_CODE: dict[str, tuple[str, str, str, str | None, str | None]] = {
     row[0]: row for row in CPC_BUDGET_STRUCTURE
 }
@@ -169,8 +170,11 @@ def verify_cpc_budget_analytique_report(
             f"Nom effectif du rapport : « {snap['name']} » (recherche initiale : « {name} »)."
         )
 
-    if not snap.get("filter_analytic"):
-        errors.append("filter_analytic devrait être True pour ce rapport analytique.")
+    if snap.get("filter_analytic"):
+        errors.append(
+            "filter_analytic devrait être False sur ce rapport CPC (réalisé analytique = colonne "
+            "realise_axe remplie par l’assistant ; le filtre analytique Odoo casse l’écart vs budget)."
+        )
 
     if "filter_budgets" in avail and not snap.get("filter_budgets"):
         warnings.append(
@@ -291,11 +295,12 @@ def verify_cpc_budget_analytique_report(
                 if row_spec and row_spec[2] == "aggregate" and row_spec[4]:
                     fa = row_spec[4]
                     _norm = lambda s: (s or "").replace(" ", "")
-                    bal_e = _norm(_agg_formula_with_suffix(fa, "balance"))
-                    if _norm(ex["balance"].get("formula")) != bal_e:
+                    ra_lab = CPC_REALISE_ANALYTIC_EXPR_LABEL
+                    ra_e = _norm(_agg_formula_with_suffix(fa, ra_lab))
+                    if _norm(ex[ra_lab].get("formula")) != ra_e:
                         lc_errors.append(
-                            f"balance: formule « {_norm(ex['balance'].get('formula'))} » "
-                            f"≠ attendue « {bal_e} »"
+                            f"{ra_lab}: formule « {_norm(ex[ra_lab].get('formula'))} » "
+                            f"≠ attendue « {ra_e} »"
                         )
                     bud_e = _norm(_agg_formula_with_suffix(fa, "budget"))
                     if _norm(ex["budget"].get("formula")) != bud_e:
@@ -303,7 +308,7 @@ def verify_cpc_budget_analytique_report(
                             f"budget: formule « {_norm(ex['budget'].get('formula'))} » "
                             f"≠ attendue « {bud_e} »"
                         )
-                    ec_e = _norm(f"{code}.budget-{code}.balance")
+                    ec_e = _norm(f"{code}.budget-{code}.{ra_lab}")
                     ec_g = _norm(ex["ecart"].get("formula"))
                     if ec_g != ec_e:
                         lc_errors.append(f"ecart: formule « {ec_g} » ≠ attendue « {ec_e} »")
@@ -326,12 +331,24 @@ def verify_cpc_budget_analytique_report(
                     if sub_g != sub_e:
                         lc_errors.append(
                             f"pct: subformula « {ex['pct'].get('subformula')!r} » ≠ attendue "
-                            f"« {sub_e or '(vide)'} » (réparation CPC toolbox si ancien schéma)."
+                            f"« {sub_e or '(vide)'} »."
                         )
             else:
-                b_eng = (ex["balance"].get("engine") or "").strip()
-                if b_eng != "account_codes":
-                    lc_errors.append(f"balance: engine={b_eng!r}, attendu account_codes")
+                ra_lab = CPC_REALISE_ANALYTIC_EXPR_LABEL
+                ra_eng = (ex.get(ra_lab) or {}).get("engine") or ""
+                ra_eng = str(ra_eng).strip()
+                if ra_eng != "external":
+                    lc_errors.append(f"{ra_lab}: engine={ra_eng!r}, attendu external")
+                ra_f = ((ex.get(ra_lab) or {}).get("formula") or "").strip()
+                if ra_f != "sum":
+                    lc_errors.append(f"{ra_lab} external: formule « {ra_f!r} » ≠ attendue « sum »")
+                ra_sub = ((ex.get(ra_lab) or {}).get("subformula") or "").strip().lower()
+                if "editable" in ra_sub:
+                    lc_errors.append(
+                        f"{ra_lab} external: sous-formule editable interdite ; actuel : "
+                        f"{(ex.get(ra_lab) or {}).get('subformula')!r}"
+                    )
+
                 bud_eng = (ex["budget"].get("engine") or "").strip()
                 if bud_eng not in ("budget", "account_codes", "external"):
                     lc_errors.append(
@@ -356,6 +373,12 @@ def verify_cpc_budget_analytique_report(
                     if eng != "aggregation":
                         lc_errors.append(f"{lab}: engine={eng!r}, attendu aggregation")
 
+                _norm_d = lambda s: (s or "").replace(" ", "")
+                ec_ed = _norm_d(f"{code}.budget-{code}.{ra_lab}")
+                ec_gd = _norm_d(ex["ecart"].get("formula"))
+                if ec_gd != ec_ed:
+                    lc_errors.append(f"ecart: formule « {ec_gd} » ≠ attendue « {ec_ed} »")
+
                 pct_got = (ex["pct"].get("formula") or "").replace(" ", "")
                 pct_exp = cpc_budget_pct_aggregation_formula(
                     code,
@@ -373,17 +396,12 @@ def verify_cpc_budget_analytique_report(
                 if sub_g != sub_e:
                     lc_errors.append(
                         f"pct: subformula « {ex['pct'].get('subformula')!r} » ≠ attendue "
-                        f"« {sub_e or '(vide)'} » (réparation CPC toolbox si ancien schéma)."
+                        f"« {sub_e or '(vide)'} »."
                     )
 
                 if row_spec and row_spec[2] == "account" and row_spec[3]:
-                    f_bal = normalize_cpc_account_codes_formula(ex["balance"].get("formula"))
-                    f_exp = normalize_cpc_account_codes_formula(row_spec[3])
-                    if f_bal != f_exp:
-                        lc_errors.append(
-                            f"formule balance « {f_bal} » ≠ attendue (normalisée) « {f_exp} »"
-                        )
                     f_bud = normalize_cpc_account_codes_formula(ex["budget"].get("formula"))
+                    f_exp = normalize_cpc_account_codes_formula(row_spec[3])
                     if bud_eng == "budget" and f_bud != f_exp:
                         lc_errors.append(
                             f"formule budget « {f_bud} » ≠ attendue (normalisée) « {f_exp} »"
@@ -398,9 +416,9 @@ def verify_cpc_budget_analytique_report(
                                 "budget external: la sous-formule « editable » (crayon) est "
                                 f"interdite ; actuel : {ex['budget'].get('subformula')!r}"
                             )
-                    if bud_eng == "account_codes" and f_bud != f_bal:
+                    if bud_eng == "account_codes" and f_bud != f_exp:
                         lc_errors.append(
-                            f"formule budget « {f_bud} » ≠ balance « {f_bal} » (fallback attendu)"
+                            f"formule budget « {f_bud} » ≠ préfixe attendu « {f_exp} » (fallback GL)"
                         )
 
         line_checks.append(

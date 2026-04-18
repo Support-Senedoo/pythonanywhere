@@ -802,48 +802,6 @@ def pl_analytic_project_report():
                 ),
             )
 
-        if action == "repair_cpc_budget_reports":
-            try:
-                from cpc_report_pct_fix import repair_cpc_budget_reports_on_odoo
-
-                rep = repair_cpc_budget_reports_on_odoo(models, db, uid, pwd, limit=40)
-                parts: list[str] = []
-                nw = int(rep.get("formula_writes") or 0)
-                ng = int(rep.get("groupby_leaf_lines") or 0)
-                nb = int(rep.get("external_budget_sub_cleared") or 0)
-                if nw:
-                    parts.append(
-                        f"{nw} expression(s) % avec denominateur securise ({rep.get('currency_code') or '?'})"
-                    )
-                if ng:
-                    parts.append(
-                        f"{ng} ligne(s) feuilles : detail par compte + presentation P&L "
-                        "(sans tout deplier, hierarchie groupes de comptes)"
-                    )
-                if nb:
-                    parts.append(
-                        f"{nb} expression(s) Budget external : saisie manuelle (crayon) desactivee"
-                    )
-                rids = rep.get("report_ids") or []
-                if rids:
-                    parts.append(f"rapport(s) touches : {rids}")
-                flash(
-                    "Reparation CPC : " + (" ; ".join(parts) if parts else "rien a modifier (deja a jour ou aucun rapport « cpc »)."),
-                    "success" if parts else "info",
-                )
-            except Exception as e:
-                flash(f"Echec reparation rapports CPC : {e!s}", "danger")
-            return redirect(
-                ru(
-                    **_pl_analytic_url_params(
-                        client_id=cid,
-                        filter_host=fl_save,
-                        analytic_q=analytic_q_post,
-                        filter_q=filter_q_post,
-                    ),
-                ),
-            )
-
         if action == "create_manager_dashboard":
             jid = _uuid.uuid4().hex[:12]
             _job_set(jid, {"status": "running"})

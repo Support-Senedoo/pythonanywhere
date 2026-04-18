@@ -1,15 +1,11 @@
 """
-Réparation des rapports « CPC » sur Odoo SaaS (toolbox).
+Utilitaires techniques sur des ``account.report`` (réécriture des %, groupby, etc.).
 
-1) Colonne % (moteur aggregation, label ``pct``) : formule ``balance*100/(budget+1)``
-   (évite la division par zéro au dépliage par compte). Sous-formule seule
-   ``if_other_expr_above(LINE.budget, DEVISE(1))`` (sans ``ignore_zero_division`` :
-   chaînage refusé par Odoo — erreur « Mauvais format pour la formule »).
+La **réparation parcourant tous les rapports « cpc »** a été retirée : la toolbox recrée
+le rapport CPC à chaque mise à jour du wizard « Budget par projet ».
 
-2) Détail par compte : sur les lignes feuilles avec moteur ``account_codes``, active
-   ``user_groupby=account_id`` et ``foldable`` (comme ``personalize_syscohada_detail``),
-   désactive ``filter_unfold_all`` sur le rapport, et applique ``filter_hierarchy`` comme
-   le P&L personnalisé (groupes de comptes, comptes repliés sous les rubriques).
+Les fonctions ``rewrite_pct_formulas_safe_denominator`` et ``apply_cpc_leaf_account_groupby``
+restent disponibles pour un usage ponctuel (CLI / support).
 """
 from __future__ import annotations
 
@@ -350,40 +346,23 @@ def repair_cpc_budget_reports_on_odoo(
     limit: int = 40,
 ) -> dict[str, Any]:
     """
-    Applique réécriture % + groupby compte sur chaque rapport « cpc » (ilike).
+    Ancienne réparation in-place des rapports « cpc » : **désactivée**.
 
-    Retourne ``formula_writes``, ``groupby_leaf_lines``, ``report_ids`` (rapports modifiés).
+    La toolbox **recrée** le rapport CPC à chaque « Mettre à jour Budget par projet »
+    (purge + création + menu pointant sur le nouvel id). Ne plus compter sur cette API.
     """
+    _ = models, db, uid, password, limit
     cur = company_currency_code(models, db, uid, password)
-    rids = search_cpc_like_report_ids(models, db, uid, password, limit=limit)
-    formula_writes = 0
-    groupby_leaf_lines = 0
-    external_budget_sub_cleared = 0
-    touched: list[int] = []
-    for rid in rids:
-        rid_i = int(rid)
-        nf = rewrite_pct_formulas_safe_denominator(
-            models, db, uid, password, rid_i, cur
-        )
-        ng = apply_cpc_leaf_account_groupby(models, db, uid, password, rid_i)
-        nb = clear_external_budget_editable_subformula(
-            models, db, uid, password, rid_i
-        )
-        if nf or ng or nb:
-            touched.append(rid_i)
-        formula_writes += nf
-        groupby_leaf_lines += ng
-        external_budget_sub_cleared += nb
     return {
-        "formula_writes": formula_writes,
-        "groupby_leaf_lines": groupby_leaf_lines,
-        "external_budget_sub_cleared": external_budget_sub_cleared,
-        "report_ids": touched,
+        "formula_writes": 0,
+        "groupby_leaf_lines": 0,
+        "external_budget_sub_cleared": 0,
+        "report_ids": [],
         "currency_code": cur,
+        "deprecated": True,
     }
 
 
-# Ancienne API (install wizard) — déléguer vers la réparation complète
 def fix_pct_on_cpc_syscohada_reports(
     models: Any,
     db: str,
@@ -393,7 +372,7 @@ def fix_pct_on_cpc_syscohada_reports(
     name_ilike: str = "CPC SYSCOHADA",
     limit: int = 8,
 ) -> tuple[int, list[int]]:
-    """Rétrocompat : utilise :func:`repair_cpc_budget_reports_on_odoo` (recherche élargie « cpc »)."""
+    """Rétrocompat : plus de parcours « cpc » ; recréer le rapport via la toolbox."""
     _ = name_ilike
     rep = repair_cpc_budget_reports_on_odoo(models, db, uid, password, limit=max(limit, 40))
     return rep["formula_writes"], rep["report_ids"]
