@@ -810,6 +810,7 @@ def pl_analytic_project_report():
                 parts: list[str] = []
                 nw = int(rep.get("formula_writes") or 0)
                 ng = int(rep.get("groupby_leaf_lines") or 0)
+                nb = int(rep.get("external_budget_sub_cleared") or 0)
                 if nw:
                     parts.append(
                         f"{nw} expression(s) % avec denominateur securise ({rep.get('currency_code') or '?'})"
@@ -818,6 +819,10 @@ def pl_analytic_project_report():
                     parts.append(
                         f"{ng} ligne(s) feuilles : detail par compte + presentation P&L "
                         "(sans tout deplier, hierarchie groupes de comptes)"
+                    )
+                if nb:
+                    parts.append(
+                        f"{nb} expression(s) Budget external : saisie manuelle (crayon) desactivee"
                     )
                 rids = rep.get("report_ids") or []
                 if rids:

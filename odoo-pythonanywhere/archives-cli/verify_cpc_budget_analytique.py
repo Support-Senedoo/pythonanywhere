@@ -393,10 +393,10 @@ def verify_cpc_budget_analytique_report(
                         if f_raw != "sum":
                             lc_errors.append(f"budget external: formule « {f_raw!r} » ≠ attendue « sum »")
                         sub = (ex["budget"].get("subformula") or "").strip().lower()
-                        if sub and sub != "editable":
+                        if "editable" in sub:
                             lc_errors.append(
-                                f"budget external: subformula « {ex['budget'].get('subformula')!r} » "
-                                "≠ attendue « editable »"
+                                "budget external: la sous-formule « editable » (crayon) est "
+                                f"interdite ; actuel : {ex['budget'].get('subformula')!r}"
                             )
                     if bud_eng == "account_codes" and f_bud != f_bal:
                         lc_errors.append(
@@ -422,9 +422,9 @@ def verify_cpc_budget_analytique_report(
     if expected_budget_mode == "external":
         if report_budget_item_ok:
             warnings.append(
-                "Budget des lignes détail = moteur external : sans alimentation des "
-                "``account.report.external.value`` (cron / module Odoo, ou phase de test intégrateur), "
-                "la colonne Budget reste vide pour les utilisateurs qui ne font que filtrer dans Odoo."
+                "Budget des lignes détail = moteur external : exécuter l’assistant toolbox "
+                "« Budget par projet » (même analytique, période et ``account.report.budget``) pour "
+                "remplir les ``account.report.external.value`` ; sinon colonne Budget vide."
             )
         else:
             warnings.append(

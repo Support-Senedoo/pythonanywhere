@@ -46,6 +46,7 @@ def collect_budget_expression_id_by_line_code(
     report_id: int,
     *,
     expression_label: str = "budget",
+    require_engine: str | None = None,
 ) -> dict[str, int]:
     lines = (
         _ek(
@@ -78,18 +79,23 @@ def collect_budget_expression_id_by_line_code(
             "account.report.expression",
             "read",
             [all_eids],
-            {"fields": ["id", "label"]},
+            {"fields": ["id", "label", "engine"]},
         )
         or []
     )
     label_by_id = {int(e["id"]): (e.get("label") or "").strip() for e in exprs}
+    engine_by_id = {int(e["id"]): (e.get("engine") or "").strip() for e in exprs}
     out: dict[str, int] = {}
     want = (expression_label or "budget").strip()
+    req = (require_engine or "").strip() or None
     for code, eids in line_exprs.items():
         for eid in eids:
-            if label_by_id.get(eid) == want:
-                out[code] = eid
-                break
+            if label_by_id.get(eid) != want:
+                continue
+            if req and engine_by_id.get(eid) != req:
+                continue
+            out[code] = eid
+            break
     return out
 
 
@@ -429,7 +435,13 @@ def sync_cpc_budget_external_values(
             }
 
     expr_by_code = collect_budget_expression_id_by_line_code(
-        models, db, uid, password, report_id, expression_label=expression_label
+        models,
+        db,
+        uid,
+        password,
+        report_id,
+        expression_label=expression_label,
+        require_engine="external",
     )
     if not expr_by_code:
         return {

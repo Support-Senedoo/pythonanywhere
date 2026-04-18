@@ -7,11 +7,15 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       1. Vérifie la cohérence analytique avec le budget (champs Studio optionnels sur account.report.budget)
       2. Lit account.move.line (filtré analytique) → réalisé CPC
       3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
-      4. Écrit account.report.external.value (colonne Budget du rapport CPC)
+      4. Écrit account.report.external.value (expressions Budget ``external``, label ``budget``)
       5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
   - Menus : Facturation/Comptabilité > Reporting > Assistant budget projet (Senedoo) — action serveur → formulaire ;
-    Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo) — ouverture directe du rapport (dépliage par compte).
-    Domain budget selon l'analytique ; bouton « Remplir le rapport CPC » (action serveur Calculer).
+    Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo).
+  - Dans le rapport Odoo : activer le filtre analytique (même axe que le wizard) pour que la colonne
+    « Réalisé » et l’« Écart » (agrégations .balance / .budget) s’appuient sur cet axe ; les lignes
+    feuilles sont regroupées par compte (dépliage sous chaque rubrique).
+  - Colonne Budget (hors moteur natif ``budget``) : remplie depuis le budget financier choisi dans le
+    wizard (pas de saisie manuelle au crayon).
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
@@ -45,7 +49,6 @@ CPC_REPORT_MENU_LABEL = "CPC SYSCOHADA — rapport budget projet (Senedoo)"
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
 # Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
 CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
-EXTERNAL_EXPR_LABEL = "budget_analytique"  # label expression externe à peupler
 
 # Champs créés sur les modèles budget reporting (Many2one vers l’axe analytique)
 BUDGET_ANALYTIC_FIELD_NAME = "x_analytic_account_id"
@@ -254,14 +257,15 @@ if not cpc_report:
     )
 cpc_report_id = cpc_report.id
 
-# Récuperer les expressions externes (label='budget_analytique') par code de ligne
+# Expressions colonne Budget (moteur external uniquement — pas les .budget en aggregation)
 expr_by_code = {}
 for line in env['account.report.line'].search([('report_id', '=', cpc_report_id)]):
     if not line.code:
         continue
     for expr in env['account.report.expression'].search([
         ('report_line_id', '=', line.id),
-        ('label', '=', '''' + EXTERNAL_EXPR_LABEL + r''''),
+        ('label', '=', 'budget'),
+        ('engine', '=', 'external'),
     ]):
         expr_by_code[line.code] = expr.id
 
@@ -1140,6 +1144,7 @@ def create_cpc_wizard(
         result["cpc_repair"] = {
             "formula_writes": 0,
             "groupby_leaf_lines": 0,
+            "external_budget_sub_cleared": 0,
             "report_ids": [],
             "error": str(pct_exc),
         }

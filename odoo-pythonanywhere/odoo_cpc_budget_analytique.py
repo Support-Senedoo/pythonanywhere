@@ -566,7 +566,6 @@ def create_report_lines(models, uid, report_id):
                         "label":          "budget",
                         "engine":         "external",
                         "formula":        "sum",
-                        "subformula":     "editable",
                         "figure_type":    "monetary",
                         "date_scope":     "strict_range",
                     })

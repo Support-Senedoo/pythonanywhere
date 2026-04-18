@@ -9,10 +9,10 @@ Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
 Stratégie colonne Budget (données 100 % Odoo pour les utilisateurs qui filtrent dans l’UI) :
   - Engine ``budget`` si la sélection ``engine`` l’expose (filtre budgets natif Odoo).
-  - Sinon ``account.report.budget.item`` ou ``crossovered.budget.lines`` : engine ``external`` ;
-    les ``account.report.external.value`` doivent être **écrits côté Odoo** (cron, module, serveur)
-    ou en phase de **test** via l’outillage d’intégration — ce n’est pas une action des utilisateurs
-    finaux dans le rapport.
+  - Sinon ``account.report.budget.item`` ou ``crossovered.budget.lines`` : engine ``external``,
+    **sans** sous-formule ``editable`` : pas de saisie manuelle au crayon ; les montants viennent
+    des ``account.report.external.value`` (remplissage via l’assistant toolbox « Budget par projet »
+    depuis le budget financier Odoo sélectionné).
   - Sinon repli ``account_codes`` (même formule que le réalisé — peu utile).
   - Après création du rapport : activation de ``filter_budgets`` ou ``filter_budget`` sur la
     fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
@@ -838,9 +838,8 @@ def create_toolbox_cpc_budget_analytique(
     elif budget_mode == "external" and budget_external_source == "report_budget_item":
         creation_warnings.append(
             "Colonne Budget = moteur « external » (``account.report.budget.item``). "
-            "Les utilisateurs Odoo choisissent période, analytique et budget financier **dans Odoo** ; "
-            "les ``account.report.external.value`` doivent être alimentés par un **mécanisme côté Odoo** "
-            "(cron, module, serveur) ou par l’outillage d’intégration **uniquement pour tests / mise en route**."
+            "Renseigner les montants via l’assistant Senedoo « Budget par projet » (wizard) : "
+            "même analytique, période et ``account.report.budget`` que dans le rapport."
         )
     elif budget_mode == "external":
         creation_warnings.append(
@@ -899,7 +898,6 @@ def create_toolbox_cpc_budget_analytique(
                     "label":          "budget",
                     "engine":         "external",
                     "formula":        "sum",
-                    "subformula":     "editable",
                     "figure_type":    "monetary",
                     "date_scope":     "strict_range",
                 })

@@ -267,6 +267,80 @@ def apply_cpc_leaf_account_groupby(
     return len(leaves)
 
 
+def clear_external_budget_editable_subformula(
+    models: Any,
+    db: str,
+    uid: int,
+    password: str,
+    report_id: int,
+) -> int:
+    """
+    Retire ``editable`` des expressions Budget (moteur external) : budget issu des
+    ``account.report.external.value`` (assistant toolbox), pas saisie au crayon ligne à ligne.
+    """
+    ids = (
+        execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "search",
+            [[
+                ("report_line_id.report_id", "=", int(report_id)),
+                ("engine", "=", "external"),
+                ("label", "=", "budget"),
+            ]],
+            {"limit": 500},
+        )
+        or []
+    )
+    nwrites = 0
+    for eid in ids:
+        rows = execute_kw(
+            models,
+            db,
+            uid,
+            password,
+            "account.report.expression",
+            "read",
+            [[int(eid)]],
+            {"fields": ["subformula"]},
+        )
+        if not rows:
+            continue
+        sub = rows[0].get("subformula")
+        sub_s = (str(sub) if sub not in (False, None) else "").lower()
+        if "editable" not in sub_s:
+            continue
+        try:
+            execute_kw(
+                models,
+                db,
+                uid,
+                password,
+                "account.report.expression",
+                "write",
+                [[int(eid)], {"subformula": False}],
+            )
+            nwrites += 1
+        except Exception:
+            try:
+                execute_kw(
+                    models,
+                    db,
+                    uid,
+                    password,
+                    "account.report.expression",
+                    "write",
+                    [[int(eid)], {"subformula": ""}],
+                )
+                nwrites += 1
+            except Exception:
+                continue
+    return nwrites
+
+
 def repair_cpc_budget_reports_on_odoo(
     models: Any,
     db: str,
@@ -284,6 +358,7 @@ def repair_cpc_budget_reports_on_odoo(
     rids = search_cpc_like_report_ids(models, db, uid, password, limit=limit)
     formula_writes = 0
     groupby_leaf_lines = 0
+    external_budget_sub_cleared = 0
     touched: list[int] = []
     for rid in rids:
         rid_i = int(rid)
@@ -291,13 +366,18 @@ def repair_cpc_budget_reports_on_odoo(
             models, db, uid, password, rid_i, cur
         )
         ng = apply_cpc_leaf_account_groupby(models, db, uid, password, rid_i)
-        if nf or ng:
+        nb = clear_external_budget_editable_subformula(
+            models, db, uid, password, rid_i
+        )
+        if nf or ng or nb:
             touched.append(rid_i)
         formula_writes += nf
         groupby_leaf_lines += ng
+        external_budget_sub_cleared += nb
     return {
         "formula_writes": formula_writes,
         "groupby_leaf_lines": groupby_leaf_lines,
+        "external_budget_sub_cleared": external_budget_sub_cleared,
         "report_ids": touched,
         "currency_code": cur,
     }
