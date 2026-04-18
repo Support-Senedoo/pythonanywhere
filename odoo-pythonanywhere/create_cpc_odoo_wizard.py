@@ -20,6 +20,7 @@ Aucune dépendance module custom — fonctionne sur Odoo 17-19 SaaS Enterprise (
 
 Usage Flask toolbox (action staff.py) :
     from create_cpc_odoo_wizard import create_cpc_wizard, purge_cpc_wizard, cpc_wizard_exists
+    (``purge_cpc_wizard`` retire aussi le rapport ``account.report`` toolbox et ses menus.)
 """
 from __future__ import annotations
 
@@ -1356,6 +1357,54 @@ def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
 # Suppression du wizard
 # ---------------------------------------------------------------------------
 
+def _purge_cpc_toolbox_account_reports(
+    models: Any, db: str, uid: int, pwd: str
+) -> tuple[list[int], str | None]:
+    """
+    Supprime les ``account.report`` toolbox CPC Senedoo (lignes, colonnes, etc.) ainsi que
+    les menus / ``ir.actions.client`` liés (même logique qu'avant recréation à l'installation).
+    Retourne ``(ids_supprimés, message_erreur_ou_None)``.
+    """
+    import sys
+    from pathlib import Path
+
+    ac = Path(__file__).resolve().parent / "archives-cli"
+    if ac.is_dir() and str(ac) not in sys.path:
+        sys.path.insert(0, str(ac))
+    try:
+        from create_cpc_budget_analytique import purge_cpc_budget_analytique_instances
+
+        rids = purge_cpc_budget_analytique_instances(models, db, uid, pwd)
+        return (list(rids), None)
+    except Exception as exc:
+        return ([], str(exc))
+
+
+def _unlink_orphan_cpc_report_menus(
+    models: Any, db: str, uid: int, pwd: str
+) -> list[int]:
+    """Menus Reporting encore présents sous le libellé exact du rapport (orphelins)."""
+    mids = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.menu",
+            "search",
+            [[("name", "=", CPC_REPORT_MENU_LABEL)]],
+        )
+        or []
+    )
+    ids = sorted({int(x) for x in mids})
+    if ids:
+        try:
+            _ek(models, db, uid, pwd, "ir.ui.menu", "unlink", [ids])
+        except Exception:
+            pass
+    return ids
+
+
 def _collect_cpc_wizard_menu_ids(
     models: Any, db: str, uid: int, pwd: str
 ) -> set[int]:
@@ -1395,8 +1444,21 @@ def _collect_cpc_wizard_menu_ids(
 
 
 def purge_cpc_wizard(models: Any, db: str, uid: int, pwd: str) -> dict[str, Any]:
-    """Supprime le wizard Budget par projet (modèle, vues, menus, actions fenêtre, actions serveur)."""
+    """
+    Supprime le wizard Budget par projet (modèle, vues, menus, actions fenêtre, actions serveur)
+    et le rapport ``account.report`` toolbox CPC (menus Reporting + actions client associées).
+    """
     purged: list[str] = []
+
+    report_rids, report_err = _purge_cpc_toolbox_account_reports(models, db, uid, pwd)
+    if report_rids:
+        purged.append(f"account_report({report_rids})")
+    elif report_err:
+        purged.append(f"account_report_error({report_err[:220]})")
+
+    orphan_report_menus = _unlink_orphan_cpc_report_menus(models, db, uid, pwd)
+    if orphan_report_menus:
+        purged.append(f"menus_rapport_cpc({orphan_report_menus})")
 
     menu_ids = sorted(_collect_cpc_wizard_menu_ids(models, db, uid, pwd))
     if menu_ids:
