@@ -4,8 +4,8 @@ Active sur un account.report (typiquement une copie de P&L) les options utiles p
 piloter budget + analytique dans l’UI Odoo : ``filter_analytic`` (optionnel), et le filtre budget
 (``filter_budgets`` sur Odoo 18+ — doc [18.0](https://www.odoo.com/documentation/18.0/developer/reference/standard_modules/account/account_report.html) ; ``filter_budget`` sur d’anciennes bases).
 
-Paramètre ``enable_analytic_filter=False`` : ne pas activer ``filter_analytic`` (rapport CPC
-« budget par projet » : réalisé analytique via colonne ``realise_axe`` / assistant).
+Paramètre ``enable_analytic_filter=False`` : ne pas activer ``filter_analytic`` (cas où le rapport
+ne doit pas proposer le filtre analytique Odoo).
 
 Les champs réellement écrits dépendent de fields_get (Odoo SaaS / Enterprise).
 Sans le bon nom de champ, la colonne budget / % ne se comporte pas comme le P&L d’origine

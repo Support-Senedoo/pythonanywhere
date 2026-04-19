@@ -56,14 +56,12 @@
     (1) <strong>Copie P&amp;L pilotage</strong> (optionnel) : si vous connaissez l’id d’un <code>account.report</code> source,
     la toolbox en duplique une copie avec filtres analytique et budgets — pour parcourir les rapports dans un tableau,
     utiliser l’utilitaire <strong>P&amp;L personnalisé</strong>.
-    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : le choix du <strong>compte analytique</strong> se fait dans le menu
-    <strong>Assistant budget projet (Senedoo)</strong> — <strong>pas</strong> dans la grille du rapport. Chemin Odoo 18 :
-    app <strong>Comptabilité</strong> ou <strong>Facturation</strong> → menu latéral <strong>Reporting</strong> (ou « Rapports ») →
-    <strong>Assistant budget projet (Senedoo)</strong> (formulaire puis <strong>Remplir le rapport CPC</strong>). Entrée séparée
-    <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong> pour ouvrir uniquement le rapport. Après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
-    injecte le budget financier sur la colonne externe du CPC et affiche dans le statut du wizard la liste des
-    <strong>codes comptes budgétisés</strong> (non nuls). Réinstallez depuis la toolbox après une mise à jour pour
-    appliquer les correctifs d’expressions « % ».
+    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : l’assistant <strong>Assistant budget projet (Senedoo)</strong>
+    injecte le <strong>budget</strong> (external si besoin). Le <strong>Réalisé</strong> vient des comptes dans le rapport
+    (filtre analytique + dépliage). Chemin assistant : <strong>Comptabilité</strong> / <strong>Facturation</strong> →
+    <strong>Reporting</strong> → <strong>Assistant budget projet (Senedoo)</strong>. Rapport seul :
+    <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>. Dans le rapport, choisir l’axe analytique et
+    utiliser l’option <strong>Masquer les lignes à zéro</strong> si proposée. Réinstallez depuis la toolbox après mise à jour.
   </p>
   <p class="sn-muted" style="margin:0.55rem 0 0;line-height:1.45;font-size:0.88rem;">
     Dépannage : <code>DEPLOY_PYTHONANYWHERE.md</code> (checklist budget × analytique).
@@ -195,7 +193,8 @@
       ou dans Odoo <strong>Parametres &gt; Interface utilisateur &gt; Menus</strong>, rechercher « Assistant budget projet » et verifier le <strong>parent</strong> (Reporting / Comptabilite).
       Le client choisit l'axe analytique, la periode et le budget financier Odoo, puis <strong>Remplir le rapport CPC</strong> :
       le rapport n'utilise <strong>pas</strong> le filtre analytique Odoo (limite moteur avec le budget) ; les colonnes
-      <strong>Réalisé (axe)</strong> et <strong>Budget</strong> sont remplies par l'assistant pour calculer l'<strong>Écart</strong>.
+      <strong>Budget</strong> (external si besoin) est rempli par l'assistant ; le <strong>Réalisé</strong> vient des
+      comptes (filtre analytique du rapport). L'<strong>Écart</strong> combine les deux (voir doc CPC).
       Utiliser <strong>Mettre a jour Budget par projet</strong> pour recréer le rapport CPC dans Odoo si besoin.
       Export PDF et Excel natifs.
       Si le wizard est deja present, le bouton l'ecrase (mise a jour).

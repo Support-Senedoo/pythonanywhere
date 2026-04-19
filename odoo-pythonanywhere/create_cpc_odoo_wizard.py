@@ -2,22 +2,19 @@
 Crée dans Odoo (via XML-RPC) un wizard natif « Budget par projet » (CPC SYSCOHADA).
 
 Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
-  - Compte analytique, budget financier (account.report.budget), période Du/Au
-  - Bouton « Calculer » → server action Python qui :
+  - Compte analytique (alignement avec le budget), budget financier (account.report.budget), période Du/Au
+  - Bouton « Remplir le rapport CPC » → server action Python qui :
       1. Vérifie la cohérence analytique avec le budget (champs Studio optionnels sur account.report.budget)
-      2. Lit account.move.line (filtré analytique) → réalisé CPC
-      3. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
-      4. Écrit account.report.external.value (expressions Budget ``external``, label ``budget``)
-      5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
+      2. Lit account.report.budget.item (filtré par budget + période + analytique sur ligne si présent)
+      3. Écrit ``account.report.external.value`` pour les expressions **Budget** en moteur ``external``
+         uniquement (totaux par rubrique CPC)
+      4. Ouvre le rapport CPC dans Odoo (``CPC_REPORT_TOOLBOX_EXACT``)
   - Menus : Facturation/Comptabilité > Reporting > Assistant budget projet (Senedoo) — action serveur → formulaire ;
     Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo).
-  - Rapport CPC : **pas** de filtre analytique Odoo sur la fiche du rapport (incompatible avec un écart
-    cohérent vs budget sur plusieurs bases Enterprise). La colonne « Réalisé (axe) » est ``realise_axe``
-    (moteur **external** + ``account.report.external.value``) ; l’« Écart » = ``budget − realise_axe``.
-    Le wizard injecte ``realise_axe`` et le budget (**external** si la base n’expose pas le moteur
-    natif ``budget``) pour la même période et le même axe. Voir **DEPLOY_PYTHONANYWHERE.md** (section
-    utilitaires, CPC) et le docstring de ``create_cpc_budget_analytique.py`` pour le détail « pourquoi
-    external » et les liens doc **Odoo 18.0**.
+  - Rapport CPC : **filtre analytique** activé sur la fiche du rapport ; colonne **Réalisé** =
+    ``realise_axe`` en **account_codes** (dépliage par compte). Choisir le **même axe** dans les filtres
+    du rapport que celui du wizard pour cohérence visuelle. **Écart** = ``budget − realise_axe`` ; le
+    budget **external** reste un total par rubrique (voir doc ``create_cpc_budget_analytique.py``).
   - Colonne Budget (hors moteur natif ``budget``) : remplie depuis le budget financier choisi dans le
     wizard (pas de saisie manuelle au crayon).
 
@@ -261,10 +258,8 @@ if not cpc_report:
     )
 cpc_report_id = cpc_report.id
 
-# Expressions colonne Budget (moteur external uniquement)
+# Expressions colonne Budget (moteur external uniquement — le Réalisé est account_codes dans le rapport)
 expr_by_code = {}
-# Colonne Réalisé (axe) — external ; alimentée comme le budget (pas le filtre analytique du rapport)
-expr_realise_by_code = {}
 for line in env['account.report.line'].search([('report_id', '=', cpc_report_id)]):
     if not line.code:
         continue
@@ -274,79 +269,6 @@ for line in env['account.report.line'].search([('report_id', '=', cpc_report_id)
         ('engine', '=', 'external'),
     ]):
         expr_by_code[line.code] = expr.id
-    for expr in env['account.report.expression'].search([
-        ('report_line_id', '=', line.id),
-        ('label', '=', 'realise_axe'),
-        ('engine', '=', 'external'),
-    ]):
-        expr_realise_by_code[line.code] = expr.id
-
-# ------------------------------------------------------------------ realized (analytic filtered)
-domain_ml = [
-    ('date', '>=', date_from),
-    ('date', '<=', date_to),
-    ('parent_state', '=', 'posted'),
-    ('analytic_distribution', '!=', False),
-]
-# Essayer un filtre serveur sur analytic_distribution
-analytic_str = str(analytic_id)
-for test_domain in [
-    domain_ml + [('analytic_distribution', 'in', [analytic_str])],
-    domain_ml + [('analytic_distribution', 'in', [analytic_id])],
-]:
-    try:
-        env['account.move.line'].search_count(test_domain)
-        domain_ml = test_domain
-        break
-    except Exception:
-        pass
-
-move_lines = env['account.move.line'].search_read(
-    domain_ml,
-    ['account_id', 'debit', 'credit', 'balance', 'analytic_distribution'],
-    limit=0,
-)
-
-# Agréger par code compte (part prorata analytique)
-realized_by_code = {}
-for ml in move_lines:
-    raw_dist = ml.get('analytic_distribution')
-    if not raw_dist:
-        continue
-    if isinstance(raw_dist, str):
-        try:
-            raw_dist = _parse_flat_json_obj(raw_dist)
-        except Exception:
-            continue
-        if raw_dist is None:
-            continue
-    if not isinstance(raw_dist, dict):
-        continue
-
-    matched_pct = 0.0
-    for key, pct in raw_dist.items():
-        key_s = str(key)
-        if key_s == analytic_str or analytic_str in key_s.split(','):
-            try:
-                matched_pct += float(pct)
-            except Exception:
-                pass
-
-    if matched_pct <= 0:
-        continue
-
-    acc_tuple = ml.get('account_id')
-    if not acc_tuple:
-        continue
-    acc_id = acc_tuple[0] if isinstance(acc_tuple, (list, tuple)) else int(acc_tuple)
-    acc = env['account.account'].browse(acc_id)
-    code = (acc.code or '').strip()
-    if not code:
-        continue
-
-    balance = float(ml.get('balance') or 0.0)
-    amt = balance * (matched_pct / 100.0)
-    realized_by_code[code] = realized_by_code.get(code, 0.0) + amt
 
 # ------------------------------------------------------------------ budget
 fg_bi = env['account.report.budget.item'].fields_get()
@@ -461,49 +383,24 @@ else:
     budget_by_code = {}
     _use_line_budget = None
 
-# ------------------------------------------------------------------ calcul CPC
-line_realized = {}  # {code: float} montants réalisés CPC
-line_budget   = {}  # {code: float} montants budget CPC
+# ------------------------------------------------------------------ calcul CPC (budget par rubrique uniquement)
+line_budget = {}  # {code: float} montants budget CPC
 
 for code, label, nature, formula_ac, formula_agg in CPC_STRUCTURE:
     if nature == 'account' and formula_ac:
-        sign = LINE_SIGN.get(code, 1)
-        raw_r = _sum_formula(formula_ac, realized_by_code)
-        line_realized[code] = sign * raw_r
-
         if budget_by_code is not None:
-            # budget par code compte : les montants sont supposés positifs (saisis CPC)
             raw_b = _sum_formula(formula_ac, budget_by_code)
             line_budget[code] = raw_b
         elif _use_line_budget is not None:
-            # budget par code de ligne CPC directement
             line_budget[code] = float(_use_line_budget.get(code, 0.0))
         else:
             line_budget[code] = 0.0
 
     elif nature == 'aggregate' and formula_agg:
-        line_realized[code] = _eval_aggregate(formula_agg, line_realized)
-        line_budget[code]   = _eval_aggregate(formula_agg, line_budget)
+        line_budget[code] = _eval_aggregate(formula_agg, line_budget)
 
-# ------------------------------------------------------------------ ecriture external values (realise axe + budget external)
+# ------------------------------------------------------------------ ecriture external values (budget external uniquement)
 company_id = env.company.id
-
-for code, expr_id in expr_realise_by_code.items():
-    val = float(line_realized.get(code, 0.0))
-    old = env['account.report.external.value'].search([
-        ('expression_id', '=', expr_id),
-        ('date', '>=', date_from),
-        ('date', '<=', date_to),
-        ('company_id', '=', company_id),
-    ])
-    old.unlink()
-    env['account.report.external.value'].create({
-        'expression_id':    expr_id,
-        'value':            val,
-        'date':             date_to,
-        'target_report_id': cpc_report_id,
-        'company_id':       company_id,
-    })
 
 for code, expr_id in expr_by_code.items():
     val = float(line_budget.get(code, 0.0))
@@ -541,13 +438,12 @@ except Exception:
     codes_diag = ''
 
 # ------------------------------------------------------------------ mise a jour statut wizard
-written_r = len(expr_realise_by_code)
 written_b = len(expr_by_code)
 wizard.write({
     'x_status': (
-        "OK - realise axe " + str(written_r) + " ligne(s), budget external " + str(written_b) + ". "
-        "Ne pas activer le filtre analytique du rapport Odoo (desactive sur ce CPC). "
-        "Analytique utilise : " + str(analytic_id) + "."
+        "OK - budget external " + str(written_b) + " rubrique(s). "
+        "Réalisé : filtre analytique du rapport + dépliage comptes (account_codes). "
+        "Aligner le filtre analytique du rapport sur l axe " + str(analytic_id) + " (wizard)."
         + codes_diag
     )
 })
@@ -598,10 +494,12 @@ def _make_form_view_arch(sa_id: int, budget_domain_arch: str) -> str:
     <div class="oe_title">
       <h1>{WIZARD_NAME}</h1>
       <p class="oe_grey">
-        1) Choisissez le <strong>compte analytique du projet</strong>.
+        1) Choisissez le <strong>compte analytique du projet</strong> (coherence avec le budget).
         2) Choisissez le <strong>budget financier</strong> (liste filtree sur l'axe lorsque le modele budget
         expose un champ analytique reconnu par la toolbox).
-        3) Ajustez la <strong>periode</strong> si besoin, puis <strong>Remplir le rapport CPC</strong>.
+        3) Ajustez la <strong>periode</strong>, puis <strong>Remplir le rapport CPC</strong> (injecte le budget external).
+        Dans le rapport : activez le <strong>meme axe analytique</strong> dans les filtres du rapport pour le
+        <strong>Realise</strong> (comptes de resultat depliables) ; option <strong>Masquer les lignes a zero</strong> si besoin.
       </p>
     </div>
     <group string="Projet">

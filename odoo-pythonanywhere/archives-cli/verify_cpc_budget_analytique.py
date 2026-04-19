@@ -8,7 +8,7 @@ Vérifie :
   - filtres utiles (filter_analytic, filter_budgets / filter_budget si le modèle les a) ;
   - 4 colonnes (expression_label realise_axe / budget / ecart / pct) ;
   - nombre de lignes et codes attendus (structure CPC toolbox) ;
-  - pour chaque ligne : 4 expressions avec les bons moteurs (external / budget|external / aggregation).
+  - pour chaque ligne : 4 expressions avec les bons moteurs (account_codes / budget|external / aggregation).
 
 Variables d'environnement (ou options CLI) : comme personalize_syscohada_detail / .env
 
@@ -136,7 +136,7 @@ def verify_cpc_budget_analytique_report(
 
     avail = _report_fields_available(models, db, uid, password)
     read_fields = ["name", "filter_analytic", "filter_date_range", "filter_journals"]
-    for f in ("filter_budgets", "filter_budget"):
+    for f in ("filter_hide_0_lines", "filter_budgets", "filter_budget"):
         if f in avail:
             read_fields.append(f)
 
@@ -170,10 +170,14 @@ def verify_cpc_budget_analytique_report(
             f"Nom effectif du rapport : « {snap['name']} » (recherche initiale : « {name} »)."
         )
 
-    if snap.get("filter_analytic"):
+    if not snap.get("filter_analytic"):
         errors.append(
-            "filter_analytic devrait être False sur ce rapport CPC (réalisé analytique = colonne "
-            "realise_axe remplie par l’assistant ; le filtre analytique Odoo casse l’écart vs budget)."
+            "filter_analytic devrait être True sur ce rapport CPC (réalisé = account_codes + "
+            "filtre analytique Odoo pour le dépliage par compte)."
+        )
+    if "filter_hide_0_lines" in avail and snap.get("filter_hide_0_lines") == "never":
+        warnings.append(
+            "filter_hide_0_lines vaut « never » : le masquage des lignes à zéro n’est pas proposé par défaut."
         )
 
     if "filter_budgets" in avail and not snap.get("filter_budgets"):
@@ -337,17 +341,15 @@ def verify_cpc_budget_analytique_report(
                 ra_lab = CPC_REALISE_ANALYTIC_EXPR_LABEL
                 ra_eng = (ex.get(ra_lab) or {}).get("engine") or ""
                 ra_eng = str(ra_eng).strip()
-                if ra_eng != "external":
-                    lc_errors.append(f"{ra_lab}: engine={ra_eng!r}, attendu external")
-                ra_f = ((ex.get(ra_lab) or {}).get("formula") or "").strip()
-                if ra_f != "sum":
-                    lc_errors.append(f"{ra_lab} external: formule « {ra_f!r} » ≠ attendue « sum »")
-                ra_sub = ((ex.get(ra_lab) or {}).get("subformula") or "").strip().lower()
-                if "editable" in ra_sub:
-                    lc_errors.append(
-                        f"{ra_lab} external: sous-formule editable interdite ; actuel : "
-                        f"{(ex.get(ra_lab) or {}).get('subformula')!r}"
-                    )
+                if ra_eng != "account_codes":
+                    lc_errors.append(f"{ra_lab}: engine={ra_eng!r}, attendu account_codes")
+                if row_spec and row_spec[2] == "account" and row_spec[3]:
+                    f_ra = normalize_cpc_account_codes_formula((ex.get(ra_lab) or {}).get("formula"))
+                    f_exp = normalize_cpc_account_codes_formula(row_spec[3])
+                    if f_ra != f_exp:
+                        lc_errors.append(
+                            f"{ra_lab}: formule « {f_ra} » ≠ préfixe attendu « {f_exp} »"
+                        )
 
                 bud_eng = (ex["budget"].get("engine") or "").strip()
                 if bud_eng not in ("budget", "account_codes", "external"):

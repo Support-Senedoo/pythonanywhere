@@ -13,36 +13,25 @@ Références doc officielles (priorité **Odoo 18.0**, même principe en 19) :
   - Modèle ``account.report.line`` :
     https://www.odoo.com/documentation/18.0/developer/reference/standard_modules/account/account_report_line.html
 
-Pourquoi le moteur ``external`` (et ``account.report.external.value``) ?
-  - **Réalisé analytique (``realise_axe``)** : le filtre analytique **sur la fiche** du rapport
-    (``filter_analytic``) est **désactivé** sur ce CPC, car sur plusieurs bases Enterprise le
-    moteur ne croise pas correctement **budget sélectionné** et **réalisé filtré par axe** :
-    l’écart et le % deviennent incohérents. Le réalisé **pour un projet donné** ne peut donc
-    pas s’appuyer sur ``account_codes`` + filtre analytique Odoo pour cette colonne.
-    L’assistant « Budget par projet » agrège les ``account.move.line`` (dont ``analytic_distribution``)
-    pour l’axe choisi et injecte un total **par ligne CPC** via ``external`` + ``external.value``.
-  - **Budget** : si la base n’expose pas le moteur natif ``budget`` sur les expressions, les
-    montants du budget financier (``account.report.budget`` / items) ne sont pas calculés comme
-    une colonne ``account_codes`` ; le repli toolbox est ``external`` + remplissage par le même
-    assistant (même période, même axe).
-  - **Trade-off documenté** : en 18.0 / 19.0, Odoo interdit le **groupby** (dépliage par compte)
-    sur les expressions en ``external`` (*Groupby isn't supported by 'external' engine*). Les
-    totaux par rubrique CPC restent corrects après remplissage ; le détail par compte **sur l’axe**
-    passe par le Grand livre / un rapport ``account_codes`` dédié, pas par ce CPC.
+Stratégie **Réalisé** (dépliage par compte de résultat) :
+  - Colonne ``realise_axe`` : moteur **account_codes** (préfixes SYSCOHADA), lignes feuilles avec
+    ``user_groupby`` / ``groupby`` = compte + ``foldable`` (via ``_apply_cpc_leaf_account_groupby``).
+  - **filter_analytic=True** sur le rapport : l’utilisateur choisit l’axe dans les **filtres du
+    rapport** Odoo ; le réalisé et l’écart suivent le même contexte que les écritures filtrées.
+  - ``filter_hide_0_lines`` = ``by_default`` lorsque le champ existe : masquer les lignes à zéro
+    activé par défaut (désactivable dans l’UI). Lignes feuilles : ``hide_if_zero=True`` (masque la
+    rubrique si toutes les colonnes sont nulles).
 
-Stratégie colonne Budget (données côté Odoo + assistant) :
-  - Engine ``budget`` si la sélection ``engine`` l’expose (filtre budgets natif Odoo).
-  - Sinon ``account.report.budget.item`` ou ``crossovered.budget.lines`` : engine ``external``,
-    **sans** sous-formule ``editable`` : pas de saisie manuelle au crayon ; les montants viennent
-    des ``account.report.external.value`` (remplissage via l’assistant « Budget par projet »).
-  - Sinon repli ``account_codes`` (même formule que le réalisé GL — peu utile pour l’analytique).
-  - Après création : activation de ``filter_budgets`` ou ``filter_budget`` sur la fiche
-    ``account.report`` lorsque le modèle les expose (comme le P&L analytique Senedoo).
-    **Sans** réactiver ``filter_analytic`` sur ce rapport (voir ci-dessus).
-  - ``filter_unfold_all=False`` et ``filter_hierarchy`` : utiles surtout si des lignes gardent
-    encore ``account_codes`` (ici les feuilles « compte » sont en ``external`` pour ``realise_axe``).
-  - Les totaux (codes X*) : engine ``aggregation`` sur ``.realise_axe`` et ``.budget``.
-  - Formules ``account_codes`` / ``budget`` : normalisation Odoo 18+ (``^601,^6011`` → ``601+6011``).
+Stratégie **Budget** et ``external`` :
+  - Moteur natif ``budget`` si disponible sur les expressions (filtre budgets Odoo).
+  - Sinon ``external`` + ``account.report.external.value`` remplis par l’assistant « Budget par projet »
+    (**totaux par code de ligne CPC**, pas par compte déplié). Au **dépliage**, la colonne Budget
+    reste celle de la **rubrique** (montant agrégé external) : l’écart / % **par ligne de compte**
+    peuvent différer du sens strict « budget compte à compte » tant que le budget n’est pas natif.
+  - Repli GL : ``account_codes`` sur le budget (peu utile analytique).
+
+Filtres rapport : ``filter_unfold_all=False``, ``filter_hierarchy`` (plan), ``filter_budgets`` /
+``filter_budget`` si le modèle les expose.
 """
 from __future__ import annotations
 
@@ -187,6 +176,38 @@ def _apply_cpc_leaf_account_groupby(
     return len(leaves)
 
 
+def _try_set_filter_hide_zero_lines(
+    models: Any, db: str, uid: int, password: str, report_id: int
+) -> str | None:
+    """
+    Active ``filter_hide_0_lines`` sur ``account.report`` si le champ existe (Odoo 18+).
+
+    Valeur ``by_default`` : masquage des lignes à zéro activé par défaut dans l’UI (l’utilisateur
+    peut le désactiver). Retourne le nom du champ écrit ou None.
+    """
+    try:
+        fg = _ek(
+            models, db, uid, password, "account.report", "fields_get", [], {"attributes": ["type"]}
+        )
+    except Exception:
+        return None
+    if not isinstance(fg, dict) or "filter_hide_0_lines" not in fg:
+        return None
+    try:
+        _ek(
+            models,
+            db,
+            uid,
+            password,
+            "account.report",
+            "write",
+            [[int(report_id)], {"filter_hide_0_lines": "by_default"}],
+        )
+        return "filter_hide_0_lines=by_default"
+    except Exception:
+        return None
+
+
 def verify_cpc_toolbox_report_install(
     models: Any,
     db: str,
@@ -297,10 +318,10 @@ def verify_cpc_toolbox_report_install(
         )
 
     fa = rows[0].get("filter_analytic")
-    if fa:
+    if not fa:
         warnings.append(
-            "filter_analytic est activé sur ce rapport CPC : attendu False (écart vs budget ; "
-            "réalisé analytique via colonne realise_axe / assistant)."
+            "filter_analytic est désactivé sur ce rapport CPC : attendu True pour le réalisé "
+            "account_codes + dépliage (recréer via la toolbox)."
         )
 
     return {
@@ -357,6 +378,7 @@ def _create_report_line_safe(
     report_id: int,
     sequence: int,
     is_total: bool,
+    hide_if_zero: bool = False,
 ) -> tuple[int | None, str | None]:
     """
     Crée account.report.line. Odoo 19+ : pas de champ ``unfoldable`` ; ``hierarchy_level`` est calculé
@@ -368,7 +390,7 @@ def _create_report_line_safe(
         "code":            code,
         "sequence":        sequence,
         "foldable":        not is_total,
-        "hide_if_zero":    False,
+        "hide_if_zero":    bool(hide_if_zero),
     }
     try:
         return int(_ek(models, db, uid, password, "account.report.line", "create", [vals])), None
@@ -521,9 +543,9 @@ def cpc_budget_pct_aggregation_formula(
     currency_code: str = "XOF",
 ) -> str:
     """
-    Formule moteur ``aggregation`` pour la colonne % (rapport Réalisé analytique / Budget).
+    Formule moteur ``aggregation`` pour la colonne % (rapport Réalisé / Budget).
 
-    Le réalisé analytique est l’expression ``realise_axe`` (valeurs externes remplies par l’assistant).
+    Le numérateur est l’expression ``realise_axe`` (moteur ``account_codes``, filtre analytique du rapport).
     Dénominateur ``(budget + 1)`` : évite la division par zéro au dépliage par compte.
     """
     if not budget_pct_meaningful:
@@ -755,7 +777,7 @@ def create_toolbox_cpc_budget_analytique(
 
     Op\u00e9rations :
       1. Supprime toutes les instances toolbox CPC Senedoo (un seul jeu autoris\u00e9 apr\u00e8s cr\u00e9ation).
-      2. Cr\u00e9e l'enregistrement account.report avec filter_analytic=True.
+      2. Cr\u00e9e l'enregistrement account.report avec filter_analytic=True (r\u00e9alis\u00e9 account_codes + axe).
       3. Active filter_budgets / filter_budget sur le rapport si le mod\u00e8le les expose.
       4. Cr\u00e9e 4 colonnes : R\u00e9alis\u00e9 / Budget / \u00c9cart / % R\u00e9alisation.
       5. Cr\u00e9e toutes les lignes CPC SYSCOHADA avec leurs expressions par colonne.
@@ -784,8 +806,7 @@ def create_toolbox_cpc_budget_analytique(
     report_id = int(_ek(models, db, uid, password, "account.report", "create", [{
         "name":                        CPC_BUDGET_ANALYTIQUE_NAME,
         "filter_date_range":           True,
-        # Filtre analytique Odoo désactivé : incompatible écart vs budget (moteur comptable).
-        "filter_analytic":             False,
+        "filter_analytic":             True,
         "filter_journals":             True,
         "filter_unfold_all":           False,
         "filter_show_draft":           False,
@@ -796,6 +817,7 @@ def create_toolbox_cpc_budget_analytique(
 
     filter_written: dict[str, Any] = {}
     filter_personalization_error: str | None = None
+    hide0_written = _try_set_filter_hide_zero_lines(models, db, uid, password, report_id)
     try:
         opt = personalize_pl_analytic_budget_options(
             models,
@@ -804,15 +826,20 @@ def create_toolbox_cpc_budget_analytique(
             password,
             report_id,
             enable_budget_filter=True,
-            enable_analytic_filter=False,
+            enable_analytic_filter=True,
         )
         filter_written = dict(opt.get("written") or {})
+        if hide0_written:
+            filter_written["filter_hide_0_lines"] = hide0_written
     except Exception as e:
         filter_personalization_error = str(e)
+    if hide0_written and "filter_hide_0_lines" not in filter_written:
+        filter_written = dict(filter_written)
+        filter_written["filter_hide_0_lines"] = hide0_written
 
     # \u00c9tape 3 \u2014 4 colonnes
     col_defs = [
-        {"name": "R\u00e9alis\u00e9 (axe)", "expression_label": CPC_REALISE_ANALYTIC_EXPR_LABEL,
+        {"name": "R\u00e9alis\u00e9", "expression_label": CPC_REALISE_ANALYTIC_EXPR_LABEL,
          "figure_type": "monetary",
          "report_id": report_id, "sequence": 10, "blank_if_zero": False, "sortable": True},
         {"name": "Budget",        "expression_label": "budget",  "figure_type": "monetary",
@@ -867,9 +894,11 @@ def create_toolbox_cpc_budget_analytique(
         )
     elif budget_mode == "external" and budget_external_source == "report_budget_item":
         creation_warnings.append(
-            "Colonnes « Réalisé (axe) » et Budget = external : exécuter l’assistant "
-            "« Budget par projet » (même analytique, période et ``account.report.budget``) "
-            "pour remplir ``account.report.external.value`` ; sinon montants vides."
+            "Budget = external : exécuter l’assistant « Budget par projet » (période, "
+            "``account.report.budget``, axe aligné avec le filtre analytique du rapport) pour "
+            "remplir ``account.report.external.value`` sur la colonne budget ; sinon budget vide. "
+            "Réalisé = comptes (account_codes) via filtre analytique du rapport ; au dépliage, "
+            "budget/écart par compte peuvent rester au niveau rubrique CPC."
         )
     elif budget_mode == "external":
         creation_warnings.append(
@@ -892,6 +921,7 @@ def create_toolbox_cpc_budget_analytique(
         line_id, lwarn = _create_report_line_safe(
             models, db, uid, password,
             code=code, label=label, report_id=report_id, sequence=seq, is_total=is_total,
+            hide_if_zero=(nature == "account"),
         )
         seq += 10
         if line_id is None:
@@ -902,14 +932,14 @@ def create_toolbox_cpc_budget_analytique(
         line_count += 1
 
         if nature == "account":
-            # R\u00e9alis\u00e9 analytique : external (assistant toolbox ; pas le filtre analytique du rapport)
+            # R\u00e9alis\u00e9 : account_codes (d\u00e9pliage par compte) + filtre analytique sur le rapport
+            _nf = normalize_cpc_account_codes_formula(formula_ac)
             _push_expr({
                 "_line_code":     code,
                 "report_line_id": line_id,
                 "label":          CPC_REALISE_ANALYTIC_EXPR_LABEL,
-                "engine":         "external",
-                "formula":        "sum",
-                "figure_type":    "monetary",
+                "engine":         "account_codes",
+                "formula":        _nf,
                 "date_scope":     "strict_range",
             })
             # Budget : natif, external (crossovered), ou repli GL
