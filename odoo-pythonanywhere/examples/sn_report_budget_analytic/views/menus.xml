@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="action_sn_report_budget_budgets" model="ir.actions.act_window">
+    <field name="name">Budgets financiers</field>
+    <field name="res_model">account.report.budget</field>
+    <field name="view_mode">tree,form</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">Créer un budget financier</p>
+      <p>Rattachez un compte analytique pour le wizard « Budget par projet » Senedoo.</p>
+    </field>
+  </record>
+
+  <record id="action_sn_report_budget_lines" model="ir.actions.act_window">
+    <field name="name">Lignes de budget (détail)</field>
+    <field name="res_model">account.report.budget.item</field>
+    <field name="view_mode">tree,form</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">Ajouter des lignes</p>
+      <p>Édition directe en liste ; ouvrez une ligne pour le formulaire détaillé.</p>
+    </field>
+  </record>
+
+  <menuitem id="menu_sn_report_budget_root"
+            name="Budgets financiers (Senedoo)"
+            parent="account.menu_finance_reports"
+            sequence="18"/>
+
+  <menuitem id="menu_sn_report_budget_budgets"
+            name="Budgets et axes analytiques"
+            parent="menu_sn_report_budget_root"
+            action="action_sn_report_budget_budgets"
+            sequence="10"/>
+
+  <menuitem id="menu_sn_report_budget_lines"
+            name="Lignes de budget"
+            parent="menu_sn_report_budget_root"
+            action="action_sn_report_budget_lines"
+            sequence="20"/>
+</odoo>

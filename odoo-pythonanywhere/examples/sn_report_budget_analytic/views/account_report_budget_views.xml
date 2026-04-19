@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Formulaire budget : groupe analytique Senedoo -->
+  <record id="view_account_report_budget_form_analytic_senedoo" model="ir.ui.view">
+    <field name="name">account.report.budget.form.analytic.senedoo</field>
+    <field name="model">account.report.budget</field>
+    <field name="inherit_id" ref="account_reports.view_account_report_budget_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//sheet" position="inside">
+        <group string="Analytique (Senedoo)" name="sn_analytic_budget">
+          <field name="x_analytic_account_id"
+                 options="{'no_create': True, 'no_create_edit': True}"
+                 placeholder="Projet / axe pour le wizard Budget par projet"/>
+        </group>
+      </xpath>
+    </field>
+  </record>
+</odoo>
