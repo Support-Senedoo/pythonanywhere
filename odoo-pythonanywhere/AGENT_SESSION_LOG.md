@@ -20,6 +20,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 
 ## Entrées
 
+### 2026-04-19 — Toolbox 1.10.3 : libellés français (écran P&L analytique / CPC) + PA
+- **Action** : `git push origin master` puis `bash deploy_to_pa.sh -SkipGitPush` (Mac, clé `~/.ssh/id_ed25519_pa_cursor`, cible `senedoo@ssh.pythonanywhere.com`).
+- **Résultat** : OK — sur PA pull `21611f6` → `91e34e6`, reload Web API `{"status":"OK"}`.
+- **Références** : commit `91e34e6`, toolbox **1.10.3** (`app_version.py`, livraison 2026-04-19).
+- **Erreur / leçon** : (vide)
+
 ### 2026-04-14 — Déploiement PA après menus CPC (1. / 2.)
 - **Action** : `git push origin master` puis `bash deploy_to_pa.sh -SkipGitPush` (Mac, clé `~/.ssh/id_ed25519_pa_cursor`).
 - **Résultat** : OK — sur PA pull `078528e` → `5cf5e56`, reload Web API `{"status":"OK"}`.
