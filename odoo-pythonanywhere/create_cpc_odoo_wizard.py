@@ -20,6 +20,9 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
+Des règles ``ir.model.access`` sont créées sur le modèle wizard pour les **profils comptables**
+(Facturation / Comptable / Responsable) : sans elles, Odoo **masque l’entrée de menu** pour les
+utilisateurs qui ne sont pas administrateurs techniques.
 
 Aucune dépendance module custom — fonctionne sur Odoo 18–19 SaaS Enterprise (réf. doc v18 ; 17 en pratique souvent OK — droits admin / Studio).
 
@@ -62,6 +65,16 @@ BUDGET_ANALYTIC_FIELD_NAME = "x_analytic_account_id"
 BUDGET_MODELS_WITH_ANALYTIC_M2O = (
     "account.report.budget",
     "account.report.budget.item",
+)
+
+# Groupes Odoo (res.groups) qui doivent voir le menu + ouvrir le formulaire wizard.
+# Sans ir.model.access, le menu reste invisible pour la plupart des profils (filtrage Odoo).
+_WIZARD_ACCESS_GROUPS_XMLIDS: tuple[str, ...] = (
+    "account.group_account_manager",
+    "account.group_account_user",
+    "account.group_account_invoice",
+    # Enterprise « Comptabilité » (module account_accountant) — ignoré si non installé
+    "account_accountant.group_account_user",
 )
 
 # ---------------------------------------------------------------------------
@@ -593,6 +606,30 @@ def verify_cpc_wizard_ui_install(
     mn = int(menu_id)
     exp_menu_action = f"ir.actions.act_window,{aw_m}"
 
+    try:
+        n_acc = int(
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.model.access",
+                "search_count",
+                [[["model_id", "=", mid]]],
+            )
+            or 0
+        )
+    except Exception:
+        n_acc = -1
+    acc_ok = n_acc > 0
+    checks.append({"step": "ir_model_access_count", "ok": acc_ok, "count": n_acc})
+    if not acc_ok:
+        errors.append(
+            "Aucune règle ir.model.access sur le modèle wizard : l'entrée de menu reste souvent "
+            "invisible pour les utilisateurs comptables (lancer « Mettre à jour Budget par projet » "
+            "avec la toolbox à jour)."
+        )
+
     rows_sa = _ek(
         models,
         db,
@@ -752,6 +789,112 @@ def _get_model_id(models: Any, db: str, uid: int, pwd: str, model_name: str) -> 
     if not ids:
         raise RuntimeError(f"Modele {model_name!r} introuvable dans ir.model")
     return int(ids[0])
+
+
+def _res_groups_id_from_full_xmlid(
+    models: Any, db: str, uid: int, pwd: str, full_xmlid: str
+) -> int | None:
+    """``account.group_account_user`` → ``ir.model.data`` module ``account``, name ``group_account_user``."""
+    mod, sep, tail = full_xmlid.partition(".")
+    if not sep or not mod or not tail:
+        return None
+    rows = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", mod], ["name", "=", tail], ["model", "=", "res.groups"]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    if not rows:
+        return None
+    rid = rows[0].get("res_id")
+    return int(rid) if rid else None
+
+
+def ensure_wizard_ir_model_access(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+    *,
+    model_id: int,
+) -> dict[str, Any]:
+    """
+    Crée des ``ir.model.access`` pour le modèle manuel wizard (lecture / écriture / création / suppression).
+
+    Odoo filtre les entrées ``ir.ui.menu`` liées à ``ir.actions.act_window`` selon les droits
+    sur ``res_model`` : sans accès explicite, seuls les administrateurs voient souvent le menu.
+    """
+    mid = int(model_id)
+    created: list[int] = []
+    notes: list[str] = []
+    for gxml in _WIZARD_ACCESS_GROUPS_XMLIDS:
+        gid = _res_groups_id_from_full_xmlid(models, db, uid, pwd, gxml)
+        if not gid:
+            notes.append(f"groupe_absent:{gxml}")
+            continue
+        existing = (
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.model.access",
+                "search",
+                [[["model_id", "=", mid], ["group_id", "=", int(gid)]]],
+                {"limit": 1},
+            )
+            or []
+        )
+        if existing:
+            notes.append(f"acces_deja_present:{gxml}")
+            continue
+        suffix = gxml.replace(".", "_")
+        aid = _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.access",
+            "create",
+            [
+                {
+                    "name": f"acc_{WIZARD_MODEL}_{suffix}"[:128],
+                    "model_id": mid,
+                    "group_id": int(gid),
+                    "perm_read": True,
+                    "perm_write": True,
+                    "perm_create": True,
+                    "perm_unlink": True,
+                }
+            ],
+        )
+        created.append(int(aid))
+        notes.append(f"acces_cree:{gxml}")
+    n_existing = int(
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.access",
+            "search_count",
+            [[["model_id", "=", mid]]],
+        )
+        or 0
+    )
+    return {
+        "created_ids": created,
+        "notes": notes,
+        "access_count": n_existing,
+        "ok": n_existing > 0,
+    }
 
 
 def ensure_budget_report_analytic_fields(
@@ -974,6 +1117,11 @@ def create_cpc_wizard(
     ]
     _ek(models, db, uid, pwd, "ir.model.fields", "create", [field_defs])
 
+    # ---- 2b. ir.model.access : sans cela le menu assistant est filtré pour les non-admins Odoo.
+    result["wizard_ir_model_access"] = ensure_wizard_ir_model_access(
+        models, db, uid, pwd, model_id=int(model_id)
+    )
+
     # ---- 3. Server action (Python code) — model_id déjà connu ---------------
     sa_id = _ek(models, db, uid, pwd, "ir.actions.server", "create", [{
         "name":     f"Calculer budget projet ({WIZARD_NAME})",
@@ -1116,6 +1264,17 @@ def create_cpc_wizard(
         f"Parent technique : {parent_menu_src!r}."
         f" Champs budget : {summary}."
     )
+    _iac = result.get("wizard_ir_model_access") or {}
+    if _iac.get("ok"):
+        result["message"] += (
+            f" Droits menu (profils comptables) : {_iac.get('access_count', 0)} règle(s) "
+            "ir.model.access sur le wizard."
+        )
+    else:
+        result["message"] += (
+            " Alerte : aucun ir.model.access n'a pu être créé (groupes absents ?) — "
+            "le menu peut rester invisible hors administrateur."
+        )
     if new_rid:
         result["message"] += f" Rapport CPC toolbox recree (account.report id={new_rid})."
         _gl = int((inst.get("groupby_leaf_lines") or 0))

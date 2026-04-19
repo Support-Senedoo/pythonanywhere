@@ -169,6 +169,12 @@
     {% if not cpc_wizard_installed %}
     <span style="display:block;margin-top:0.35rem;">Si ce menu n’existe pas : installez d’abord avec le bouton <strong>Installer Budget par projet (Odoo)</strong> ci-dessous.</span>
     {% endif %}
+    <span style="display:block;margin-top:0.35rem;font-size:0.88rem;">
+      <strong>Menu installé mais invisible ?</strong> À partir de la toolbox <strong>1.10.4</strong>, la réinstallation crée les
+      <strong>droits d’accès Odoo</strong> (<code>ir.model.access</code>) pour les profils Facturation / Comptable — sans cela, seuls les
+      administrateurs voient souvent l’entrée. Lancez <strong>Mettre à jour Budget par projet</strong>, puis reconnectez-vous avec un
+      utilisateur qui a bien le rôle comptable (pas seulement « interne »).
+    </span>
     <span class="sn-muted" style="display:block;margin-top:0.4rem;font-size:0.84rem;">Dépannage : <strong>Paramètres</strong> → <strong>Interface utilisateur</strong> → <strong>Menus</strong>, recherche « CPC Senedoo » ou « 1. Assistant » — vérifier le <strong>menu parent</strong> (Reporting).</span>
   </div>
   <p class="sn-muted" style="margin:0 0 0.75rem;font-size:0.84rem;line-height:1.45;">
