@@ -2,6 +2,8 @@
 
 Ce fichier sert de **mémoire projet** : les assistants IA n’ont pas de souvenir des sessions passées. Tout ce qui compte pour remettre en ligne ou mettre à jour l’app doit rester **ici** (et dans le Git).
 
+**Journal court agent (déploiements, erreurs, leçons)** : après une livraison ou un incident notable, **ajouter une entrée** dans **[`AGENT_SESSION_LOG.md`](AGENT_SESSION_LOG.md)** (versionné, sans secrets). Les sessions suivantes peuvent ainsi **reprendre le fil** sans dépendre du chat.
+
 ## Dépôt GitHub
 
 - Organisation : **Support-Senedoo**

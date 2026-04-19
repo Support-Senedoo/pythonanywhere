@@ -5,7 +5,9 @@ alwaysApply: true
 
 # PythonAnywhere (budget-financier) — mémoire opérationnelle
 
-Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte utile est **ici** et dans **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)** — en particulier la section **« Reprise technique — toolbox odoo-pythonanywhere »** et la checklist « reprise après une pause ».
+Les assistants **n’ont pas** la mémoire des chats passés : tout le contexte utile est **ici**, dans **[odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md](odoo-pythonanywhere/DEPLOY_PYTHONANYWHERE.md)** (reprise technique, checklist), et dans **[odoo-pythonanywhere/AGENT_SESSION_LOG.md](odoo-pythonanywhere/AGENT_SESSION_LOG.md)** — journal **versionné** des derniers déploiements PA, échecs et leçons (sans secrets).
+
+Après **push + déploiement réussi** ou **échec** de déploiement / correction d’infra : **ajouter une entrée** en bas de `AGENT_SESSION_LOG.md` (modèle en tête de fichier), puis **commit** avec le reste si le fichier a été modifié.
 
 ## Compte et hôtes
 
@@ -22,7 +24,7 @@ Dès qu’il y a une **modification** dans le dépôt sous **`odoo-pythonanywher
 2. **`git push origin master`** (dépôt `Support-Senedoo/pythonanywhere`).
 3. Sur la machine où la clé SSH PA fonctionne : depuis **`odoo-pythonanywhere/`**, lancer **`.\deploy_pa.ps1 -SkipGitPush`** (Windows), ou **`bash deploy_to_pa.sh -SkipGitPush`** (Mac / Linux / terminal Cursor sur la même machine que la clé). Même effet : pull sur PA + pip + reload API si token.
 
-Ne pas attendre une phrase du type « fais le » : **enchaîner commit + push + déploiement** dans la même session dès que les changements sont cohérents, sauf si l’utilisateur a explicitement demandé de ne pas pousser / pas déployer. Si le push ou le déploiement échoue, diagnostiquer et réessayer ou le signaler clairement.
+Ne pas attendre une phrase du type « fais le » : **enchaîner commit + push + déploiement** dans la même session dès que les changements sont cohérents, sauf si l’utilisateur a explicitement demandé de ne pas pousser / pas déployer. Si le push ou le déploiement échoue, diagnostiquer et réessayer ou le signaler clairement. En fin de chaîne utile, **mettre à jour `AGENT_SESSION_LOG.md`** (persistance inter-sessions).
 
 ## Automatisation sans toi (agent + MCP, sans phrase secrète à chaque fois)
 
