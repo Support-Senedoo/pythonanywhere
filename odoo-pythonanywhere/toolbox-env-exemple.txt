@@ -21,6 +21,12 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 # Chemins optionnels (défaut : toolbox_users.json et toolbox_clients.json à la racine du projet)
 # TOOLBOX_USERS_PATH=/home/VOTRE_USER/odoo-pythonanywhere/toolbox_users.json
 # TOOLBOX_CLIENTS_PATH=/home/VOTRE_USER/odoo-pythonanywhere/toolbox_clients.json
+#
+# Script XML-RPC console (scripts/xmlrpc_toolbox_client.py) : même registre que la toolbox.
+# Mettre le nom de base choisi dans l’écran staff (identique à la liste déroulante) :
+# TOOLBOX_XMLRPC_CLIENT_ID=nom_base_odoo
+# Ou fichier dont la 1re ligne = ce nom (cron / Bash) :
+# TOOLBOX_XMLRPC_CLIENT_ID_FILE=/home/VOTRE_USER/odoo-pythonanywhere/.toolbox_xmlrpc_client_id
 
 # Génération des hash mots de passe :
 #   python toolbox_generate_password_hash.py
