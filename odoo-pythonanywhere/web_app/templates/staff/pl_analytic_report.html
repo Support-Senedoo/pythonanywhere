@@ -56,10 +56,11 @@
     (1) <strong>Copie P&amp;L pilotage</strong> (optionnel) : si vous connaissez l’id d’un <code>account.report</code> source,
     la toolbox en duplique une copie avec filtres analytique et budgets — pour parcourir les rapports dans un tableau,
     utiliser l’utilitaire <strong>P&amp;L personnalisé</strong>.
-    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : sous <strong>Facturation / Comptabilite &gt; Reporting</strong>, menu
-    <strong>Assistant budget projet (Senedoo)</strong> (formulaire puis <strong>Remplir le rapport CPC</strong>) et entree
-    <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>
-    pour ouvrir le même rapport directement (dépliage par compte sous chaque rubrique). Après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
+    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : le choix du <strong>compte analytique</strong> se fait dans le menu
+    <strong>Assistant budget projet (Senedoo)</strong> — <strong>pas</strong> dans la grille du rapport. Chemin Odoo 18 :
+    app <strong>Comptabilité</strong> ou <strong>Facturation</strong> → menu latéral <strong>Reporting</strong> (ou « Rapports ») →
+    <strong>Assistant budget projet (Senedoo)</strong> (formulaire puis <strong>Remplir le rapport CPC</strong>). Entrée séparée
+    <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong> pour ouvrir uniquement le rapport. Après installation, calcule depuis Odoo (Réalisé / Budget / Écart / %),
     injecte le budget financier sur la colonne externe du CPC et affiche dans le statut du wizard la liste des
     <strong>codes comptes budgétisés</strong> (non nuls). Réinstallez depuis la toolbox après une mise à jour pour
     appliquer les correctifs d’expressions « % ».
@@ -160,6 +161,22 @@
 
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Budget par projet (CPC) — installation dans Odoo</h2>
+  <div style="margin:0 0 0.85rem;padding:0.65rem 0.85rem;border-left:4px solid #2563eb;background:rgba(37,99,235,0.07);font-size:0.9rem;line-height:1.55;">
+    <strong>Où est le wizard (choix du compte analytique) ?</strong>
+    Il n’apparaît <strong>pas</strong> dans la fenêtre du rapport comptable (grille avec « mars 2026 », colonnes Réalisé / Budget / Écart…).
+    C’est une <strong>entrée de menu</strong> à part : fermez cette vue ou ouvrez un autre onglet, puis dans Odoo
+    <strong>Comptabilité</strong> ou <strong>Facturation</strong> → <strong>Reporting</strong> (libellé selon langue / édition) →
+    <strong>Assistant budget projet (Senedoo)</strong> → formulaire (analytique, budget financier, dates) →
+    <strong>Remplir le rapport CPC</strong>.
+    {% if not cpc_wizard_installed %}
+    <span style="display:block;margin-top:0.35rem;">Si ce menu n’existe pas : installez d’abord avec le bouton <strong>Installer Budget par projet (Odoo)</strong> ci-dessous.</span>
+    {% endif %}
+    <span class="sn-muted" style="display:block;margin-top:0.4rem;font-size:0.84rem;">Dépannage : <strong>Paramètres</strong> → <strong>Interface utilisateur</strong> → <strong>Menus</strong>, recherche « Assistant budget projet » — vérifier le <strong>menu parent</strong> (Reporting).</span>
+  </div>
+  <p class="sn-muted" style="margin:0 0 0.75rem;font-size:0.84rem;line-height:1.45;">
+    <strong>Menu présent en base mais invisible dans la barre latérale ?</strong> Anciennes installs le plaçaient sous un parent peu ouvert (ex. états légaux).
+    Depuis la toolbox, lancez <strong>Mettre à jour Budget par projet</strong> (v. toolbox ≥ 1.9.2) : replacement sous <strong>Reporting</strong> principal et séquence remontée.
+  </p>
   {% if cpc_wizard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
     &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.

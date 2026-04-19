@@ -470,9 +470,16 @@ def _ir_ui_menu_id_from_xmlid(
 
 
 # Parents possibles pour accrocher un rapport « autonome » (sans root_report_id).
+# Priorité au menu **Reporting** général (``menu_finance_reports``) : plus visible dans la barre
+# latérale que ``account_reports_legal_statements_menu`` (états légaux / Statement reports), souvent
+# replié, localisé ou restreint par groupes — plusieurs bases avaient l'assistant CPC « présent en base
+# mais invisible » pour les utilisateurs.
 _ACCOUNT_REPORT_MENU_PARENT_XMLIDS: tuple[str, ...] = (
-    "account.account_reports_legal_statements_menu",
     "account.menu_finance_reports",
+    "account_accountant.menu_finance_reports",
+    "account_reports.menu_finance_reports",
+    "account.account_reports_legal_statements_menu",
+    "account_reports.account_reports_legal_statements_menu",
 )
 
 # Menu « Balance comptable » / trial balance (Enterprise account_reports, etc.) : même parent = sous-menu
@@ -1189,7 +1196,7 @@ def ensure_account_report_reporting_menu(
     """
     Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu``.
 
-    Par défaut : sous **Reporting** (Statement Reports / Reporting). Avec ``under_trial_balance=True``
+    Par défaut : sous le menu **Reporting** principal (``menu_finance_reports`` si présent ; repli états légaux). Avec ``under_trial_balance=True``
     (balance 6 col.) : sous le sous-menu **Grands livres** (parent du **Grand livre général** si
     trouvé ; séquence en fin de groupe), sinon repli après **Balance comptable**.
 

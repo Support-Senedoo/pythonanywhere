@@ -1119,7 +1119,9 @@ def create_cpc_wizard(
         "name":      WIZARD_MENU_LABEL,
         "parent_id": parent_menu_id,
         "action":    f"ir.actions.server,{int(sa_menu_id)}",
-        "sequence":  99,
+        # Séquence basse = haut du sous-menu (Odoo trie par ``sequence`` croissant) ; évite l'effet
+        # « enterré » sous des dizaines d'entrées avec ``sequence`` 10, 20, …
+        "sequence":  8,
     }
 
     menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [menu_vals])
@@ -1278,7 +1280,7 @@ def _reattach_wizard_menu_under_finance_root(
             pwd,
             "ir.ui.menu",
             "write",
-            [[int(menu_id)], {"parent_id": int(root), "sequence": 950}],
+            [[int(menu_id)], {"parent_id": int(root), "sequence": 40}],
         )
         return int(root)
     except Exception:
@@ -1293,13 +1295,14 @@ def _find_reports_menu(models: Any, db: str, uid: int, pwd: str) -> int | None:
     de ``menu_finance`` (app Facturation / Invoicing) — le nom du parent n'est souvent **pas**
     « Comptabilité », d'où l'échec de l'ancienne recherche et un menu introuvable ou mal placé.
     """
-    # 1) Xmlid officiels (EE : états légaux / rapports ; CE : menu_finance_reports)
+    # 1) Xmlid : **menu_finance_reports** en premier (menu Reporting visible) ; états légaux en repli
+    #    (même logique que ``_ACCOUNT_REPORT_MENU_PARENT_XMLIDS`` dans odoo_account_reports.py).
     for mod, xid in (
-        ("account", "account_reports_legal_statements_menu"),
-        ("account_reports", "account_reports_legal_statements_menu"),
         ("account", "menu_finance_reports"),
         ("account_accountant", "menu_finance_reports"),
         ("account_reports", "menu_finance_reports"),
+        ("account", "account_reports_legal_statements_menu"),
+        ("account_reports", "account_reports_legal_statements_menu"),
     ):
         mid = _menu_id_from_xmlid(models, db, uid, pwd, mod, xid)
         if mid:
