@@ -11,16 +11,20 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       5. Ouvre le rapport CPC dans Odoo (rapport toolbox unique ``CPC_REPORT_TOOLBOX_EXACT``)
   - Menus : Facturation/Comptabilité > Reporting > Assistant budget projet (Senedoo) — action serveur → formulaire ;
     Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo).
-  - Rapport CPC : **pas** de filtre analytique Odoo (incompatible avec l’écart vs budget). La colonne
-    « Réalisé (axe) » est ``realise_axe`` (valeurs externes) ; l’« Écart » = ``budget − realise_axe``.
-    Le wizard injecte ``realise_axe`` et le budget (external) pour la même période et le même axe.
+  - Rapport CPC : **pas** de filtre analytique Odoo sur la fiche du rapport (incompatible avec un écart
+    cohérent vs budget sur plusieurs bases Enterprise). La colonne « Réalisé (axe) » est ``realise_axe``
+    (moteur **external** + ``account.report.external.value``) ; l’« Écart » = ``budget − realise_axe``.
+    Le wizard injecte ``realise_axe`` et le budget (**external** si la base n’expose pas le moteur
+    natif ``budget``) pour la même période et le même axe. Voir **DEPLOY_PYTHONANYWHERE.md** (section
+    utilitaires, CPC) et le docstring de ``create_cpc_budget_analytique.py`` pour le détail « pourquoi
+    external » et les liens doc **Odoo 18.0**.
   - Colonne Budget (hors moteur natif ``budget``) : remplie depuis le budget financier choisi dans le
     wizard (pas de saisie manuelle au crayon).
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
 
-Aucune dépendance module custom — fonctionne sur Odoo 17-19 SaaS Enterprise (droits admin / Studio).
+Aucune dépendance module custom — fonctionne sur Odoo 18–19 SaaS Enterprise (réf. doc v18 ; 17 en pratique souvent OK — droits admin / Studio).
 
 Usage Flask toolbox (action staff.py) :
     from create_cpc_odoo_wizard import create_cpc_wizard, purge_cpc_wizard, cpc_wizard_exists

@@ -97,7 +97,7 @@
 <details class="sn-doc">
   <summary>Mode d’emploi — P&amp;L analytique et budget</summary>
   <p style="margin:0.65rem 0 0;line-height:1.5;">
-    <strong>But.</strong> Même principe qu’un P&amp;L personnalisé, avec en plus l’activation de <code>filter_analytic</code> et du filtre budgets (<code>filter_budgets</code> sur Odoo 17+, ou <code>filter_budget</code> sur d’anciennes bases) sur la copie. Sans le bon filtre budgets sur la fiche du rapport, les colonnes <strong>budget</strong> et <strong>%</strong> peuvent rester vides ou ne plus suivre le comportement du P&amp;L d’origine lorsque le filtre analytique est actif.
+    <strong>But.</strong> Même principe qu’un P&amp;L personnalisé, avec en plus l’activation de <code>filter_analytic</code> et du filtre budgets (<code>filter_budgets</code> sur Odoo 18+, ou <code>filter_budget</code> sur d’anciennes bases) sur la copie. Sans le bon filtre budgets sur la fiche du rapport, les colonnes <strong>budget</strong> et <strong>%</strong> peuvent rester vides ou ne plus suivre le comportement du P&amp;L d’origine lorsque le filtre analytique est actif.
   </p>
   <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.88rem;">
     <strong>Sonde</strong> (lecture seule) : budget × analytique. Puis <strong>Créer la copie</strong> depuis la liste des rapports. Dépannage : fiche <code>account.report</code> dans Odoo (filtres analytique / budgets) — voir <code>DEPLOY_PYTHONANYWHERE.md</code>.

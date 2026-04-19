@@ -2,7 +2,7 @@
 """
 Active sur un account.report (typiquement une copie de P&L) les options utiles pour
 piloter budget + analytique dans l’UI Odoo : ``filter_analytic`` (optionnel), et le filtre budget
-(``filter_budgets`` sur Odoo 17+, ou ``filter_budget`` sur d’anciennes bases).
+(``filter_budgets`` sur Odoo 18+ — doc [18.0](https://www.odoo.com/documentation/18.0/developer/reference/standard_modules/account/account_report.html) ; ``filter_budget`` sur d’anciennes bases).
 
 Paramètre ``enable_analytic_filter=False`` : ne pas activer ``filter_analytic`` (rapport CPC
 « budget par projet » : réalisé analytique via colonne ``realise_axe`` / assistant).
@@ -92,7 +92,7 @@ def personalize_pl_analytic_budget_options(
             )
         vals["filter_analytic"] = True
     if enable_budget_filter:
-        # Ordre : nom courant Odoo 17+ puis rétrocompatibilité.
+        # Ordre : nom courant Odoo 18+ puis rétrocompatibilité (filter_budget).
         if "filter_budgets" in filters:
             vals["filter_budgets"] = True
         elif "filter_budget" in filters:

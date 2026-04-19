@@ -28,7 +28,7 @@ def account_report_odoo_runner_url(base_url: str, report_id: int) -> str:
     """
     Ancienne forme d’URL « courte » vers un enregistrement ``account.report``.
 
-    Sur Odoo 17+, ce lien ouvre surtout la **vue fiche / backend**, pas l’écran d’analyse (grille du rapport).
+    Sur Odoo 18+, ce lien ouvre surtout la **vue fiche / backend**, pas l’écran d’analyse (grille du rapport).
     Préférer :func:`account_report_execution_url` (action client ``account_report``).
     """
     base = normalize_odoo_base_url(base_url).rstrip("/")

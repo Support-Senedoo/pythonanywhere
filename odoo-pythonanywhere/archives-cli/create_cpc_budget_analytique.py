@@ -7,24 +7,42 @@ Structure CPC SYSCOHADA complète (plan comptable OHADA / Sénégal).
 Compatible avec les fonctions execute_kw de personalize_syscohada_detail.py.
 Utilisé par la toolbox Flask (web_app/blueprints/staff.py).
 
-Stratégie colonne Budget (données 100 % Odoo pour les utilisateurs qui filtrent dans l’UI) :
+Références doc officielles (priorité **Odoo 18.0**, même principe en 19) :
+  - Rapports personnalisés / moteurs d’expressions :
+    https://www.odoo.com/documentation/18.0/applications/finance/accounting/reporting/customize.html
+  - Modèle ``account.report.line`` :
+    https://www.odoo.com/documentation/18.0/developer/reference/standard_modules/account/account_report_line.html
+
+Pourquoi le moteur ``external`` (et ``account.report.external.value``) ?
+  - **Réalisé analytique (``realise_axe``)** : le filtre analytique **sur la fiche** du rapport
+    (``filter_analytic``) est **désactivé** sur ce CPC, car sur plusieurs bases Enterprise le
+    moteur ne croise pas correctement **budget sélectionné** et **réalisé filtré par axe** :
+    l’écart et le % deviennent incohérents. Le réalisé **pour un projet donné** ne peut donc
+    pas s’appuyer sur ``account_codes`` + filtre analytique Odoo pour cette colonne.
+    L’assistant « Budget par projet » agrège les ``account.move.line`` (dont ``analytic_distribution``)
+    pour l’axe choisi et injecte un total **par ligne CPC** via ``external`` + ``external.value``.
+  - **Budget** : si la base n’expose pas le moteur natif ``budget`` sur les expressions, les
+    montants du budget financier (``account.report.budget`` / items) ne sont pas calculés comme
+    une colonne ``account_codes`` ; le repli toolbox est ``external`` + remplissage par le même
+    assistant (même période, même axe).
+  - **Trade-off documenté** : en 18.0 / 19.0, Odoo interdit le **groupby** (dépliage par compte)
+    sur les expressions en ``external`` (*Groupby isn't supported by 'external' engine*). Les
+    totaux par rubrique CPC restent corrects après remplissage ; le détail par compte **sur l’axe**
+    passe par le Grand livre / un rapport ``account_codes`` dédié, pas par ce CPC.
+
+Stratégie colonne Budget (données côté Odoo + assistant) :
   - Engine ``budget`` si la sélection ``engine`` l’expose (filtre budgets natif Odoo).
   - Sinon ``account.report.budget.item`` ou ``crossovered.budget.lines`` : engine ``external``,
     **sans** sous-formule ``editable`` : pas de saisie manuelle au crayon ; les montants viennent
-    des ``account.report.external.value`` (remplissage via l’assistant toolbox « Budget par projet »
-    depuis le budget financier Odoo sélectionné).
-  - Sinon repli ``account_codes`` (même formule que le réalisé — peu utile).
-  - Après création du rapport : activation de ``filter_budgets`` ou ``filter_budget`` sur la
-    fiche ``account.report`` lorsque le modèle les expose (même logique que le P&L analytique
-    Senedoo), en plus de ``filter_analytic``. Sans ce filtre budgets, Odoo peut masquer ou
-    ne plus piloter correctement les colonnes budget / % avec l’analytique.
-  - ``filter_analytic=False`` : le filtre analytique Odoo empêche un écart cohérent avec le
-    budget sélectionné ; le **réalisé sur l’axe** est une colonne ``realise_axe`` (external),
-    remplie par l’assistant « Budget par projet ».
-  - ``filter_unfold_all=False`` et ``filter_hierarchy`` pour la hiérarchie des comptes si des
-    lignes utilisent encore ``account_codes``.
+    des ``account.report.external.value`` (remplissage via l’assistant « Budget par projet »).
+  - Sinon repli ``account_codes`` (même formule que le réalisé GL — peu utile pour l’analytique).
+  - Après création : activation de ``filter_budgets`` ou ``filter_budget`` sur la fiche
+    ``account.report`` lorsque le modèle les expose (comme le P&L analytique Senedoo).
+    **Sans** réactiver ``filter_analytic`` sur ce rapport (voir ci-dessus).
+  - ``filter_unfold_all=False`` et ``filter_hierarchy`` : utiles surtout si des lignes gardent
+    encore ``account_codes`` (ici les feuilles « compte » sont en ``external`` pour ``realise_axe``).
   - Les totaux (codes X*) : engine ``aggregation`` sur ``.realise_axe`` et ``.budget``.
-  - Formules ``account_codes`` / ``budget`` : normalisation Odoo 19 (``^601,^6011`` → ``601+6011``).
+  - Formules ``account_codes`` / ``budget`` : normalisation Odoo 18+ (``^601,^6011`` → ``601+6011``).
 """
 from __future__ import annotations
 

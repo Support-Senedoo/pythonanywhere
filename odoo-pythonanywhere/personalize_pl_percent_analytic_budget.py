@@ -5,8 +5,9 @@ expressions du **compte de résultat** pour que la colonne **%** utilise le **nu
 de la colonne analytique** (libellé d’expression de cette colonne) au lieu du total
 période, tout en gardant le **dénominateur budget** inchangé.
 
-Réf. doc Odoo (v17+ valable pour la syntaxe des formules ; v19 utilise le même modèle
+Réf. doc Odoo **18.0** (syntaxe des formules ; 19.0 conserve le même modèle
 ``account.report.expression`` avec ``engine == 'aggregation'``) :
+  https://www.odoo.com/documentation/18.0/applications/finance/accounting/reporting/customize.html
   « To refer to an expression, type its parent line's code followed by a period and the
   expression's label (ex. code.label). »
 

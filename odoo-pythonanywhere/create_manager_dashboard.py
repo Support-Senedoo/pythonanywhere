@@ -16,7 +16,7 @@ KPIs couverts (si modules installes) :
   - Fabrication MRP (OFs, retards, en cours)
 
 Comparaison automatique N vs N-1 pour toutes les sections.
-Compatible Odoo 17-19 SaaS Enterprise.
+Compatible Odoo 18–19 SaaS Enterprise (17 souvent OK).
 
 Usage Flask toolbox :
     from create_manager_dashboard import (
@@ -126,7 +126,7 @@ def _mods():
 
 def _cd(cid): return [('company_id', '=', cid)] if cid else []
 
-# ---- read_group wrapper compatible Odoo 17-19 ----
+# ---- read_group wrapper compatible Odoo 18–19 (17 souvent OK) ----
 
 def _rg(mn, dom, fields, groupby, order='', lim=0):
     M = env[mn].sudo()
