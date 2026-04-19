@@ -56,11 +56,11 @@
     (1) <strong>Copie P&amp;L pilotage</strong> (optionnel) : si vous connaissez l’id d’un <code>account.report</code> source,
     la toolbox en duplique une copie avec filtres analytique et budgets — pour parcourir les rapports dans un tableau,
     utiliser l’utilitaire <strong>P&amp;L personnalisé</strong>.
-    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : l’assistant <strong>Assistant budget projet (Senedoo)</strong>
+    (2) <strong>Budget par projet (CPC SYSCOHADA)</strong> : l’entrée <strong>CPC Senedoo — 1. Assistant (formulaire, budget)</strong>
     injecte le <strong>budget</strong> (external si besoin). Le <strong>Réalisé</strong> vient des comptes dans le rapport
-    (filtre analytique + dépliage). Chemin assistant : <strong>Comptabilité</strong> / <strong>Facturation</strong> →
-    <strong>Reporting</strong> → <strong>Assistant budget projet (Senedoo)</strong>. Rapport seul :
-    <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>. Dans le rapport, choisir l’axe analytique et
+    (filtre analytique + dépliage). Chemin : <strong>Comptabilité</strong> / <strong>Facturation</strong> →
+    <strong>Reporting</strong> → menu <strong>1.</strong> (assistant) puis, juste en dessous, menu <strong>2.</strong> (rapport seul) :
+    <strong>CPC Senedoo — 2. Rapport interactif (SYSCOHADA)</strong>. Dans le rapport, choisir l’axe analytique et
     utiliser l’option <strong>Masquer les lignes à zéro</strong> si proposée. Réinstallez depuis la toolbox après mise à jour.
   </p>
   <p class="sn-muted" style="margin:0.55rem 0 0;line-height:1.45;font-size:0.88rem;">
@@ -164,12 +164,12 @@
     Il n’apparaît <strong>pas</strong> dans la fenêtre du rapport comptable (grille avec « mars 2026 », colonnes Réalisé / Budget / Écart…).
     C’est une <strong>entrée de menu</strong> à part : fermez cette vue ou ouvrez un autre onglet, puis dans Odoo
     <strong>Comptabilité</strong> ou <strong>Facturation</strong> → <strong>Reporting</strong> (libellé selon langue / édition) →
-    <strong>Assistant budget projet (Senedoo)</strong> → formulaire (analytique, budget financier, dates) →
+    <strong>CPC Senedoo — 1. Assistant (formulaire, budget)</strong> → formulaire (analytique, budget financier, dates) →
     <strong>Remplir le rapport CPC</strong>.
     {% if not cpc_wizard_installed %}
     <span style="display:block;margin-top:0.35rem;">Si ce menu n’existe pas : installez d’abord avec le bouton <strong>Installer Budget par projet (Odoo)</strong> ci-dessous.</span>
     {% endif %}
-    <span class="sn-muted" style="display:block;margin-top:0.4rem;font-size:0.84rem;">Dépannage : <strong>Paramètres</strong> → <strong>Interface utilisateur</strong> → <strong>Menus</strong>, recherche « Assistant budget projet » — vérifier le <strong>menu parent</strong> (Reporting).</span>
+    <span class="sn-muted" style="display:block;margin-top:0.4rem;font-size:0.84rem;">Dépannage : <strong>Paramètres</strong> → <strong>Interface utilisateur</strong> → <strong>Menus</strong>, recherche « CPC Senedoo » ou « 1. Assistant » — vérifier le <strong>menu parent</strong> (Reporting).</span>
   </div>
   <p class="sn-muted" style="margin:0 0 0.75rem;font-size:0.84rem;line-height:1.45;">
     <strong>Menu présent en base mais invisible dans la barre latérale ?</strong> Anciennes installs le plaçaient sous un parent peu ouvert (ex. états légaux).
@@ -179,18 +179,18 @@
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
     &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.
     <strong>Lancer le wizard :</strong> Odoo app <strong>Facturation</strong> ou <strong>Comptabilite</strong>, menu <strong>Reporting</strong> (ou Rapports),
-    puis <strong>Assistant budget projet (Senedoo)</strong> (apres reinstallation / mise a jour depuis la toolbox si le menu manquait).
+    puis <strong>CPC Senedoo — 1. Assistant (formulaire, budget)</strong> (apres reinstallation / mise a jour depuis la toolbox si le menu manquait).
     (action serveur → formulaire : analytique, budget, periode, puis <strong>Remplir le rapport CPC</strong>).
-    Rapport seul (depliage comptes) : <strong>Reporting</strong> (menu dedie) <strong>CPC SYSCOHADA — rapport budget projet (Senedoo)</strong>.
+    Rapport seul (depliage comptes) : sous <strong>Reporting</strong>, l’entrée <strong>CPC Senedoo — 2. Rapport interactif (SYSCOHADA)</strong> (juste sous le menu 1.).
   </p>
   {% endif %}
   <details class="sn-doc" style="margin:0 0 0.75rem;">
     <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ca marche ?</summary>
     <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
-      Installe un wizard natif Odoo (<code>x_cpc_budget_wizard</code>). Menu dedie
-      <strong>Assistant budget projet (Senedoo)</strong> (action serveur → formulaire) et un second menu sous <strong>Reporting</strong>
-      pour le rapport seul. Si le menu n'apparait pas apres installation : bouton <strong>Mettre a jour</strong> ci-dessus,
-      ou dans Odoo <strong>Parametres &gt; Interface utilisateur &gt; Menus</strong>, rechercher « Assistant budget projet » et verifier le <strong>parent</strong> (Reporting / Comptabilite).
+      Installe un wizard natif Odoo (<code>x_cpc_budget_wizard</code>). Deux menus dédiés sous <strong>Reporting</strong> :
+      <strong>1.</strong> assistant (action serveur → formulaire) et <strong>2.</strong> rapport interactif seul.
+      Si le menu n'apparait pas apres installation : bouton <strong>Mettre a jour</strong> ci-dessus,
+      ou dans Odoo <strong>Parametres &gt; Interface utilisateur &gt; Menus</strong>, rechercher « CPC Senedoo » et verifier le <strong>parent</strong> (Reporting / Comptabilite).
       Le client choisit l'axe analytique, la periode et le budget financier Odoo, puis <strong>Remplir le rapport CPC</strong> :
       le rapport n'utilise <strong>pas</strong> le filtre analytique Odoo (limite moteur avec le budget) ; les colonnes
       <strong>Budget</strong> (external si besoin) est rempli par l'assistant ; le <strong>Réalisé</strong> vient des

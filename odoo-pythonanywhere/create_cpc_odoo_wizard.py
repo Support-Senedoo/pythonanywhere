@@ -9,8 +9,8 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
       3. Écrit ``account.report.external.value`` pour les expressions **Budget** en moteur ``external``
          uniquement (totaux par rubrique CPC)
       4. Ouvre le rapport CPC dans Odoo (``CPC_REPORT_TOOLBOX_EXACT``)
-  - Menus : Facturation/Comptabilité > Reporting > Assistant budget projet (Senedoo) — action serveur → formulaire ;
-    Reporting > … > CPC SYSCOHADA — rapport budget projet (Senedoo).
+  - Menus : Facturation/Comptabilité > Reporting > deux entrées voisines (séquences 8 et 9) : d'abord l'assistant
+    (formulaire, action serveur), puis l'ouverture directe du rapport interactif (grille SYSCOHADA).
   - Rapport CPC : **filtre analytique** activé sur la fiche du rapport ; colonne **Réalisé** =
     ``realise_axe`` en **account_codes** (dépliage par compte). Choisir le **même axe** dans les filtres
     du rapport que celui du wizard pour cohérence visuelle. **Écart** = ``budget − realise_axe`` ; le
@@ -37,16 +37,22 @@ from typing import Any
 
 WIZARD_MODEL   = "x_cpc_budget_wizard"
 WIZARD_NAME    = "Budget par projet (Senedoo)"
-WIZARD_MENU_LABEL = "Assistant budget projet (Senedoo)"
+# Libellés distincts : « 1. » = formulaire (remplissage), « 2. » = grille rapport (évite la confusion wizard / rapport).
+WIZARD_MENU_LABEL = "CPC Senedoo — 1. Assistant (formulaire, budget)"
+WIZARD_MENU_SEQUENCE = 8
 # Anciens libellés de menu (purge pour éviter doublons après renommage)
 WIZARD_MENU_PREVIOUS_NAMES = (
+    "Assistant budget projet (Senedoo)",
     "CPC Budget Analytique (Senedoo)",
     "Budget par projet (Senedoo)",
 )
 # Motifs ilike sur ir.ui.menu.name (orphelins après suppression Studio / modèle, libellés partiels)
-WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%", "%Assistant budget%")
+WIZARD_MENU_ILIKE_PATTERNS = ("%CPC Budget%", "%Budget par projet%", "%Assistant budget%", "%CPC Senedoo — 1.%")
 # Menu Reporting distinct du wizard : ouverture directe du rapport (dépliage par compte).
-CPC_REPORT_MENU_LABEL = "CPC SYSCOHADA — rapport budget projet (Senedoo)"
+CPC_REPORT_MENU_LABEL = "CPC Senedoo — 2. Rapport interactif (SYSCOHADA)"
+CPC_REPORT_MENU_SEQUENCE = 9
+# Ancien libellé du menu rapport (purge orphelins avant recréation)
+CPC_REPORT_MENU_PREVIOUS_NAMES = ("CPC SYSCOHADA — rapport budget projet (Senedoo)",)
 CPC_REPORT_NAME_LIKE = "CPC SYSCOHADA"        # recherche ilike de secours dans account.report
 # Nom exact du account.report créé par la toolbox (aligné sur create_cpc_budget_analytique)
 CPC_REPORT_TOOLBOX_EXACT = "CPC SYSCOHADA — Budget par projet (Senedoo)"
@@ -892,6 +898,7 @@ def create_cpc_wizard(
                 pwd,
                 _rid_menu,
                 CPC_REPORT_MENU_LABEL,
+                menu_sequence=CPC_REPORT_MENU_SEQUENCE,
             )
             result["cpc_report_client_action_id"] = _aid
             result["cpc_report_menu_id"] = _mid
@@ -1019,7 +1026,7 @@ def create_cpc_wizard(
         "action":    f"ir.actions.server,{int(sa_menu_id)}",
         # Séquence basse = haut du sous-menu (Odoo trie par ``sequence`` croissant) ; évite l'effet
         # « enterré » sous des dizaines d'entrées avec ``sequence`` 10, 20, …
-        "sequence":  8,
+        "sequence":  int(WIZARD_MENU_SEQUENCE),
     }
 
     menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [menu_vals])
@@ -1293,20 +1300,24 @@ def _purge_cpc_toolbox_account_reports(
 def _unlink_orphan_cpc_report_menus(
     models: Any, db: str, uid: int, pwd: str
 ) -> list[int]:
-    """Menus Reporting encore présents sous le libellé exact du rapport (orphelins)."""
-    mids = (
-        _ek(
-            models,
-            db,
-            uid,
-            pwd,
-            "ir.ui.menu",
-            "search",
-            [[("name", "=", CPC_REPORT_MENU_LABEL)]],
+    """Menus Reporting encore présents sous le libellé courant ou historique du rapport (orphelins)."""
+    labels = (CPC_REPORT_MENU_LABEL,) + tuple(CPC_REPORT_MENU_PREVIOUS_NAMES)
+    found: list[int] = []
+    for lab in labels:
+        part = (
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.ui.menu",
+                "search",
+                [[("name", "=", lab)]],
+            )
+            or []
         )
-        or []
-    )
-    ids = sorted({int(x) for x in mids})
+        found.extend(int(x) for x in part)
+    ids = sorted(set(found))
     if ids:
         try:
             _ek(models, db, uid, pwd, "ir.ui.menu", "unlink", [ids])

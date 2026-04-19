@@ -1192,6 +1192,7 @@ def ensure_account_report_reporting_menu(
     menu_title: str,
     *,
     under_trial_balance: bool = False,
+    menu_sequence: int | None = None,
 ) -> tuple[int | None, int | None, dict[str, Any]]:
     """
     Garantit une ``ir.actions.client`` + une entrée ``ir.ui.menu``.
@@ -1199,6 +1200,9 @@ def ensure_account_report_reporting_menu(
     Par défaut : sous le menu **Reporting** principal (``menu_finance_reports`` si présent ; repli états légaux). Avec ``under_trial_balance=True``
     (balance 6 col.) : sous le sous-menu **Grands livres** (parent du **Grand livre général** si
     trouvé ; séquence en fin de groupe), sinon repli après **Balance comptable**.
+
+    Si ``menu_sequence`` est fourni (entier), il remplace la séquence Odoo par défaut (500 ou celle
+    du groupe Grands livres) pour placer l'entrée au bon rang dans le sous-menu.
 
     Retourne ``(client_action_id, menu_id, post_checks)`` où ``post_checks`` est le résultat de
     :func:`verify_reporting_menu_and_client_action` (contrôle lecture menu + action + contexte).
@@ -1232,13 +1236,18 @@ def ensure_account_report_reporting_menu(
     if under_trial_balance:
         placement = resolve_parent_menu_in_grands_livres_group(models, db, uid, password)
         if placement:
-            parent_id, menu_sequence = placement[0], placement[1]
+            parent_id, resolved_sequence = placement[0], placement[1]
         else:
             parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
-            menu_sequence = 500
+            resolved_sequence = 500
     else:
         parent_id = resolve_parent_menu_for_account_report(models, db, uid, password)
-        menu_sequence = 500
+        resolved_sequence = 500
+
+    if menu_sequence is not None:
+        menu_sequence = int(menu_sequence)
+    else:
+        menu_sequence = int(resolved_sequence)
 
     # Réinstall rapport : nouvel ir.actions.client — rattacher le menu Reporting existant (même titre / parent)
     if parent_id:

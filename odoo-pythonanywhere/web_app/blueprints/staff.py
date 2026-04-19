@@ -763,8 +763,9 @@ def pl_analytic_project_report():
                 ):
                     flash(
                         "Menu assistant : aucun parent Reporting resolu et rattachement racine impossible. "
-                        "Dans Odoo : Parametres > Interface utilisateur > Menus, rechercher « Assistant budget projet (Senedoo) » "
-                        "et definir un parent (ex. Reporting). Puis reinstaller depuis la toolbox.",
+                        "Dans Odoo : Parametres > Interface utilisateur > Menus, rechercher « CPC Senedoo — 1. Assistant » "
+                        "ou l'ancien libelle « Assistant budget projet (Senedoo) », puis definir un parent (ex. Reporting). "
+                        "Puis reinstaller depuis la toolbox.",
                         "warning",
                     )
             except Exception as e:
