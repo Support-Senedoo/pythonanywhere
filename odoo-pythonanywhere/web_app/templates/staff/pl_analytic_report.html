@@ -177,27 +177,27 @@
   </p>
   {% if cpc_wizard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
-    &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le wizard dans Odoo.
-    <strong>Lancer le wizard :</strong> Odoo app <strong>Facturation</strong> ou <strong>Comptabilite</strong>, menu <strong>Reporting</strong> (ou Rapports),
-    puis <strong>CPC Senedoo — 1. Assistant (formulaire, budget)</strong> (apres reinstallation / mise a jour depuis la toolbox si le menu manquait).
-    (menu → formulaire : analytique, budget, periode, puis <strong>Remplir le rapport CPC</strong>).
-    Rapport seul (depliage comptes) : sous <strong>Reporting</strong>, l’entrée <strong>CPC Senedoo — 2. Rapport interactif (SYSCOHADA)</strong> (juste sous le menu 1.).
+    &#10003; Déjà installé — le bouton ci-dessous <strong>écrase et remet à jour</strong> le wizard dans Odoo.
+    <strong>Lancer le wizard :</strong> application Odoo <strong>Facturation</strong> ou <strong>Comptabilité</strong>, menu <strong>Reporting</strong> (ou Rapports),
+    puis <strong>CPC Senedoo — 1. Assistant (formulaire, budget)</strong> (après réinstallation / mise à jour depuis la toolbox si le menu manquait).
+    (menu → formulaire : analytique, budget, période, puis <strong>Remplir le rapport CPC</strong>).
+    Rapport seul (dépliage comptes) : sous <strong>Reporting</strong>, l’entrée <strong>CPC Senedoo — 2. Rapport interactif (SYSCOHADA)</strong> (juste sous le menu 1.).
   </p>
   {% endif %}
   <details class="sn-doc" style="margin:0 0 0.75rem;">
-    <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ca marche ?</summary>
+    <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ça marche ?</summary>
     <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
       Installe un wizard natif Odoo (<code>x_cpc_budget_wizard</code>). Deux menus dédiés sous <strong>Reporting</strong> :
       <strong>1.</strong> assistant (action fenêtre → formulaire) et <strong>2.</strong> rapport interactif seul.
-      Si le menu n'apparait pas apres installation : bouton <strong>Mettre a jour</strong> ci-dessus,
-      ou dans Odoo <strong>Parametres &gt; Interface utilisateur &gt; Menus</strong>, rechercher « CPC Senedoo » et verifier le <strong>parent</strong> (Reporting / Comptabilite).
-      Le client choisit l'axe analytique, la periode et le budget financier Odoo, puis <strong>Remplir le rapport CPC</strong> :
-      le rapport n'utilise <strong>pas</strong> le filtre analytique Odoo (limite moteur avec le budget) ; les colonnes
-      <strong>Budget</strong> (external si besoin) est rempli par l'assistant ; le <strong>Réalisé</strong> vient des
-      comptes (filtre analytique du rapport). L'<strong>Écart</strong> combine les deux (voir doc CPC).
-      Utiliser <strong>Mettre a jour Budget par projet</strong> pour recréer le rapport CPC dans Odoo si besoin.
+      Si le menu n’apparaît pas après installation : bouton <strong>Mettre à jour</strong> ci-dessus,
+      ou dans Odoo <strong>Paramètres &gt; Interface utilisateur &gt; Menus</strong>, rechercher « CPC Senedoo » et vérifier le <strong>parent</strong> (Reporting / Comptabilité).
+      Le client choisit l’axe analytique, la période et le budget financier Odoo, puis <strong>Remplir le rapport CPC</strong> :
+      le rapport n’utilise <strong>pas</strong> le filtre analytique Odoo (limite moteur avec le budget) ; la colonne
+      <strong>Budget</strong> (external si besoin) est remplie par l’assistant ; le <strong>Réalisé</strong> vient des
+      comptes (filtre analytique du rapport). L’<strong>Écart</strong> combine les deux (voir doc CPC).
+      Utiliser <strong>Mettre à jour Budget par projet</strong> pour recréer le rapport CPC dans Odoo si besoin.
       Export PDF et Excel natifs.
-      Si le wizard est deja present, le bouton l'ecrase (mise a jour).
+      Si le wizard est déjà présent, le bouton l’écrase (mise à jour).
     </p>
   </details>
   <div class="sn-report-btn-row">
@@ -208,7 +208,7 @@
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="create_cpc_wizard">
       <button type="submit" {% if not selected_client or conn_status != 'ok' %}disabled{% endif %}>
-        {% if cpc_wizard_installed %}Mettre a jour Budget par projet{% else %}Installer Budget par projet (Odoo){% endif %}
+        {% if cpc_wizard_installed %}Mettre à jour Budget par projet{% else %}Installer Budget par projet (Odoo){% endif %}
       </button>
     </form>
     {% if cpc_wizard_installed %}
@@ -227,18 +227,18 @@
   <h2 style="margin-top:0;font-size:1.05rem;">Tableau de Bord Manager — installation dans Odoo</h2>
   {% if manager_dashboard_installed %}
   <p style="margin:0 0 0.65rem;font-size:0.93rem;color:var(--sn-success, #166534);">
-    &#10003; Deja installe — le bouton ci-dessous <strong>ecrase et remet a jour</strong> le tableau de bord dans Odoo.
-    Dans Odoo : <strong>Comptabilite &gt; Rapports &gt; Tableau de Bord Manager (Senedoo)</strong>.
+    &#10003; Déjà installé — le bouton ci-dessous <strong>écrase et remet à jour</strong> le tableau de bord dans Odoo.
+    Dans Odoo : <strong>Comptabilité &gt; Rapports &gt; Tableau de Bord Manager (Senedoo)</strong>.
   </p>
   {% endif %}
   <details class="sn-doc" style="margin:0 0 0.75rem;">
-    <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ca marche ?</summary>
+    <summary style="cursor:pointer;font-weight:600;font-size:0.93rem;">Comment ça marche ?</summary>
     <p style="margin:0.5rem 0 0;line-height:1.45;font-size:0.9rem;">
-      Installe un wizard natif Odoo (<code>x_manager_dashboard_wizard</code>). Le manager selectionne
-      la periode (mois, annee, trimestre, cumul YTD ou personnalisee), la societe et l'axe analytique optionnel,
-      puis clique <strong>Calculer</strong> : le tableau de bord s'affiche directement dans Odoo
-      avec KPIs Ventes, Achats, Facturation, Tresorerie, Stock et Fabrication — comparaison N vs N-1 automatique.
-      Seules les sections correspondant aux modules Odoo installes apparaissent.
+      Installe un wizard natif Odoo (<code>x_manager_dashboard_wizard</code>). Le manager sélectionne
+      la période (mois, année, trimestre, cumul YTD ou personnalisée), la société et l’axe analytique optionnel,
+      puis clique sur <strong>Calculer</strong> : le tableau de bord s’affiche directement dans Odoo
+      avec KPIs Ventes, Achats, Facturation, Trésorerie, Stock et Fabrication — comparaison N vs N-1 automatique.
+      Seules les sections correspondant aux modules Odoo installés apparaissent.
     </p>
   </details>
   <div class="sn-report-btn-row">
@@ -247,7 +247,7 @@
       <input type="hidden" name="filter_host" value="{{ filter_host }}">
       <input type="hidden" name="action" value="create_manager_dashboard">
       <button type="submit">
-        {% if manager_dashboard_installed %}Mettre a jour le Tableau de Bord Manager{% else %}Installer le Tableau de Bord Manager (Odoo){% endif %}
+        {% if manager_dashboard_installed %}Mettre à jour le Tableau de Bord Manager{% else %}Installer le Tableau de Bord Manager (Odoo){% endif %}
       </button>
     </form>
     {% if manager_dashboard_installed %}

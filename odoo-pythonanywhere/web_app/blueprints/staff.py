@@ -755,7 +755,7 @@ def pl_analytic_project_report():
                 flash(_msg, "success")
                 if result.get("budget_analytic_fields_ok") is False:
                     flash(
-                        "Certains champs x_analytic_account_id n'ont pas ete crees (droits Odoo ou modele manquant).",
+                        "Certains champs x_analytic_account_id n'ont pas été créés (droits Odoo ou modèle manquant).",
                         "warning",
                     )
                 if result.get("wizard_menu_parent_source") == "none" and not result.get(
@@ -763,8 +763,8 @@ def pl_analytic_project_report():
                 ):
                     flash(
                         "Menu assistant : aucun parent Reporting resolu et rattachement racine impossible. "
-                        "Dans Odoo : Parametres > Interface utilisateur > Menus, rechercher « CPC Senedoo — 1. Assistant » "
-                        "ou l'ancien libelle « Assistant budget projet (Senedoo) », puis definir un parent (ex. Reporting). "
+                        "Dans Odoo : Paramètres > Interface utilisateur > Menus, rechercher « CPC Senedoo — 1. Assistant » "
+                        "ou l'ancien libellé « Assistant budget projet (Senedoo) », puis définir un parent (ex. Reporting). "
                         "Puis reinstaller depuis la toolbox.",
                         "warning",
                     )
@@ -772,7 +772,7 @@ def pl_analytic_project_report():
                 _err = str(e)
                 if len(_err) > 3500:
                     _err = _err[:3490] + "…"
-                flash(f"Echec installation wizard CPC : {_err}", "danger")
+                flash(f"Échec installation wizard CPC : {_err}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
@@ -791,7 +791,7 @@ def pl_analytic_project_report():
                 result = purge_cpc_wizard(models, db, uid, pwd)
                 flash(result.get("message") or "Wizard Budget par projet supprime.", "info")
             except Exception as e:
-                flash(f"Echec suppression wizard CPC : {e!s}", "danger")
+                flash(f"Échec suppression wizard CPC : {e!s}", "danger")
             return redirect(
                 ru(
                     **_pl_analytic_url_params(
