@@ -25,3 +25,8 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Résultat** : OK — sur PA pull `078528e` → `5cf5e56`, reload Web API `{"status":"OK"}`.
 - **Références** : commit `5cf5e56`, toolbox **1.10.1** (`app_version.py`).
 - **Erreur / leçon** : une réponse avait indiqué à tort que le déploiement ne pouvait pas se faire depuis macOS ; le bon script local est **`deploy_to_pa.sh`** (équivalent de **`deploy_pa.ps1`**). Toujours vérifier dans le dépôt avant d’affirmer une contrainte d’OS.
+
+### 2026-04-14 — Menu wizard CPC invisible (Odoo) : act_window + parent = menu rapport
+- **Action** : code `create_cpc_odoo_wizard.py` — menu « 1. Assistant » via **`ir.actions.act_window`** au lieu de **`ir.actions.server`** ; alignement **`parent_id`** du menu assistant sur celui du menu « 2. Rapport ».
+- **Résultat** : livré en toolbox **1.10.2** ; après **Mettre à jour Budget par projet** dans Odoo, l’entrée **1.** doit apparaître au même endroit que **2.** (juste au-dessus si séquences 8/9).
+- **Leçon** : les menus **`ir.actions.server`** peuvent ne pas s’afficher dans la barre latérale selon édition / droits ; **`ir.actions.act_window`** est le pattern standard des entrées visibles.

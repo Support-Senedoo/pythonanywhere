@@ -10,7 +10,7 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
          uniquement (totaux par rubrique CPC)
       4. Ouvre le rapport CPC dans Odoo (``CPC_REPORT_TOOLBOX_EXACT``)
   - Menus : Facturation/Comptabilité > Reporting > deux entrées voisines (séquences 8 et 9) : d'abord l'assistant
-    (formulaire, action serveur), puis l'ouverture directe du rapport interactif (grille SYSCOHADA).
+    (formulaire via ``ir.actions.act_window``, plus fiable que ``ir.actions.server`` dans la barre Odoo), puis le rapport interactif (``ir.actions.client``).
   - Rapport CPC : **filtre analytique** activé sur la fiche du rapport ; colonne **Réalisé** =
     ``realise_axe`` en **account_codes** (dépliage par compte). Choisir le **même axe** dans les filtres
     du rapport que celui du wizard pour cohérence visuelle. **Écart** = ``budget − realise_axe`` ; le
@@ -574,13 +574,13 @@ def verify_cpc_wizard_ui_install(
     wizard_model: str,
     model_id: int,
     server_action_id: int,
-    menu_server_action_id: int,
+    menu_act_window_id: int,
     view_id: int,
     menu_id: int,
     parent_menu_id: int | None,
 ) -> dict[str, Any]:
     """
-    Contrôle post-création : actions serveur, vue formulaire, menu (lecture + cohérence).
+    Contrôle post-création : action calcul (serveur), action menu (fenêtre), vue, menu.
     Retourne ``{"ok": bool, "checks": [...], "errors": [...], "warnings": [...]}``.
     """
     checks: list[dict[str, Any]] = []
@@ -588,10 +588,10 @@ def verify_cpc_wizard_ui_install(
     warnings: list[str] = []
     mid = int(model_id)
     sa = int(server_action_id)
-    sa_m = int(menu_server_action_id)
+    aw_m = int(menu_act_window_id)
     vid = int(view_id)
     mn = int(menu_id)
-    exp_menu_action = f"ir.actions.server,{sa_m}"
+    exp_menu_action = f"ir.actions.act_window,{aw_m}"
 
     rows_sa = _ek(
         models,
@@ -618,44 +618,51 @@ def verify_cpc_wizard_ui_install(
         if not st_ok:
             errors.append(f"Action calcul : state attendu code, obtenu {st!r}.")
 
-    rows_sm = _ek(
+    rows_aw = _ek(
         models,
         db,
         uid,
         pwd,
-        "ir.actions.server",
+        "ir.actions.act_window",
         "read",
-        [[sa_m]],
-        {"fields": ["id", "state", "code"]},
+        [[aw_m]],
+        {"fields": ["id", "res_model", "view_mode", "views", "view_id"]},
     )
-    if not rows_sm:
-        errors.append(f"ir.actions.server id={sa_m} (menu) introuvable en lecture.")
+    if not rows_aw:
+        errors.append(f"ir.actions.act_window id={aw_m} (menu wizard) introuvable en lecture.")
     else:
-        r1 = rows_sm[0]
-        st_m = (r1.get("state") or "").strip()
-        st_m_ok = st_m == "code"
-        checks.append({"step": "server_action_menu_state", "ok": st_m_ok, "state": st_m})
-        if not st_m_ok:
-            errors.append(f"Action menu : state attendu code, obtenu {st_m!r}.")
-        code = str(r1.get("code") or "")
-        code_ok = (
-            "ir.actions.act_window" in code
-            and wizard_model in code
-            and str(vid) in code
-        )
+        r1 = rows_aw[0]
+        rm_ok = (r1.get("res_model") or "").strip() == wizard_model
+        checks.append({"step": "menu_act_window_res_model", "ok": rm_ok, "res_model": r1.get("res_model")})
+        if not rm_ok:
+            errors.append(
+                f"Action menu : res_model attendu {wizard_model!r}, obtenu {r1.get('res_model')!r}."
+            )
+        vm = (r1.get("view_mode") or "").strip()
+        vm_ok = "form" in vm.split(",")
+        checks.append({"step": "menu_act_window_view_mode", "ok": vm_ok, "view_mode": vm})
+        if not vm_ok:
+            errors.append(f"Action menu : view_mode doit inclure form, obtenu {vm!r}.")
+        views_blob = str(r1.get("views") or "")
+        vid_single = r1.get("view_id")
+        vid_ok = str(vid) in views_blob
+        if not vid_ok and vid_single:
+            try:
+                vid_ok = int(_m2o_id_rpc(vid_single) or 0) == int(vid)
+            except (TypeError, ValueError):
+                vid_ok = False
         checks.append(
             {
-                "step": "server_action_menu_code_window",
-                "ok": code_ok,
-                "has_act_window": "ir.actions.act_window" in code,
-                "has_model": wizard_model in code,
-                "has_view_id": str(vid) in code,
+                "step": "menu_act_window_views",
+                "ok": vid_ok,
+                "views_snippet": views_blob[:200],
+                "view_id_field": vid_single,
             }
         )
-        if not code_ok:
-            errors.append(
-                "Action menu : le code ne semble pas ouvrir la vue formulaire attendue "
-                f"(modele {wizard_model!r}, view_id {vid})."
+        if not vid_ok:
+            warnings.append(
+                "Action menu : la vue formulaire n'a pas pu etre verifiee via read RPC "
+                f"(view_id attendu {vid}) ; verifier manuellement dans Odoo."
             )
 
     rows_v = _ek(
@@ -987,33 +994,27 @@ def create_cpc_wizard(
     }])
     result["view_id"] = view_id
 
-    # ---- 5. Action serveur « menu » : ouvre le formulaire (pleine page + dates par défaut)
+    # ---- 5. Action fenêtre « menu » (ir.actions.act_window) : même effet qu'une entrée standard Odoo.
+    #     Les menus ``ir.actions.server`` sont souvent absents de la barre latérale selon édition / droits.
     _vid = int(view_id)
-    menu_opener_code = (
-        "_ctx = {}\n"
-        "try:\n"
-        "    _today = context_today()\n"
-        "    _first = _today.replace(day=1)\n"
-        "    _ctx = {'default_x_date_from': str(_first), 'default_x_date_to': str(_today)}\n"
-        "except Exception:\n"
-        "    pass\n"
-        "action = {\n"
-        '    "type": "ir.actions.act_window",\n'
-        f'    "name": {repr(WIZARD_NAME)},\n'
-        f'    "res_model": {repr(WIZARD_MODEL)},\n'
-        '    "view_mode": "form",\n'
-        f'    "views": [[{_vid}, "form"]],\n'
-        '    "target": "current",\n'
-        '    "context": _ctx,\n'
-        "}\n"
+    aw_menu_id = _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.actions.act_window",
+        "create",
+        [
+            {
+                "name":      WIZARD_MENU_LABEL,
+                "res_model": WIZARD_MODEL,
+                "view_mode": "form",
+                "views":     [[_vid, "form"]],
+                "target":    "current",
+            }
+        ],
     )
-    sa_menu_id = _ek(models, db, uid, pwd, "ir.actions.server", "create", [{
-        "name":     f"Ouvrir {WIZARD_MENU_LABEL}",
-        "model_id": model_id,
-        "state":    "code",
-        "code":     menu_opener_code,
-    }])
-    result["menu_server_action_id"] = sa_menu_id
+    result["menu_act_window_id"] = aw_menu_id
 
     # ---- 6. Menu sous Reporting (même parent que les rapports comptables Senedoo ; pas de copie
     #     groups_id du parent : sur certaines bases Enterprise cela masquait l'entrée pour les utilisateurs.)
@@ -1023,7 +1024,7 @@ def create_cpc_wizard(
     menu_vals: dict[str, Any] = {
         "name":      WIZARD_MENU_LABEL,
         "parent_id": parent_menu_id,
-        "action":    f"ir.actions.server,{int(sa_menu_id)}",
+        "action":    f"ir.actions.act_window,{int(aw_menu_id)}",
         # Séquence basse = haut du sous-menu (Odoo trie par ``sequence`` croissant) ; évite l'effet
         # « enterré » sous des dizaines d'entrées avec ``sequence`` 10, 20, …
         "sequence":  int(WIZARD_MENU_SEQUENCE),
@@ -1032,6 +1033,31 @@ def create_cpc_wizard(
     menu_id = _ek(models, db, uid, pwd, "ir.ui.menu", "create", [menu_vals])
     result["menu_id"] = menu_id
     result["wizard_menu_parent_id"] = parent_menu_id
+    _sync_wizard_menu_parent_with_report_menu(
+        models,
+        db,
+        uid,
+        pwd,
+        int(menu_id),
+        int(result["cpc_report_menu_id"]) if result.get("cpc_report_menu_id") else None,
+    )
+    # Relire le parent effectif après alignement sur le menu rapport
+    try:
+        _pm = _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.menu",
+            "read",
+            [[int(menu_id)]],
+            {"fields": ["parent_id"]},
+        )
+        if _pm:
+            parent_menu_id = _m2o_id_rpc(_pm[0].get("parent_id")) or parent_menu_id
+            result["wizard_menu_parent_id"] = parent_menu_id
+    except Exception:
+        pass
     if not parent_menu_id:
         re_root = _reattach_wizard_menu_under_finance_root(
             models, db, uid, pwd, int(menu_id)
@@ -1050,7 +1076,7 @@ def create_cpc_wizard(
             wizard_model=WIZARD_MODEL,
             model_id=int(model_id),
             server_action_id=int(sa_id),
-            menu_server_action_id=int(sa_menu_id),
+            menu_act_window_id=int(aw_menu_id),
             view_id=int(view_id),
             menu_id=int(menu_id),
             parent_menu_id=parent_menu_id,
@@ -1147,6 +1173,57 @@ def _menu_id_from_xmlid(
         return None
     rid = rows[0].get("res_id")
     return int(rid) if rid else None
+
+
+def _sync_wizard_menu_parent_with_report_menu(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+    wizard_menu_id: int,
+    report_menu_id: int | None,
+) -> None:
+    """
+    Force le menu assistant sous le **même parent** que le menu « rapport CPC » (client action).
+
+    Évite les cas où seul le menu 2. apparaît dans un sous-menu (ex. « Gestion ») alors que le 1.
+    resterait rattaché à un autre parent après résolution xmlid / données hétérogènes.
+    """
+    if not report_menu_id:
+        return
+    try:
+        rows = _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.menu",
+            "read",
+            [[int(report_menu_id)]],
+            {"fields": ["parent_id"]},
+        )
+        if not rows:
+            return
+        pid = _m2o_id_rpc(rows[0].get("parent_id"))
+        if not pid:
+            return
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.menu",
+            "write",
+            [
+                [int(wizard_menu_id)],
+                {
+                    "parent_id": int(pid),
+                    "sequence": int(WIZARD_MENU_SEQUENCE),
+                },
+            ],
+        )
+    except Exception:
+        pass
 
 
 def _resolve_wizard_parent_menu(
