@@ -20,6 +20,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 
 ## Entrées
 
+### 2026-04-19 — CPC wizard : menu assistant invisible → ir.model.access (toolbox 1.10.4)
+- **Action** : correction `create_cpc_odoo_wizard.py` — création de règles **ir.model.access** sur `x_cpc_budget_wizard` pour les groupes comptables Odoo (Facturation / Comptable / Responsable + EE `account_accountant` si présent) ; contrôle post-install ; doc écran staff. `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
+- **Résultat** : OK — PA pull `63508ac`, reload Web `{"status":"OK"}`.
+- **Références** : commit `63508ac`, toolbox **1.10.4**.
+- **Erreur / leçon** : un modèle **manuel** sans `ir.model.access` laisse Odoo filtrer le menu pour les non-admins ; le parent `ir.ui.menu` était correct mais l’entrée restait invisible pour les comptables.
+
 ### 2026-04-19 — Toolbox 1.10.3 : libellés français (écran P&L analytique / CPC) + PA
 - **Action** : `git push origin master` puis `bash deploy_to_pa.sh -SkipGitPush` (Mac, clé `~/.ssh/id_ed25519_pa_cursor`, cible `senedoo@ssh.pythonanywhere.com`).
 - **Résultat** : OK — sur PA pull `21611f6` → `91e34e6`, reload Web API `{"status":"OK"}`.
