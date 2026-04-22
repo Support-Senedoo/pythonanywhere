@@ -12,7 +12,7 @@ Objectifs :
   - **provision-financial-budget** : menus **« Budget Senedoo »** (racine configurable)
     + champs ``x_analytic_account_id`` sur en-tête et lignes — idempotent ;
     + vues formulaire / liste (numéro de compte, analytique), **icône** menu (PNG violet / blanc)
-    et **charte** légère (SCSS ``web.assets_backend``, classes ``o_sn_senedoo_financial_budget*``) ;
+    et **charte** (CSS ``web.assets_backend``, classes ``o_sn_senedoo_financial_budget*``) ;
   - gérer les **noms** de budget et le **lien optionnel** vers un **compte analytique existant**
     (filtrage / cohérence avec le wizard « Budget par projet », sans remplacer un budget analytique) ;
   - importer / exporter des lignes depuis un CSV.

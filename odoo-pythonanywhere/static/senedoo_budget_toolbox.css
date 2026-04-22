@@ -1,0 +1,348 @@
+/* Budget Senedoo (toolbox) — CSS pur (le navigateur ne compile pas le SCSS sur /web/content).
+   Fond sombre, texte clair, boutons violets. Périmètre : classes posées par provision-financial-budget. */
+
+.o_sn_senedoo_financial_budget,
+.o_sn_senedoo_financial_budget_lines,
+.o_sn_senedoo_financial_budget_headers {
+  --sn-bg: #0a0a0a;
+  --sn-bg-elevated: #161616;
+  --sn-bg-cell: #1c1c1c;
+  --sn-border: #333333;
+  --sn-text: #ffffff;
+  --sn-text-muted: #c4c4c4;
+  --sn-violet: #7c4dff;
+  --sn-violet-dark: #5b2c91;
+  --sn-violet-hover: #9575ff;
+}
+
+/* ----- Formulaire budget ----- */
+.o_sn_senedoo_financial_budget {
+  background-color: var(--sn-bg) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_form_sheet_bg {
+  background: var(--sn-bg) !important;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_form_sheet,
+.o_sn_senedoo_financial_budget .o_inner_group,
+.o_sn_senedoo_financial_budget .o_group {
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_form_label,
+.o_sn_senedoo_financial_budget label,
+.o_sn_senedoo_financial_budget .o_field_widget,
+.o_sn_senedoo_financial_budget .o_input_dropdown > input,
+.o_sn_senedoo_financial_budget input,
+.o_sn_senedoo_financial_budget select,
+.o_sn_senedoo_financial_budget textarea {
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .text-muted,
+.o_sn_senedoo_financial_budget .o_field_widget .text-muted {
+  color: var(--sn-text-muted) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget input,
+.o_sn_senedoo_financial_budget .o_field_widget select,
+.o_sn_senedoo_financial_budget .o_field_widget textarea,
+.o_sn_senedoo_financial_budget .o_input,
+.o_sn_senedoo_financial_budget .o_field_many2one_selection .o_input {
+  background-color: var(--sn-bg-elevated) !important;
+  border-color: var(--sn-border) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_notebook_headers .nav-link {
+  color: var(--sn-text-muted) !important;
+  border-color: transparent !important;
+}
+
+.o_sn_senedoo_financial_budget .o_notebook_headers .nav-link.active,
+.o_sn_senedoo_financial_budget .o_notebook_headers .nav-link:hover {
+  color: var(--sn-text) !important;
+  background: var(--sn-bg-elevated) !important;
+  border-color: var(--sn-border) var(--sn-border) transparent !important;
+}
+
+.o_sn_senedoo_financial_budget .o_horizontal_separator {
+  color: var(--sn-text-muted) !important;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_group_sn_budget_analytic {
+  border: 1px solid var(--sn-violet-dark);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  background: var(--sn-bg-elevated);
+  box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.25);
+}
+
+.o_sn_senedoo_financial_budget .o_group_sn_budget_analytic .o_form_label {
+  color: var(--sn-text) !important;
+  font-weight: 600;
+}
+
+.o_sn_senedoo_financial_budget .btn-primary,
+.o_sn_senedoo_financial_budget .o_form_button_save,
+.o_sn_senedoo_financial_budget .o_form_button_create,
+.o_sn_senedoo_financial_budget button[name="save"],
+.o_sn_senedoo_financial_budget .o_statusbar_buttons .btn {
+  background: linear-gradient(180deg, var(--sn-violet) 0%, var(--sn-violet-dark) 100%) !important;
+  border-color: var(--sn-violet-dark) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .btn-primary:hover,
+.o_sn_senedoo_financial_budget .btn-primary:focus,
+.o_sn_senedoo_financial_budget .o_form_button_save:hover,
+.o_sn_senedoo_financial_budget .o_form_button_create:hover,
+.o_sn_senedoo_financial_budget .o_statusbar_buttons .btn:hover {
+  background: linear-gradient(180deg, var(--sn-violet-hover) 0%, var(--sn-violet) 100%) !important;
+  border-color: var(--sn-violet) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .btn-secondary,
+.o_sn_senedoo_financial_budget .btn-light,
+.o_sn_senedoo_financial_budget .o_form_button_cancel,
+.o_sn_senedoo_financial_budget .o_form_button_discard {
+  background: var(--sn-bg-elevated) !important;
+  border-color: var(--sn-violet) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .btn-secondary:hover,
+.o_sn_senedoo_financial_budget .btn-light:hover {
+  background: rgba(124, 77, 255, 0.2) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_statusbar > .o_statusbar_status > .o_arrow_button.btn {
+  background: var(--sn-bg-cell) !important;
+  color: var(--sn-text-muted) !important;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .o_list_renderer {
+  --ListRenderer-thead-bg-color: #161616;
+  background: var(--sn-bg) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .o_list_renderer .o_list_table thead th {
+  background: var(--sn-bg-elevated) !important;
+  color: var(--sn-text) !important;
+  font-weight: 600;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .o_list_renderer .o_list_table td {
+  background-color: var(--sn-bg) !important;
+  color: var(--sn-text) !important;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .o_list_renderer .o_data_row:nth-child(even) .o_data_cell {
+  background-color: var(--sn-bg-cell) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .o_list_renderer .o_data_row:hover .o_data_cell {
+  background-color: rgba(124, 77, 255, 0.15) !important;
+}
+
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .btn,
+.o_sn_senedoo_financial_budget .o_field_widget[name="item_ids"] .o_list_button_add {
+  background: linear-gradient(180deg, var(--sn-violet) 0%, var(--sn-violet-dark) 100%) !important;
+  border-color: var(--sn-violet-dark) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget .oe_title,
+.o_sn_senedoo_financial_budget .oe_title h1,
+.o_sn_senedoo_financial_budget .oe_title .o_field_widget,
+.o_sn_senedoo_financial_budget .oe_title input {
+  color: var(--sn-text) !important;
+}
+
+/* Barre d’action formulaire budget */
+.o_form_view:has(> form.o_sn_senedoo_financial_budget),
+.o_form_view:has(form.o_sn_senedoo_financial_budget) {
+  --sn-bg: #0a0a0a;
+  --sn-bg-elevated: #161616;
+  --sn-border: #333333;
+  --sn-text: #ffffff;
+  --sn-text-muted: #c4c4c4;
+  --sn-violet: #7c4dff;
+  --sn-violet-dark: #5b2c91;
+  --sn-violet-hover: #9575ff;
+}
+
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_control_panel,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_control_panel {
+  background: var(--sn-bg) !important;
+  border-bottom: 1px solid var(--sn-border) !important;
+}
+
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_control_panel_main_buttons .btn-primary,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_control_panel_main_buttons .btn-primary,
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_control_panel .o_cp_buttons .btn-primary,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_control_panel .o_cp_buttons .btn-primary {
+  background: linear-gradient(180deg, var(--sn-violet) 0%, var(--sn-violet-dark) 100%) !important;
+  border-color: var(--sn-violet-dark) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_control_panel .btn-secondary,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_control_panel .btn-secondary,
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_control_panel .o_form_button_create,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_control_panel .o_form_button_create {
+  background: var(--sn-bg-elevated) !important;
+  border-color: var(--sn-violet) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_breadcrumb,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_breadcrumb,
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_last_breadcrumb_item,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_last_breadcrumb_item,
+.o_form_view:has(> form.o_sn_senedoo_financial_budget) .o_cp_switch_buttons .btn-link,
+.o_form_view:has(form.o_sn_senedoo_financial_budget) .o_cp_switch_buttons .btn-link {
+  color: var(--sn-text-muted) !important;
+}
+
+/* ----- Listes : lignes OU en-têtes ----- */
+.o_sn_senedoo_financial_budget_lines,
+.o_sn_senedoo_financial_budget_headers {
+  background-color: var(--sn-bg) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .o_list_renderer,
+.o_sn_senedoo_financial_budget_headers .o_list_renderer {
+  background: var(--sn-bg) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .o_list_table thead th,
+.o_sn_senedoo_financial_budget_headers .o_list_table thead th {
+  background: var(--sn-bg-elevated) !important;
+  color: var(--sn-text) !important;
+  font-weight: 600;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .o_list_table td,
+.o_sn_senedoo_financial_budget_headers .o_list_table td {
+  background-color: var(--sn-bg) !important;
+  color: var(--sn-text) !important;
+  border-color: var(--sn-border) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .o_data_row:nth-child(even) .o_data_cell,
+.o_sn_senedoo_financial_budget_headers .o_data_row:nth-child(even) .o_data_cell {
+  background-color: var(--sn-bg-cell) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .o_data_row:hover .o_data_cell,
+.o_sn_senedoo_financial_budget_headers .o_data_row:hover .o_data_cell {
+  background-color: rgba(124, 77, 255, 0.15) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .btn-primary,
+.o_sn_senedoo_financial_budget_lines .o_list_button_add,
+.o_sn_senedoo_financial_budget_lines .o_field_x2many_list_row_add a,
+.o_sn_senedoo_financial_budget_headers .btn-primary,
+.o_sn_senedoo_financial_budget_headers .o_list_button_add,
+.o_sn_senedoo_financial_budget_headers .o_field_x2many_list_row_add a {
+  background: linear-gradient(180deg, var(--sn-violet) 0%, var(--sn-violet-dark) 100%) !important;
+  border-color: var(--sn-violet-dark) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .btn-secondary,
+.o_sn_senedoo_financial_budget_lines .btn-light,
+.o_sn_senedoo_financial_budget_headers .btn-secondary,
+.o_sn_senedoo_financial_budget_headers .btn-light {
+  background: var(--sn-bg-elevated) !important;
+  border-color: var(--sn-violet) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines input,
+.o_sn_senedoo_financial_budget_lines select,
+.o_sn_senedoo_financial_budget_lines textarea,
+.o_sn_senedoo_financial_budget_lines .o_input,
+.o_sn_senedoo_financial_budget_headers input,
+.o_sn_senedoo_financial_budget_headers select,
+.o_sn_senedoo_financial_budget_headers textarea,
+.o_sn_senedoo_financial_budget_headers .o_input {
+  background-color: var(--sn-bg-elevated) !important;
+  border-color: var(--sn-border) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_sn_senedoo_financial_budget_lines .o_form_label,
+.o_sn_senedoo_financial_budget_lines label,
+.o_sn_senedoo_financial_budget_headers .o_form_label,
+.o_sn_senedoo_financial_budget_headers label {
+  color: var(--sn-text) !important;
+}
+
+/* Zone liste + panneau (OWL enveloppe souvent la liste) */
+.o_list_view:has(.o_sn_senedoo_financial_budget_lines),
+.o_list_view:has(.o_sn_senedoo_financial_budget_headers),
+.o_action:has(.o_sn_senedoo_financial_budget_lines),
+.o_action:has(.o_sn_senedoo_financial_budget_headers) {
+  --sn-bg: #0a0a0a;
+  --sn-bg-elevated: #161616;
+  --sn-border: #333333;
+  --sn-text: #ffffff;
+  --sn-text-muted: #c4c4c4;
+  --sn-violet: #7c4dff;
+  --sn-violet-dark: #5b2c91;
+  --sn-violet-hover: #9575ff;
+}
+
+.o_list_view:has(.o_sn_senedoo_financial_budget_lines) .o_control_panel,
+.o_list_view:has(.o_sn_senedoo_financial_budget_headers) .o_control_panel,
+.o_action:has(.o_sn_senedoo_financial_budget_lines) .o_control_panel,
+.o_action:has(.o_sn_senedoo_financial_budget_headers) .o_control_panel {
+  background: var(--sn-bg) !important;
+  border-bottom: 1px solid var(--sn-border) !important;
+}
+
+.o_list_view:has(.o_sn_senedoo_financial_budget_lines) .o_control_panel_main_buttons .btn-primary,
+.o_list_view:has(.o_sn_senedoo_financial_budget_headers) .o_control_panel_main_buttons .btn-primary,
+.o_action:has(.o_sn_senedoo_financial_budget_lines) .o_control_panel_main_buttons .btn-primary,
+.o_action:has(.o_sn_senedoo_financial_budget_headers) .o_control_panel_main_buttons .btn-primary,
+.o_list_view:has(.o_sn_senedoo_financial_budget_lines) .o_control_panel .o_cp_buttons .btn-primary,
+.o_list_view:has(.o_sn_senedoo_financial_budget_headers) .o_control_panel .o_cp_buttons .btn-primary,
+.o_action:has(.o_sn_senedoo_financial_budget_lines) .o_control_panel .o_cp_buttons .btn-primary,
+.o_action:has(.o_sn_senedoo_financial_budget_headers) .o_control_panel .o_cp_buttons .btn-primary {
+  background: linear-gradient(180deg, var(--sn-violet) 0%, var(--sn-violet-dark) 100%) !important;
+  border-color: var(--sn-violet-dark) !important;
+  color: var(--sn-text) !important;
+}
+
+.o_list_view:has(.o_sn_senedoo_financial_budget_lines) .o_breadcrumb,
+.o_list_view:has(.o_sn_senedoo_financial_budget_headers) .o_breadcrumb,
+.o_action:has(.o_sn_senedoo_financial_budget_lines) .o_breadcrumb,
+.o_action:has(.o_sn_senedoo_financial_budget_headers) .o_breadcrumb,
+.o_list_view:has(.o_sn_senedoo_financial_budget_lines) .o_last_breadcrumb_item,
+.o_list_view:has(.o_sn_senedoo_financial_budget_headers) .o_last_breadcrumb_item,
+.o_action:has(.o_sn_senedoo_financial_budget_lines) .o_last_breadcrumb_item,
+.o_action:has(.o_sn_senedoo_financial_budget_headers) .o_last_breadcrumb_item {
+  color: var(--sn-text-muted) !important;
+}
+
+/* Fond sombre sur le canevas liste (hors cellules déjà traitées) */
+.o_action:has(.o_sn_senedoo_financial_budget_lines) .o_content,
+.o_action:has(.o_sn_senedoo_financial_budget_headers) .o_content {
+  background: var(--sn-bg) !important;
+}
