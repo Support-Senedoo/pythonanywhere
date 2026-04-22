@@ -82,6 +82,7 @@ SN_BUDGET_TOOLBOX_IMD_MODULE = "sn_budget_toolbox"
 SN_BUDGET_FORM_VIEW_IMD_NAME = "account_report_budget_form_senedoo_toolbox"
 SN_BUDGET_ITEM_LIST_VIEW_IMD_NAME = "account_report_budget_item_list_senedoo_toolbox"
 SN_BUDGET_HEADER_LIST_VIEW_IMD_NAME = "account_report_budget_tree_senedoo_toolbox"
+SN_BUDGET_HEADER_KANBAN_VIEW_IMD_NAME = "account_report_budget_kanban_senedoo_toolbox"
 SN_BUDGET_SCSS_ATTACHMENT_IMD_NAME = "senedoo_budget_toolbox_backend_scss"
 SN_BUDGET_SCSS_ASSET_IMD_NAME = "senedoo_budget_toolbox_backend_asset"
 # Héritage formulaire budget : xmlid standard Enterprise 18.x (nom sans préfixe view_).
@@ -1067,6 +1068,276 @@ def _primary_list_view_id(
     return None
 
 
+def _kanban_view_ids_for_model(
+    models: Any, db: str, uid: int, pwd: str, model_name: str
+) -> list[int]:
+    ids = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.view",
+            "search",
+            [[["model", "=", model_name], ["type", "=", "kanban"]]],
+            {"order": "priority asc, id asc"},
+        )
+        or []
+    )
+    return [int(i) for i in ids]
+
+
+def _toolbox_budget_header_kanban_view_id(
+    models: Any, db: str, uid: int, pwd: str
+) -> int | None:
+    rows = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", SN_BUDGET_TOOLBOX_IMD_MODULE], ["name", "=", SN_BUDGET_HEADER_KANBAN_VIEW_IMD_NAME]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    if not rows or not rows[0].get("res_id"):
+        return None
+    return int(rows[0]["res_id"])
+
+
+def _budget_header_kanban_templates_inner(field_names: set[str]) -> str:
+    """Corps du template kanban-box (carte Senedoo)."""
+    has_df = "date_from" in field_names
+    has_dt = "date_to" in field_names
+    has_rep = "report_id" in field_names
+    analytic_f: str | None = None
+    if "x_analytic_account_id" in field_names:
+        analytic_f = "x_analytic_account_id"
+    elif "analytic_account_id" in field_names:
+        analytic_f = "analytic_account_id"
+
+    dates_block = ""
+    if has_df or has_dt:
+        parts = []
+        if has_df:
+            parts.append(
+                """<span t-if="record.date_from.raw_value" class="o_sn_budget_kanban_meta_line">
+              <i class="fa fa-calendar-o me-1"/> Du <field name="date_from"/>
+            </span>"""
+            )
+        if has_dt:
+            parts.append(
+                """<span t-if="record.date_to.raw_value" class="o_sn_budget_kanban_meta_line">
+              <i class="fa fa-calendar-o me-1"/> Au <field name="date_to"/>
+            </span>"""
+            )
+        dates_block = (
+            '<div class="o_sn_budget_kanban_dates text-muted small">'
+            + "".join(parts)
+            + "</div>"
+        )
+
+    report_block = ""
+    if has_rep:
+        report_block = """<div t-if="record.report_id.raw_value" class="o_sn_budget_kanban_report small text-muted text-truncate">
+          <i class="fa fa-bar-chart me-1"/> <field name="report_id"/>
+        </div>"""
+
+    analytic_block = ""
+    if analytic_f:
+        analytic_block = f"""<div t-if="record.{analytic_f}.raw_value" class="o_sn_budget_kanban_analytic small">
+          <i class="fa fa-crosshairs me-1 o_sn_budget_kanban_icon"/> <field name="{analytic_f}"/>
+        </div>"""
+
+    company_block = ""
+    if "company_id" in field_names:
+        company_block = """<div t-if="record.company_id.raw_value" class="o_sn_budget_kanban_company small text-muted mb-1">
+          <i class="fa fa-building-o me-1"/> <field name="company_id"/>
+        </div>"""
+
+    return f"""<div class="oe_kanban_card oe_kanban_global_click o_sn_budget_kanban_card h-100">
+      <div class="o_sn_budget_kanban_card_inner d-flex flex-column h-100">
+        <div class="o_sn_budget_kanban_title text-truncate fw-bold fs-5 mb-2">
+          <field name="name"/>
+        </div>
+        {dates_block}
+        {company_block}
+        {report_block}
+        {analytic_block}
+        <div class="o_sn_budget_kanban_footer mt-auto pt-2 text-end">
+          <span class="badge rounded-pill o_sn_budget_kanban_badge">Budget</span>
+        </div>
+      </div>
+    </div>"""
+
+
+def _budget_header_kanban_field_declarations(field_names: set[str]) -> str:
+    decl: list[str] = ["name"]
+    if "company_id" in field_names:
+        decl.append("company_id")
+    for n in ("date_from", "date_to", "report_id", "x_analytic_account_id", "analytic_account_id"):
+        if n in field_names and n not in decl:
+            decl.append(n)
+    return "\n    ".join(f'<field name="{n}"/>' for n in decl)
+
+
+def _budget_header_kanban_arch_primary(field_names: set[str]) -> str:
+    fields_xml = _budget_header_kanban_field_declarations(field_names)
+    inner = _budget_header_kanban_templates_inner(field_names)
+    return f"""<kanban class="o_sn_senedoo_budget_headers_kanban" create="false" default_order="name asc">
+    {fields_xml}
+    <templates>
+        <t t-name="kanban-box">
+            {inner}
+        </t>
+    </templates>
+</kanban>"""
+
+
+def _budget_header_kanban_arch_extension(field_names: set[str]) -> str:
+    """Vue extension : autre kanban présent sur le modèle (héritage + remplacement du template)."""
+    inner = _budget_header_kanban_templates_inner(field_names)
+    return f"""<data>
+  <xpath expr="//kanban" position="attributes">
+    <attribute name="class" add="o_sn_senedoo_budget_headers_kanban" separator=" "/>
+  </xpath>
+  <xpath expr="//templates" position="replace">
+    <templates>
+        <t t-name="kanban-box">
+            {inner}
+        </t>
+    </templates>
+  </xpath>
+</data>"""
+
+
+def ensure_budget_report_senedoo_budget_header_kanban_view(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Vue **kanban** pour les en-têtes ``account.report.budget`` (cartes Senedoo).
+
+    Si aucune vue kanban n'existe sur le modèle : création d'une vue **primaire**.
+    Sinon : extension de la première vue kanban existante (hors celle de la toolbox).
+    """
+    model_name = "account.report.budget"
+    if not _model_exists(models, db, uid, pwd, model_name):
+        return {"status": "missing_model", "ok": False}
+
+    try:
+        fg = _ek(models, db, uid, pwd, model_name, "fields_get", [[]], {})
+    except Exception as e:
+        return {"status": "fields_get_error", "ok": False, "error": str(e)}
+    field_names = set(fg.keys()) if isinstance(fg, dict) else set()
+
+    existing_tid = _toolbox_budget_header_kanban_view_id(models, db, uid, pwd)
+    all_k = _kanban_view_ids_for_model(models, db, uid, pwd, model_name)
+
+    arch_primary = _budget_header_kanban_arch_primary(field_names)
+    arch_ext = _budget_header_kanban_arch_extension(field_names)
+
+    if existing_tid:
+        row = (
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.ui.view",
+                "read",
+                [[existing_tid]],
+                {"fields": ["inherit_id", "mode", "type"]},
+            )
+            or [{}]
+        )[0]
+        inherit_id = row.get("inherit_id")
+        inherit_val = inherit_id[0] if isinstance(inherit_id, (list, tuple)) and inherit_id else inherit_id
+        use_arch = arch_ext if inherit_val else arch_primary
+        _ek(models, db, uid, pwd, "ir.ui.view", "write", [[existing_tid], {"arch": use_arch}])
+        return {
+            "status": "updated",
+            "ok": True,
+            "view_id": existing_tid,
+            "inherit_id": int(inherit_val) if inherit_val else None,
+        }
+
+    foreign = [vid for vid in all_k]
+    if foreign:
+        parent_id = int(foreign[0])
+        vid = _rpc_create_id(
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.ui.view",
+                "create",
+                [
+                    {
+                        "name": "account.report.budget.kanban.headers.senedoo.toolbox",
+                        "model": model_name,
+                        "inherit_id": parent_id,
+                        "mode": "extension",
+                        "type": "kanban",
+                        "arch": arch_ext,
+                        "priority": 99,
+                    }
+                ],
+            )
+        )
+        if not vid:
+            return {"status": "error", "ok": False, "error": "create ir.ui.view kanban extension a retourne vide."}
+        _ensure_toolbox_xml_id(
+            models,
+            db,
+            uid,
+            pwd,
+            name=SN_BUDGET_HEADER_KANBAN_VIEW_IMD_NAME,
+            model="ir.ui.view",
+            res_id=vid,
+        )
+        return {"status": "created", "ok": True, "view_id": vid, "inherit_id": parent_id}
+
+    vid = _rpc_create_id(
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.view",
+            "create",
+                [
+                    {
+                        "name": "account.report.budget.kanban.headers.senedoo.toolbox",
+                        "model": model_name,
+                        "mode": "primary",
+                        "type": "kanban",
+                        "arch": arch_primary,
+                        "priority": 16,
+                    }
+                ],
+        )
+    )
+    if not vid:
+        return {"status": "error", "ok": False, "error": "create ir.ui.view kanban primary a retourne vide."}
+    _ensure_toolbox_xml_id(
+        models,
+        db,
+        uid,
+        pwd,
+        name=SN_BUDGET_HEADER_KANBAN_VIEW_IMD_NAME,
+        model="ir.ui.view",
+        res_id=vid,
+    )
+    return {"status": "created", "ok": True, "view_id": vid, "inherit_id": None}
+
+
 def _ensure_toolbox_xml_id(
     models: Any,
     db: str,
@@ -1460,12 +1731,24 @@ def ensure_budget_report_senedoo_budget_views(
     uid: int,
     pwd: str,
 ) -> dict[str, Any]:
-    """Formulaire budget + listes en-têtes et lignes (UX Senedoo)."""
+    """Formulaire budget + listes en-têtes et lignes + kanban en-têtes (UX Senedoo)."""
     form = ensure_budget_report_senedoo_budget_form_view(models, db, uid, pwd)
     header_list = ensure_budget_report_senedoo_budget_header_list_view(models, db, uid, pwd)
+    header_kanban = ensure_budget_report_senedoo_budget_header_kanban_view(models, db, uid, pwd)
     item_list = ensure_budget_report_senedoo_budget_item_list_view(models, db, uid, pwd)
-    ok = bool(form.get("ok")) and bool(header_list.get("ok")) and bool(item_list.get("ok"))
-    return {"form": form, "header_list": header_list, "item_list": item_list, "ok": ok}
+    ok = (
+        bool(form.get("ok"))
+        and bool(header_list.get("ok"))
+        and bool(header_kanban.get("ok"))
+        and bool(item_list.get("ok"))
+    )
+    return {
+        "form": form,
+        "header_list": header_list,
+        "header_kanban": header_kanban,
+        "item_list": item_list,
+        "ok": ok,
+    }
 
 
 def _toolbox_static_dir() -> Path:

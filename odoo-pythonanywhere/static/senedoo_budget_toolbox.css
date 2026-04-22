@@ -463,3 +463,77 @@
     radial-gradient(800px 400px at 100% 0%, rgba(240, 180, 41, 0.05), transparent),
     var(--sn-bg) !important;
 }
+
+/* ----- Kanban en-têtes budget (cartes Senedoo) ----- */
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_content {
+  background: radial-gradient(1200px 600px at 10% -10%, rgba(156, 86, 247, 0.18), transparent),
+    radial-gradient(800px 400px at 100% 0%, rgba(240, 180, 41, 0.05), transparent),
+    #110e21 !important;
+}
+
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel {
+  background: #110e21 !important;
+  border-bottom: 1px solid #2e2a48 !important;
+}
+
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel .o_searchview .o_searchview_input,
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel .o_searchview input.o_searchview_input {
+  background-color: #fff !important;
+  color: #1a1028 !important;
+  border-color: rgba(156, 86, 247, 0.45) !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban.o_kanban_view,
+.o_kanban_view.o_sn_senedoo_budget_headers_kanban {
+  background: transparent !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_kanban_grouped,
+.o_sn_senedoo_budget_headers_kanban .o_kanban_ungrouped {
+  background: transparent !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_kanban_record {
+  padding: 0.35rem !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_card {
+  border-radius: 12px !important;
+  border: 1px solid rgba(156, 86, 247, 0.35) !important;
+  border-left: 4px solid #9c56f7 !important;
+  background: linear-gradient(155deg, #1c1a32 0%, #151228 100%) !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.38) !important;
+  min-height: 132px !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 14px 40px rgba(156, 86, 247, 0.22), 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  border-color: rgba(156, 86, 247, 0.55) !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_title,
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_title .o_field_widget {
+  color: #f4f2ff !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_meta_line,
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_dates,
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_company,
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_report,
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_analytic {
+  color: #9ca3c7 !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_icon {
+  color: #9c56f7 !important;
+}
+
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_badge {
+  background: linear-gradient(165deg, #9c56f7, #5b21a6) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  padding: 0.35rem 0.75rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}

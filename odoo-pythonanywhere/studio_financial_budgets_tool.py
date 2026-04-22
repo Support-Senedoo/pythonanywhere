@@ -11,7 +11,7 @@ Objectifs :
   - analyser une base (champs natifs + Studio / champs manuels, budgets existants) ;
   - **provision-financial-budget** : menus **« Budget Senedoo »** (racine configurable)
     + champs ``x_analytic_account_id`` sur en-tête et lignes — idempotent ;
-    + vues formulaire / liste (numéro de compte, analytique), **icône** menu (PNG violet / blanc)
+    + vues formulaire / liste / **kanban** en-têtes (numéro de compte, analytique), **icône** menu (PNG violet / blanc)
     et **charte** (CSS ``web.assets_backend``, classes ``o_sn_senedoo_financial_budget*``) ;
   - gérer les **noms** de budget et le **lien optionnel** vers un **compte analytique existant**
     (filtrage / cohérence avec le wizard « Budget par projet », sans remplacer un budget analytique) ;
@@ -1087,7 +1087,7 @@ def provision_financial_budget_toolbox(
 
     act_header_name = f"{root_label} — En-têtes"
     act_lines_name = f"{root_label} — Lignes"
-    view_hdr = "list,form"
+    view_hdr = "kanban,list,form"
     view_lines = "list,form"
 
     ah_id, ah_st = _find_or_create_act_window(
@@ -1098,6 +1098,16 @@ def provision_financial_budget_toolbox(
         name=act_header_name,
         res_model="account.report.budget",
         view_mode=view_hdr,
+    )
+    # Toujours proposer le kanban en premier (même si l’action existait en list,form seulement).
+    _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.actions.act_window",
+        "write",
+        args=[[ah_id], {"view_mode": view_hdr}],
     )
     al_id, al_st = _find_or_create_act_window(
         models,
