@@ -20,6 +20,9 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
+Le provision **Budget Senedoo** ajoute aussi ``x_sn_account_code`` (numéro de compte sur les lignes),
+des **vues** héritées (analytique + colonnes), une **icône** menu (``web_icon_data``) et une feuille
+**SCSS** (``ir.attachment`` + ``ir.asset`` → ``web.assets_backend``, classes ``o_sn_senedoo_financial_budget*``).
 Des règles ``ir.model.access`` sont créées sur le modèle wizard pour les **profils comptables**
 (Facturation / Comptable / Responsable) : sans elles, Odoo **masque l’entrée de menu** pour les
 utilisateurs qui ne sont pas administrateurs techniques.
@@ -32,6 +35,8 @@ Usage Flask toolbox (action staff.py) :
 """
 from __future__ import annotations
 
+import base64
+from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -65,6 +70,20 @@ BUDGET_ANALYTIC_FIELD_NAME = "x_analytic_account_id"
 BUDGET_MODELS_WITH_ANALYTIC_M2O = (
     "account.report.budget",
     "account.report.budget.item",
+)
+
+# Champ lié (code compte général) sur les lignes de budget financier — affichage liste / formulaire.
+BUDGET_ITEM_ACCOUNT_CODE_FIELD_NAME = "x_sn_account_code"
+# Espace de noms XML pour les vues / pièces jointes créées par la toolbox (hors module installable).
+SN_BUDGET_TOOLBOX_IMD_MODULE = "sn_budget_toolbox"
+SN_BUDGET_FORM_VIEW_IMD_NAME = "account_report_budget_form_senedoo_toolbox"
+SN_BUDGET_ITEM_LIST_VIEW_IMD_NAME = "account_report_budget_item_list_senedoo_toolbox"
+SN_BUDGET_SCSS_ATTACHMENT_IMD_NAME = "senedoo_budget_toolbox_backend_scss"
+SN_BUDGET_SCSS_ASSET_IMD_NAME = "senedoo_budget_toolbox_backend_asset"
+# Héritage formulaire budget : xmlid standard Enterprise 18.x (nom sans préfixe view_).
+BUDGET_FORM_VIEW_XMLID_CANDIDATES: tuple[tuple[str, str], ...] = (
+    ("account_reports", "account_report_budget_form"),
+    ("account_reports", "view_account_report_budget_form"),
 )
 
 # Groupes Odoo (res.groups) qui doivent voir le menu + ouvrir le formulaire wizard.
@@ -952,6 +971,544 @@ def ensure_budget_report_analytic_fields(
     return {"by_model": out, "ok": all(
         v.get("status") in ("created", "skipped") for v in out.values()
     )}
+
+
+def _rpc_create_id(val: Any) -> int | None:
+    if val in (None, False):
+        return None
+    if isinstance(val, (list, tuple)):
+        return int(val[0]) if val else None
+    return int(val)
+
+
+def _view_id_from_xmlid(
+    models: Any, db: str, uid: int, pwd: str, module: str, xml_name: str
+) -> int | None:
+    rows = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", module], ["name", "=", xml_name], ["model", "=", "ir.ui.view"]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    if not rows:
+        return None
+    rid = rows[0].get("res_id")
+    return int(rid) if rid else None
+
+
+def _resolve_account_report_budget_form_view_id(
+    models: Any, db: str, uid: int, pwd: str
+) -> int | None:
+    for mod, xname in BUDGET_FORM_VIEW_XMLID_CANDIDATES:
+        vid = _view_id_from_xmlid(models, db, uid, pwd, mod, xname)
+        if vid:
+            return vid
+    ids = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.view",
+            "search",
+            [[["model", "=", "account.report.budget"], ["type", "=", "form"], ["mode", "=", "primary"]]],
+            {"limit": 1, "order": "id asc"},
+        )
+        or []
+    )
+    return int(ids[0]) if ids else None
+
+
+def _primary_list_view_id(
+    models: Any, db: str, uid: int, pwd: str, model_name: str
+) -> int | None:
+    for vtype in ("list", "tree"):
+        ids = (
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.ui.view",
+                "search",
+                [[["model", "=", model_name], ["type", "=", vtype], ["mode", "=", "primary"]]],
+                {"limit": 1, "order": "id asc"},
+            )
+            or []
+        )
+        if ids:
+            return int(ids[0])
+    return None
+
+
+def _ensure_toolbox_xml_id(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+    *,
+    name: str,
+    model: str,
+    res_id: int,
+) -> str:
+    found = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search",
+            [[["module", "=", SN_BUDGET_TOOLBOX_IMD_MODULE], ["name", "=", name]]],
+            {"limit": 1},
+        )
+        or []
+    )
+    if found:
+        return "exists"
+    _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.model.data",
+        "create",
+        [
+            {
+                "module": SN_BUDGET_TOOLBOX_IMD_MODULE,
+                "name": name,
+                "model": model,
+                "res_id": int(res_id),
+            }
+        ],
+    )
+    return "created"
+
+
+def ensure_budget_report_item_account_code_field(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Crée ``x_sn_account_code`` (Char lié ``account_id.code``) sur ``account.report.budget.item``.
+
+    Sert d’affichage explicite du **numéro de compte** sur les lignes (complément du many2one compte).
+    """
+    model_name = "account.report.budget.item"
+    if not _model_exists(models, db, uid, pwd, model_name):
+        return {"status": "missing_model", "ok": False}
+    if not _field_exists(models, db, uid, pwd, model_name, "account_id"):
+        return {"status": "missing_account_id", "ok": False, "note": "Champ account_id absent."}
+    if _field_exists(models, db, uid, pwd, model_name, BUDGET_ITEM_ACCOUNT_CODE_FIELD_NAME):
+        return {"status": "skipped", "ok": True, "note": "Champ deja present."}
+    try:
+        mid = _get_model_id(models, db, uid, pwd, model_name)
+        fid = _rpc_create_id(
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.model.fields",
+                "create",
+                [
+                    {
+                        "name": BUDGET_ITEM_ACCOUNT_CODE_FIELD_NAME,
+                        "field_description": "Numero de compte (Senedoo)",
+                        "ttype": "char",
+                        "model_id": mid,
+                        "state": "manual",
+                        "related": "account_id.code",
+                        "readonly": True,
+                        "store": False,
+                    }
+                ],
+            )
+        )
+        return {"status": "created", "ok": True, "field_id": fid}
+    except Exception as e:
+        return {"status": "error", "ok": False, "error": str(e)}
+
+
+def ensure_budget_report_senedoo_budget_form_view(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Vue formulaire héritée : analytique sur l’en-tête, colonnes **numéro de compte** + analytique
+    dans la sous-liste ``item_ids``.
+    """
+    inherit_id = _resolve_account_report_budget_form_view_id(models, db, uid, pwd)
+    if not inherit_id:
+        return {"status": "missing_parent_view", "ok": False}
+
+    arch = """<data>
+  <xpath expr="//form" position="attributes">
+    <attribute name="class" add="o_sn_senedoo_financial_budget" separator=" "/>
+  </xpath>
+  <xpath expr="//sheet" position="inside">
+    <group string="Compte analytique (Senedoo)" name="o_group_sn_budget_analytic" class="o_group_sn_budget_analytic">
+      <field name="x_analytic_account_id" options="{'no_create': True, 'no_create_edit': True}"/>
+    </group>
+  </xpath>
+  <xpath expr="//field[@name='item_ids']/list/field[@name='account_id']" position="after">
+    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1" width="12%%"/>
+    <field name="x_analytic_account_id" string="Compte analytique (ligne)" optional="show"
+           options="{'no_create': True, 'no_create_edit': True}" width="18%%"/>
+  </xpath>
+</data>"""
+
+    existing = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", SN_BUDGET_TOOLBOX_IMD_MODULE], ["name", "=", SN_BUDGET_FORM_VIEW_IMD_NAME]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    if existing and existing[0].get("res_id"):
+        vid = int(existing[0]["res_id"])
+        _ek(models, db, uid, pwd, "ir.ui.view", "write", [[vid], {"arch": arch}])
+        return {"status": "updated", "ok": True, "view_id": vid, "inherit_id": inherit_id}
+
+    vid = _rpc_create_id(
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.view",
+            "create",
+            [
+                {
+                    "name": "account.report.budget.form.senedoo.toolbox",
+                    "model": "account.report.budget",
+                    "inherit_id": inherit_id,
+                    "mode": "extension",
+                    "type": "form",
+                    "arch": arch,
+                    "priority": 90,
+                }
+            ],
+        )
+    )
+    if not vid:
+        return {"status": "error", "ok": False, "error": "create ir.ui.view a retourne vide."}
+    _ensure_toolbox_xml_id(
+        models,
+        db,
+        uid,
+        pwd,
+        name=SN_BUDGET_FORM_VIEW_IMD_NAME,
+        model="ir.ui.view",
+        res_id=vid,
+    )
+    return {"status": "created", "ok": True, "view_id": vid, "inherit_id": inherit_id}
+
+
+def ensure_budget_report_senedoo_budget_item_list_view(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Enrichit la liste primaire ``account.report.budget.item`` (menu « Lignes de budget ») :
+    budget, compte, numéro, période, montant, analytique.
+    """
+    model_name = "account.report.budget.item"
+    inherit_id = _primary_list_view_id(models, db, uid, pwd, model_name)
+    if not inherit_id:
+        return {"status": "missing_parent_view", "ok": False}
+
+    arch = """<data>
+  <xpath expr="//list" position="attributes">
+    <attribute name="string">Lignes budget financier (Senedoo)</attribute>
+    <attribute name="editable">bottom</attribute>
+    <attribute name="class" add="o_sn_senedoo_financial_budget_lines" separator=" "/>
+  </xpath>
+  <xpath expr="//field[@name='id']" position="replace">
+    <field name="budget_id" optional="show"/>
+    <field name="account_id" optional="hide"/>
+    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1"/>
+    <field name="date"/>
+    <field name="amount"/>
+    <field name="x_analytic_account_id" optional="show" options="{'no_create': True, 'no_create_edit': True}"/>
+  </xpath>
+</data>"""
+
+    existing = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", SN_BUDGET_TOOLBOX_IMD_MODULE], ["name", "=", SN_BUDGET_ITEM_LIST_VIEW_IMD_NAME]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    if existing and existing[0].get("res_id"):
+        vid = int(existing[0]["res_id"])
+        _ek(models, db, uid, pwd, "ir.ui.view", "write", [[vid], {"arch": arch}])
+        return {"status": "updated", "ok": True, "view_id": vid, "inherit_id": inherit_id}
+
+    vid = _rpc_create_id(
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.ui.view",
+            "create",
+            [
+                {
+                    "name": "account.report.budget.item.list.senedoo.toolbox",
+                    "model": model_name,
+                    "inherit_id": inherit_id,
+                    "mode": "extension",
+                    "type": "list",
+                    "arch": arch,
+                    "priority": 90,
+                }
+            ],
+        )
+    )
+    if not vid:
+        return {"status": "error", "ok": False, "error": "create ir.ui.view a retourne vide."}
+    _ensure_toolbox_xml_id(
+        models,
+        db,
+        uid,
+        pwd,
+        name=SN_BUDGET_ITEM_LIST_VIEW_IMD_NAME,
+        model="ir.ui.view",
+        res_id=vid,
+    )
+    return {"status": "created", "ok": True, "view_id": vid, "inherit_id": inherit_id}
+
+
+def ensure_budget_report_senedoo_budget_views(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """Formulaire budget + liste des lignes (UX Senedoo)."""
+    form = ensure_budget_report_senedoo_budget_form_view(models, db, uid, pwd)
+    item_list = ensure_budget_report_senedoo_budget_item_list_view(models, db, uid, pwd)
+    ok = bool(form.get("ok")) and bool(item_list.get("ok"))
+    return {"form": form, "item_list": item_list, "ok": ok}
+
+
+def _toolbox_static_dir() -> Path:
+    return Path(__file__).resolve().parent / "static"
+
+
+def ensure_senedoo_financial_budget_toolbox_backend_scss_asset(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Publie une feuille SCSS (charte Senedoo) dans ``web.assets_backend`` via ``ir.attachment``
+    + ``ir.asset`` (URL ``/web/content/<id>`` — non agrégable, servie comme ressource externe).
+
+    Périmètre volontairement **restreint** aux classes ``o_sn_senedoo_financial_budget*`` pour ne pas
+    recolorer tout le backend Odoo.
+    """
+    scss_path = _toolbox_static_dir() / "senedoo_budget_toolbox.scss"
+    if not scss_path.is_file():
+        return {"status": "missing_file", "ok": False, "path": str(scss_path)}
+
+    scss_bytes = scss_path.read_bytes()
+    b64 = base64.b64encode(scss_bytes).decode("ascii")
+    att_name = "senedoo_budget_toolbox_backend.scss"
+
+    att_rows = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", SN_BUDGET_TOOLBOX_IMD_MODULE], ["name", "=", SN_BUDGET_SCSS_ATTACHMENT_IMD_NAME]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    if att_rows and att_rows[0].get("res_id"):
+        att_id = int(att_rows[0]["res_id"])
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.attachment",
+            "write",
+            [[att_id], {"datas": b64, "mimetype": "text/scss", "name": att_name, "public": True}],
+        )
+        att_status = "updated"
+    else:
+        att_id = _rpc_create_id(
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.attachment",
+                "create",
+                [
+                    {
+                        "name": att_name,
+                        "type": "binary",
+                        "mimetype": "text/scss",
+                        "datas": b64,
+                        "public": True,
+                    }
+                ],
+            )
+        )
+        if not att_id:
+            return {"status": "error", "ok": False, "error": "Echec creation ir.attachment SCSS."}
+        _ensure_toolbox_xml_id(
+            models,
+            db,
+            uid,
+            pwd,
+            name=SN_BUDGET_SCSS_ATTACHMENT_IMD_NAME,
+            model="ir.attachment",
+            res_id=att_id,
+        )
+        att_status = "created"
+
+    content_path = f"/web/content/{int(att_id)}"
+    asset_name = "Senedoo — charte budget financier (SCSS toolbox)"
+
+    asset_rows = (
+        _ek(
+            models,
+            db,
+            uid,
+            pwd,
+            "ir.model.data",
+            "search_read",
+            [[["module", "=", SN_BUDGET_TOOLBOX_IMD_MODULE], ["name", "=", SN_BUDGET_SCSS_ASSET_IMD_NAME]]],
+            {"fields": ["res_id"], "limit": 1},
+        )
+        or []
+    )
+    asset_vals = {
+        "name": asset_name,
+        "bundle": "web.assets_backend",
+        "directive": "append",
+        "path": content_path,
+        "sequence": 120,
+        "active": True,
+    }
+    if asset_rows and asset_rows[0].get("res_id"):
+        asset_id = int(asset_rows[0]["res_id"])
+        _ek(models, db, uid, pwd, "ir.asset", "write", [[asset_id], asset_vals])
+        asset_status = "updated"
+    else:
+        asset_id = _rpc_create_id(
+            _ek(models, db, uid, pwd, "ir.asset", "create", [asset_vals])
+        )
+        if not asset_id:
+            return {"status": "error", "ok": False, "error": "Echec creation ir.asset SCSS."}
+        _ensure_toolbox_xml_id(
+            models,
+            db,
+            uid,
+            pwd,
+            name=SN_BUDGET_SCSS_ASSET_IMD_NAME,
+            model="ir.asset",
+            res_id=asset_id,
+        )
+        asset_status = "created"
+
+    return {
+        "ok": True,
+        "status": "ok",
+        "attachment_id": int(att_id),
+        "attachment_status": att_status,
+        "asset_id": int(asset_id),
+        "asset_status": asset_status,
+        "content_url": content_path,
+    }
+
+
+def ensure_senedoo_financial_budget_root_menu_icon(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+    *,
+    root_menu_id: int,
+) -> dict[str, Any]:
+    """
+    Dépose une icône PNG (dégradé violet / blanc) sur le menu racine « Budget Senedoo ».
+
+    Fichier source : ``static/senedoo_budget_menu_icon.png`` à côté de ce script.
+    """
+    icon_path = _toolbox_static_dir() / "senedoo_budget_menu_icon.png"
+    if not icon_path.is_file():
+        return {"status": "missing_file", "ok": False, "path": str(icon_path)}
+    png_b64 = base64.b64encode(icon_path.read_bytes()).decode("ascii")
+    _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.ui.menu",
+        "write",
+        [[int(root_menu_id)], {"web_icon_data": png_b64}],
+    )
+    return {"status": "written", "ok": True, "menu_id": int(root_menu_id)}
+
+
+def ensure_senedoo_financial_budget_toolbox_branding(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+    *,
+    root_menu_id: int | None,
+) -> dict[str, Any]:
+    """Icône menu racine + asset SCSS backend (charte limitée aux écrans toolbox)."""
+    out: dict[str, Any] = {"scss_asset": {}, "menu_icon": {}}
+    out["scss_asset"] = ensure_senedoo_financial_budget_toolbox_backend_scss_asset(models, db, uid, pwd)
+    if root_menu_id:
+        try:
+            out["menu_icon"] = ensure_senedoo_financial_budget_root_menu_icon(
+                models, db, uid, pwd, root_menu_id=int(root_menu_id)
+            )
+        except Exception as e:
+            out["menu_icon"] = {"ok": False, "status": "error", "error": str(e)}
+    else:
+        out["menu_icon"] = {"ok": False, "status": "skipped", "note": "menu racine inconnu."}
+    out["ok"] = bool(out["scss_asset"].get("ok")) and bool(out["menu_icon"].get("ok"))
+    return out
 
 
 def _install_fresh_toolbox_cpc_budget_report(

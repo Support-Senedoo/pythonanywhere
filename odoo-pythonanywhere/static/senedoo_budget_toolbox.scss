@@ -1,0 +1,69 @@
+/* Charte Senedoo (violet / blanc) — périmètre limité aux écrans budget financier toolbox.
+   Les classes sont posées par les vues héritées créées via provision-financial-budget. */
+
+.o_sn_senedoo_financial_budget {
+  --sn-violet: #5b2c91;
+  --sn-violet-soft: #ede7f6;
+  --sn-violet-mid: #7c4dff;
+  --sn-white: #ffffff;
+
+  .o_form_sheet_bg {
+    background: linear-gradient(
+      180deg,
+      var(--sn-white) 0%,
+      #faf8ff 35%,
+      var(--sn-white) 100%
+    );
+  }
+
+  .o_group_sn_budget_analytic {
+    border: 1px solid rgba(91, 44, 145, 0.18);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    background: rgba(124, 77, 255, 0.06);
+    box-shadow: 0 1px 2px rgba(91, 44, 145, 0.06);
+  }
+
+  .o_group_sn_budget_analytic .o_horizontal_separator,
+  .o_group_sn_budget_analytic .o_form_label {
+    color: var(--sn-violet);
+    font-weight: 600;
+  }
+
+  /* Grille des lignes dans l’onglet Budget Items */
+  .o_field_widget[name="item_ids"] .o_list_renderer .o_list_table thead th {
+    background: var(--sn-violet-soft);
+    color: var(--sn-violet);
+    font-weight: 600;
+    border-bottom: 2px solid rgba(91, 44, 145, 0.25);
+  }
+
+  .o_field_widget[name="item_ids"] .o_list_renderer .o_data_row:nth-child(even) .o_data_cell {
+    background-color: rgba(237, 231, 246, 0.45);
+  }
+
+  .o_field_widget[name="item_ids"] .o_list_renderer .o_data_row:hover .o_data_cell {
+    background-color: rgba(124, 77, 255, 0.08);
+  }
+}
+
+.o_sn_senedoo_financial_budget_lines {
+  --sn-violet: #5b2c91;
+  --sn-violet-soft: #ede7f6;
+
+  .o_list_table thead th {
+    background: var(--sn-violet-soft);
+    color: var(--sn-violet);
+    font-weight: 600;
+    border-bottom: 2px solid rgba(91, 44, 145, 0.22);
+  }
+
+  .o_data_row:nth-child(even) .o_data_cell {
+    background-color: rgba(237, 231, 246, 0.4);
+  }
+
+  .o_data_row:hover .o_data_cell {
+    background-color: rgba(124, 77, 255, 0.07);
+  }
+}
