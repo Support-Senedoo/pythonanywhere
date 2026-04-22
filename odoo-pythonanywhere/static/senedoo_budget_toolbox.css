@@ -464,23 +464,29 @@
     var(--sn-bg) !important;
 }
 
-/* ----- Kanban en-têtes budget (cartes Senedoo) ----- */
+/* ----- Kanban en-têtes budget : zone claire + cartes type Flask (.sn-card clair, liseré violet) ----- */
 .o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_content {
-  background: radial-gradient(1200px 600px at 10% -10%, rgba(156, 86, 247, 0.18), transparent),
-    radial-gradient(800px 400px at 100% 0%, rgba(240, 180, 41, 0.05), transparent),
-    #110e21 !important;
+  background: radial-gradient(900px 480px at 12% 0%, rgba(111, 45, 168, 0.08), transparent),
+    radial-gradient(700px 360px at 100% 20%, rgba(240, 180, 41, 0.04), transparent),
+    #e8ecf4 !important;
 }
 
 .o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel {
-  background: #110e21 !important;
-  border-bottom: 1px solid #2e2a48 !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-bottom: 1px solid #d5dce8 !important;
+}
+
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_breadcrumb,
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_last_breadcrumb_item,
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_cp_switch_buttons .btn-link {
+  color: #64748b !important;
 }
 
 .o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel .o_searchview .o_searchview_input,
 .o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel .o_searchview input.o_searchview_input {
   background-color: #fff !important;
   color: #1a1028 !important;
-  border-color: rgba(156, 86, 247, 0.45) !important;
+  border-color: rgba(111, 45, 168, 0.35) !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban.o_kanban_view,
@@ -493,29 +499,34 @@
   background: transparent !important;
 }
 
+/* Évite le « double cadre » : le conteneur Odoo reste neutre, la carte = .o_sn_budget_kanban_card */
 .o_sn_senedoo_budget_headers_kanban .o_kanban_record {
   padding: 0.35rem !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_card {
-  border-radius: 12px !important;
-  border: 1px solid rgba(156, 86, 247, 0.35) !important;
-  border-left: 4px solid #9c56f7 !important;
-  background: linear-gradient(155deg, #1c1a32 0%, #151228 100%) !important;
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.38) !important;
+  border-radius: var(--sn-radius, 10px) !important;
+  border: 1px solid #d5dce8 !important;
+  border-left: 4px solid #9b4ddc !important;
+  background: #fff !important;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06) !important;
   min-height: 132px !important;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_card:hover {
   transform: translateY(-2px) !important;
-  box-shadow: 0 14px 40px rgba(156, 86, 247, 0.22), 0 8px 24px rgba(0, 0, 0, 0.45) !important;
-  border-color: rgba(156, 86, 247, 0.55) !important;
+  box-shadow: 0 10px 28px rgba(111, 45, 168, 0.12), 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+  border-color: rgba(155, 77, 220, 0.45) !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_title,
-.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_title .o_field_widget {
-  color: #f4f2ff !important;
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_title .o_field_widget,
+.o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_title .o_field_char {
+  color: #0f172a !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_meta_line,
@@ -523,17 +534,24 @@
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_company,
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_report,
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_analytic {
-  color: #9ca3c7 !important;
+  color: #64748b !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_icon {
-  color: #9c56f7 !important;
+  color: #6f2da8 !important;
 }
 
 .o_sn_senedoo_budget_headers_kanban .o_sn_budget_kanban_badge {
-  background: linear-gradient(165deg, #9c56f7, #5b21a6) !important;
+  background: linear-gradient(165deg, #9b4ddc, #6f2da8) !important;
   color: #fff !important;
   font-weight: 600 !important;
   padding: 0.35rem 0.75rem !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel_main_buttons .btn-primary,
+.o_action:has(.o_sn_senedoo_budget_headers_kanban) .o_control_panel .o_cp_buttons .btn-primary {
+  background: linear-gradient(165deg, #9b4ddc, #552080) !important;
+  border-color: #6f2da8 !important;
+  color: #fff !important;
 }
