@@ -1109,7 +1109,7 @@ def _toolbox_budget_header_kanban_view_id(
 
 
 def _budget_header_kanban_templates_inner(field_names: set[str]) -> str:
-    """Corps du template kanban-box (carte Senedoo)."""
+    """Corps du template kanban ``card`` (OWL Odoo 18+ ; plus ``kanban-box``)."""
     has_df = "date_from" in field_names
     has_dt = "date_to" in field_names
     has_rep = "report_id" in field_names
@@ -1190,7 +1190,7 @@ def _budget_header_kanban_arch_primary(field_names: set[str]) -> str:
     return f"""<kanban class="o_sn_senedoo_budget_headers_kanban" create="false" default_order="name asc">
     {fields_xml}
     <templates>
-        <t t-name="kanban-box">
+        <t t-name="card">
             {inner}
         </t>
     </templates>
@@ -1206,7 +1206,7 @@ def _budget_header_kanban_arch_extension(field_names: set[str]) -> str:
   </xpath>
   <xpath expr="//templates" position="replace">
     <templates>
-        <t t-name="kanban-box">
+        <t t-name="card">
             {inner}
         </t>
     </templates>
