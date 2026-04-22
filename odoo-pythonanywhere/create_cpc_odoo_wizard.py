@@ -1341,8 +1341,8 @@ def ensure_budget_report_senedoo_budget_item_list_view(
   </xpath>
   <xpath expr="//field[@name='id']" position="replace">
     <field name="budget_id" optional="show"/>
-    <field name="account_id" optional="hide"/>
-    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1"/>
+    <field name="account_id" optional="show"/>
+    <field name="x_sn_account_code" string="Numero compte" optional="hide" readonly="1"/>
     <field name="date"/>
     <field name="amount"/>
     <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"
@@ -1444,6 +1444,9 @@ def ensure_senedoo_financial_budget_toolbox_backend_scss_asset(
     css_bytes = css_path.read_bytes()
     b64 = base64.b64encode(css_bytes).decode("ascii")
     att_name = "senedoo_budget_toolbox_backend.css"
+    # Odoo inclut les feuilles « externes » du bundle via ir.attachment._get_serve_attachment(url) :
+    # domaine [('type','=','binary'), ('url','=', <path ir.asset>)]. Sans ``url``, le fichier n'est
+    # jamais résolu et aucun <link> effectif (cf. deploy_dashboard_studio.py : /web/content/id/nom.css).
 
     att_rows = (
         _ek(
@@ -1460,15 +1463,6 @@ def ensure_senedoo_financial_budget_toolbox_backend_scss_asset(
     )
     if att_rows and att_rows[0].get("res_id"):
         att_id = int(att_rows[0]["res_id"])
-        _ek(
-            models,
-            db,
-            uid,
-            pwd,
-            "ir.attachment",
-            "write",
-            [[att_id], {"datas": b64, "mimetype": "text/css", "name": att_name, "public": True}],
-        )
         att_status = "updated"
     else:
         att_id = _rpc_create_id(
@@ -1503,7 +1497,25 @@ def ensure_senedoo_financial_budget_toolbox_backend_scss_asset(
         )
         att_status = "created"
 
-    content_path = f"/web/content/{int(att_id)}"
+    content_path = f"/web/content/{int(att_id)}/{att_name}"
+    _ek(
+        models,
+        db,
+        uid,
+        pwd,
+        "ir.attachment",
+        "write",
+        [
+            [int(att_id)],
+            {
+                "datas": b64,
+                "mimetype": "text/css",
+                "name": att_name,
+                "public": True,
+                "url": content_path,
+            },
+        ],
+    )
     asset_name = "Senedoo — charte budget financier (CSS toolbox)"
 
     asset_rows = (
@@ -1547,6 +1559,11 @@ def ensure_senedoo_financial_budget_toolbox_backend_scss_asset(
             res_id=asset_id,
         )
         asset_status = "created"
+
+    try:
+        _ek(models, db, uid, pwd, "ir.attachment", "regenerate_assets_bundles", [], {})
+    except Exception:
+        pass
 
     return {
         "ok": True,
