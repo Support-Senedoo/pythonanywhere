@@ -1041,6 +1041,7 @@ def provision_financial_budget_toolbox(
     from create_cpc_odoo_wizard import (
         ensure_budget_report_analytic_fields,
         ensure_budget_report_item_account_code_field,
+        ensure_budget_report_item_account_name_field,
         ensure_budget_report_senedoo_budget_views,
         ensure_senedoo_financial_budget_toolbox_branding,
     )
@@ -1055,6 +1056,7 @@ def provision_financial_budget_toolbox(
         "placement": place,
         "analytic_fields": {},
         "budget_item_account_code": {},
+        "budget_item_account_name": {},
         "budget_views": {},
         "branding": {},
         "actions": {},
@@ -1063,6 +1065,9 @@ def provision_financial_budget_toolbox(
 
     out["analytic_fields"] = ensure_budget_report_analytic_fields(models, db, uid, pwd)
     out["budget_item_account_code"] = ensure_budget_report_item_account_code_field(
+        models, db, uid, pwd
+    )
+    out["budget_item_account_name"] = ensure_budget_report_item_account_name_field(
         models, db, uid, pwd
     )
     out["budget_views"] = ensure_budget_report_senedoo_budget_views(models, db, uid, pwd)

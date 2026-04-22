@@ -74,8 +74,9 @@ BUDGET_MODELS_WITH_ANALYTIC_M2O = (
     "account.report.budget.item",
 )
 
-# Champ lié (code compte général) sur les lignes de budget financier — affichage liste / formulaire.
+# Champs liés (compte général) sur les lignes de budget financier — affichage liste / formulaire.
 BUDGET_ITEM_ACCOUNT_CODE_FIELD_NAME = "x_sn_account_code"
+BUDGET_ITEM_ACCOUNT_NAME_FIELD_NAME = "x_sn_account_name"
 # Espace de noms XML pour les vues / pièces jointes créées par la toolbox (hors module installable).
 SN_BUDGET_TOOLBOX_IMD_MODULE = "sn_budget_toolbox"
 SN_BUDGET_FORM_VIEW_IMD_NAME = "account_report_budget_form_senedoo_toolbox"
@@ -1157,6 +1158,53 @@ def ensure_budget_report_item_account_code_field(
         return {"status": "error", "ok": False, "error": str(e)}
 
 
+def ensure_budget_report_item_account_name_field(
+    models: Any,
+    db: str,
+    uid: int,
+    pwd: str,
+) -> dict[str, Any]:
+    """
+    Crée ``x_sn_account_name`` (Char lié ``account_id.name``) sur ``account.report.budget.item``.
+
+    Affiche le **libellé** du compte à côté du numéro (``x_sn_account_code``).
+    """
+    model_name = "account.report.budget.item"
+    if not _model_exists(models, db, uid, pwd, model_name):
+        return {"status": "missing_model", "ok": False}
+    if not _field_exists(models, db, uid, pwd, model_name, "account_id"):
+        return {"status": "missing_account_id", "ok": False, "note": "Champ account_id absent."}
+    if _field_exists(models, db, uid, pwd, model_name, BUDGET_ITEM_ACCOUNT_NAME_FIELD_NAME):
+        return {"status": "skipped", "ok": True, "note": "Champ deja present."}
+    try:
+        mid = _get_model_id(models, db, uid, pwd, model_name)
+        fid = _rpc_create_id(
+            _ek(
+                models,
+                db,
+                uid,
+                pwd,
+                "ir.model.fields",
+                "create",
+                [
+                    {
+                        "name": BUDGET_ITEM_ACCOUNT_NAME_FIELD_NAME,
+                        "field_description": "Libelle compte (Senedoo)",
+                        "ttype": "char",
+                        "model_id": mid,
+                        "state": "manual",
+                        "related": "account_id.name",
+                        "readonly": True,
+                        "store": False,
+                    }
+                ],
+            )
+        )
+        return {"status": "created", "ok": True, "field_id": fid}
+    except Exception as e:
+        return {"status": "error", "ok": False, "error": str(e)}
+
+
 def ensure_budget_report_senedoo_budget_form_view(
     models: Any,
     db: str,
@@ -1181,7 +1229,8 @@ def ensure_budget_report_senedoo_budget_form_view(
     </group>
   </xpath>
   <xpath expr="//field[@name='item_ids']/list/field[@name='account_id']" position="after">
-    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1" width="12%%"/>
+    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1" width="10%%"/>
+    <field name="x_sn_account_name" string="Libelle compte" optional="show" readonly="1" width="22%%"/>
     <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"
            options="{'no_create': True, 'no_create_edit': True, 'no_open': True}" width="18%%"/>
   </xpath>
@@ -1248,7 +1297,7 @@ def ensure_budget_report_senedoo_budget_header_list_view(
 ) -> dict[str, Any]:
     """
     Liste des en-têtes ``account.report.budget`` (menu « En-têtes de budget ») :
-    classe thème Senedoo + colonne **compte analytique**.
+    classe thème Senedoo, colonne **compte analytique**, liste **éditable** (saisie par ligne).
     """
     model_name = "account.report.budget"
     inherit_id = _resolve_account_report_budget_tree_view_id(models, db, uid, pwd)
@@ -1258,6 +1307,7 @@ def ensure_budget_report_senedoo_budget_header_list_view(
     arch = """<data>
   <xpath expr="//list" position="attributes">
     <attribute name="class" add="o_sn_senedoo_financial_budget_headers" separator=" "/>
+    <attribute name="editable">bottom</attribute>
   </xpath>
   <xpath expr="//field[@name='name']" position="after">
     <field name="x_analytic_account_id" string="Compte analytique" optional="show"
@@ -1342,7 +1392,8 @@ def ensure_budget_report_senedoo_budget_item_list_view(
   <xpath expr="//field[@name='id']" position="replace">
     <field name="budget_id" optional="show"/>
     <field name="account_id" optional="show"/>
-    <field name="x_sn_account_code" string="Numero compte" optional="hide" readonly="1"/>
+    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1"/>
+    <field name="x_sn_account_name" string="Libelle compte" optional="show" readonly="1"/>
     <field name="date"/>
     <field name="amount"/>
     <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"
