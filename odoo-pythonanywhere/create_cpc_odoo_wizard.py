@@ -20,6 +20,8 @@ Le wizard est un modèle manuel (x_cpc_budget_wizard) avec :
 
 Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
+L'analytique est porté par **l'en-tête** du budget (un budget = un compte analytique) ; sur les **lignes**,
+il est affiché en **lecture seule** dans les vues toolbox et aligné sur l'en-tête (import / sync).
 Le provision **Budget Senedoo** ajoute aussi ``x_sn_account_code`` (numéro de compte sur les lignes),
 des **vues** héritées (analytique + colonnes), une **icône** menu (``web_icon_data``) et une feuille
 **CSS** (``ir.attachment`` + ``ir.asset`` → ``web.assets_backend``, classes ``o_sn_senedoo_financial_budget*``).
@@ -1180,8 +1182,8 @@ def ensure_budget_report_senedoo_budget_form_view(
   </xpath>
   <xpath expr="//field[@name='item_ids']/list/field[@name='account_id']" position="after">
     <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1" width="12%%"/>
-    <field name="x_analytic_account_id" string="Compte analytique (ligne)" optional="show"
-           options="{'no_create': True, 'no_create_edit': True}" width="18%%"/>
+    <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"
+           options="{'no_create': True, 'no_create_edit': True, 'no_open': True}" width="18%%"/>
   </xpath>
 </data>"""
 
@@ -1343,7 +1345,8 @@ def ensure_budget_report_senedoo_budget_item_list_view(
     <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1"/>
     <field name="date"/>
     <field name="amount"/>
-    <field name="x_analytic_account_id" optional="show" options="{'no_create': True, 'no_create_edit': True}"/>
+    <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"
+           options="{'no_create': True, 'no_create_edit': True, 'no_open': True}"/>
   </xpath>
 </data>"""
 

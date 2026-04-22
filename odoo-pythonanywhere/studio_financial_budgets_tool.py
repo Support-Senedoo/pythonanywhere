@@ -29,9 +29,10 @@ Exemples (base ``ericfavre-budget``) ::
   python studio_financial_budgets_tool.py set-budget-analytic --budget-id 6 --analytic-id 42 --propagate-to-lines
   python studio_financial_budgets_tool.py import-items --budget-id 6 --csv lignes.csv --date-from 2026-01-01
 
-Format CSV pour ``import-items`` : ``account_code``, ``amount`` ; optionnel : ``date`` (ou ``--date-from``),
-``analytic_account_id`` / ``x_analytic_account_id`` pour forcer une ligne ; sinon le compte analytique
-de **l'en-tête du budget** est recopié sur chaque ligne (sauf ``--no-inherit-header-analytic``).
+Format CSV pour ``import-items`` : ``account_code``, ``amount`` ; optionnel : ``date`` (ou ``--date-from``).
+Le compte analytique des lignes est **toujours** celui de l'**en-tête du budget** (ou ``--header-analytic-*``
+pour tout le fichier) : une colonne analytique par ligne dans le CSV est **ignorée** (un budget = un axe).
+Utilisez ``--no-inherit-header-analytic`` pour créer des lignes **sans** analytique.
 """
 from __future__ import annotations
 
@@ -711,17 +712,9 @@ def cmd_import_items(models: Any, db: str, uid: int, pwd: str, args: argparse.Na
                     )
                     continue
 
-        line_aid_raw = (
-            row.get("analytic_account_id")
-            or row.get("x_analytic_account_id")
-            or ""
-        )
-        line_aid = str(line_aid_raw).strip()
-        if analytic_item_f:
-            if line_aid.isdigit():
-                vals[analytic_item_f] = int(line_aid)
-            elif default_line_analytic and not skip_inherit:
-                vals[analytic_item_f] = default_line_analytic
+        # Analytique : uniquement l'en-tête du budget (ou --header-analytic-*), jamais par ligne CSV.
+        if analytic_item_f and default_line_analytic and not skip_inherit:
+            vals[analytic_item_f] = default_line_analytic
 
         batch.append(vals)
         if len(batch) >= batch_size:
@@ -1572,13 +1565,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Si les lignes ont un champ date unique (Odoo 18.3+), valeur par défaut si le CSV n'a pas de colonne date.",
     )
     pi.add_argument("--date-to", dest="date_to", default="")
-    pi.add_argument("--header-analytic-id", dest="header_analytic_id", type=int, default=None)
-    pi.add_argument("--header-analytic-name", dest="header_analytic_name", default=None)
+    pi.add_argument(
+        "--header-analytic-id",
+        dest="header_analytic_id",
+        type=int,
+        default=None,
+        help="Compte analytique commun à toutes les lignes créées (prioritaire sur l'en-tête budget).",
+    )
+    pi.add_argument(
+        "--header-analytic-name",
+        dest="header_analytic_name",
+        default=None,
+        help="Idem par nom (recherche ilike) ; une seule valeur pour tout l'import.",
+    )
     pi.add_argument(
         "--no-inherit-header-analytic",
         dest="no_inherit_header_analytic",
         action="store_true",
-        help="Ne pas recopier le compte analytique de l'en-tête budget sur les lignes créées.",
+        help="Ne pas remplir l'analytique sur les lignes (par défaut : copie de l'en-tête ou de --header-analytic-*).",
     )
     pi.add_argument("--batch-size", dest="batch_size", type=int, default=80)
     pi.add_argument("--json", action="store_true")
