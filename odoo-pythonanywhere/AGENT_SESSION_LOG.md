@@ -20,6 +20,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 
 ## Entrées
 
+### 2026-04-23 — Cookie portail odoo.com : variables d’environnement + script Playwright (toolbox 1.10.21)
+- **Action** : `TOOLBOX_ODOO_PORTAL_COOKIE` / `TOOLBOX_ODOO_PORTAL_COOKIE_FILE` lus par la toolbox ; fusion sur `/staff/admin/odoo-connexion` et sonde bases ; script `scripts/capture_odoo_portal_cookie_playwright.py` ; `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
+- **Résultat** : OK — PA pull `7c9095d..c55429e`, reload Web `{"status":"OK"}`.
+- **Références** : commit `c55429e`, toolbox **1.10.21**.
+- **Erreur / leçon** : ne jamais committer le cookie ; renouveler quand la session odoo.com expire.
+
 ### 2026-04-23 — Connexion Odoo admin : aide captcha + cookie portail visible (toolbox 1.10.20)
 - **Action** : `/staff/admin/odoo-connexion` — encadré PythonAnywhere / captcha, champ Cookie en évidence, rappel « étape suivante » si message portail captcha ; `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
 - **Résultat** : OK — PA pull jusqu’à `7c9095d`, reload Web `{"status":"OK"}`.
