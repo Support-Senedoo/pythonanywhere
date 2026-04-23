@@ -140,6 +140,24 @@ def admin_index():
     return redirect(url_for("staff_admin.clients_list"))
 
 
+def _portal_db_error_suggests_captcha(message: str | None) -> bool:
+    """Message renvoyé par le portail / probe quand odoo.com bloque les robots (souvent sur PA)."""
+    low = (message or "").lower()
+    if not low:
+        return False
+    return any(
+        n in low
+        for n in (
+            "captcha",
+            "anti-robot",
+            "turnstile",
+            "recaptcha",
+            "datacenter",
+            "pythonanywhere",
+        )
+    )
+
+
 def _probe_result_allows_remembering_credentials(result: dict[str, Any] | None) -> bool:
     if not result or result.get("url_error"):
         return False
@@ -300,6 +318,7 @@ def odoo_connexion_staff():
                         "info",
                     )
 
+    db_err = (result or {}).get("db_list_error") if isinstance(result, dict) else None
     return render_template(
         "staff/admin/odoo_connexion.html",
         result=result,
@@ -307,6 +326,9 @@ def odoo_connexion_staff():
         session_store_ok=store_ok,
         session_login_saved=staff_odoo_work_login_saved(session),
         session_has_creds=bool(get_staff_odoo_work_credentials(session)),
+        portal_captcha_blocked=_portal_db_error_suggests_captcha(
+            db_err if isinstance(db_err, str) else None
+        ),
     )
 
 
