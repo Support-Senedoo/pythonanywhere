@@ -20,6 +20,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 
 ## Entrées
 
+### 2026-04-23 — Administration : connexion Odoo, liste des bases, enregistrement (toolbox 1.10.18)
+- **Action** : page `/staff/admin/odoo-connexion` (`probe_account_databases`, session fichiers pour mémoriser login/mot de passe, bouton enregistrer + base active) ; liens liste clients / accueil staff / utilitaires ; `git push` + `bash deploy_to_pa.sh -SkipGitPush` (US, clé `~/.ssh/id_ed25519_pa_cursor`).
+- **Résultat** : OK — PA fast-forward `188b158..e6470d6`, reload Web `{"status":"OK"}`.
+- **Références** : commit `e6470d6`, toolbox **1.10.18**.
+- **Erreur / leçon** : (vide)
+
 ### 2026-04-19 — CPC wizard : menu assistant invisible → ir.model.access (toolbox 1.10.4)
 - **Action** : correction `create_cpc_odoo_wizard.py` — création de règles **ir.model.access** sur `x_cpc_budget_wizard` pour les groupes comptables Odoo (Facturation / Comptable / Responsable + EE `account_accountant` si présent) ; contrôle post-install ; doc écran staff. `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
 - **Résultat** : OK — PA pull `63508ac`, reload Web `{"status":"OK"}`.
