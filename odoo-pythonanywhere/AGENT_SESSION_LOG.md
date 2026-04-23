@@ -20,6 +20,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 
 ## Entrées
 
+### 2026-04-23 — Connexion Odoo admin : aide captcha + cookie portail visible (toolbox 1.10.20)
+- **Action** : `/staff/admin/odoo-connexion` — encadré PythonAnywhere / captcha, champ Cookie en évidence, rappel « étape suivante » si message portail captcha ; `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
+- **Résultat** : OK — PA pull jusqu’à `7c9095d`, reload Web `{"status":"OK"}`.
+- **Références** : commit `7c9095d`, toolbox **1.10.20**.
+- **Erreur / leçon** : le captcha odoo.com depuis PA reste une limite du portail ; l’UI doit orienter vers le cookie navigateur sans le cacher dans un `<details>`.
+
 ### 2026-04-23 — Correctif site HS : `staff_selected_client_persist.py` manquant dans Git (toolbox 1.10.19)
 - **Action** : ajout du fichier au dépôt (déjà importé par `staff_admin` depuis 1.10.18) ; `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
 - **Résultat** : OK — PA pull `e6470d6..3c8cf76`, reload Web `{"status":"OK"}`.
