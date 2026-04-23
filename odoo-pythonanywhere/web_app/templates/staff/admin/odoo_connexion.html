@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Connexion Odoo — administration{% endblock %}
+{% block main_class %}sn-main--wide{% endblock %}
+{% block body %}
+<h1>Connexion Odoo et choix de la base</h1>
+<p class="sn-muted" style="max-width:52rem;line-height:1.5;">
+  Saisissez le <strong>login</strong> et le <strong>mot de passe</strong> du compte Odoo (souvent le compte administrateur API) <strong>une fois</strong> :
+  la toolbox interroge le portail <strong>Mes bases</strong> (odoo.com) si l’URL est vide, ou <code>db.list()</code> sur une instance si vous renseignez l’URL.
+  {% if session_store_ok %}
+  Avec la session serveur activée, vous pouvez <strong>relancer la liste</strong> sans ressaisir le mot de passe tant que cette session navigateur est ouverte.
+  {% else %}
+  Sur ce déploiement, le mot de passe n’est pas conservé entre deux pages : vous le ressaisissez à chaque analyse (voir message d’information après une liste réussie).
+  {% endif %}
+</p>
+
+<p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.clients_list') }}">← Liste des bases enregistrées</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.odoo_account_databases_probe') }}">Sonde détaillée (utilitaires)</a>
+</p>
+
+{% if session_has_creds %}
+<div class="sn-card sn-card--accent" style="margin-top:1rem;">
+  <p style="margin:0;line-height:1.45;">
+    Compte mémorisé sur le serveur : <strong>{{ session_login_saved }}</strong>
+  </p>
+  <form method="post" style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+    <input type="hidden" name="action" value="list_session">
+    <button type="submit">Relancer la liste des bases</button>
+  </form>
+  <form method="post" style="margin-top:0.5rem;" onsubmit="return confirm('Oublier le login et le mot de passe mémorisés sur ce serveur ?');">
+    <input type="hidden" name="action" value="clear">
+    <button type="submit" class="sn-btn sn-btn--ghost">Oublier les identifiants mémorisés</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="sn-card" style="margin-top:1.25rem;">
+  <h2 style="margin-top:0;font-size:1.05rem;">{% if session_has_creds %}Autre compte ou nouvelle analyse{% else %}Identifiants{% endif %}</h2>
+  <form method="post" autocomplete="on" novalidate>
+    <input type="hidden" name="action" value="connect">
+    <label for="odoo_login">E-mail / login Odoo</label>
+    <input type="text" id="odoo_login" name="odoo_login"
+           value="{{ request.form.get('odoo_login', '') }}"
+           autocomplete="username" spellcheck="false">
+
+    <label for="odoo_password">Mot de passe ou clé API (même compte)</label>
+    <input type="password" id="odoo_password" name="odoo_password" value="" autocomplete="current-password"
+           placeholder="{% if session_has_creds %}Laisser vide pour réutiliser uniquement la session mémorisée…{% else %}Obligatoire sauf cookie portail{% endif %}">
+
+    <details class="sn-doc" style="margin:1rem 0 0;">
+      <summary>Cookie portail odoo.com (captcha / IP datacenter)</summary>
+      <p class="sn-muted" style="font-size:0.88rem;line-height:1.45;margin:0.5rem 0 0;">
+        Même procédure que l’écran « Sonde bases » : après connexion manuelle sur odoo.com, copiez l’en-tête <strong>Cookie</strong> de la requête document vers <code>…/my/databases</code>.
+      </p>
+      <label for="odoo_portal_session_cookie" style="margin-top:0.65rem;">Cookie portail (facultatif)</label>
+      <textarea id="odoo_portal_session_cookie" name="odoo_portal_session_cookie" rows="2" maxlength="16000"
+                spellcheck="false" autocomplete="off"></textarea>
+    </details>
+
+    <hr style="margin:1.15rem 0;border:none;border-top:1px solid var(--sn-border);">
+    <p class="sn-muted" style="font-size:0.88rem;margin:0 0 0.5rem;line-height:1.45;">
+      <strong>URL d’instance</strong> : laissez vide pour le mode portail « Mes bases » (recommandé sur odoo.com).
+      Remplissez-la seulement pour une instance auto-hébergée ou si <code>db.list()</code> est disponible.
+    </p>
+    <label for="odoo_url" class="sn-muted">URL de l’instance (facultatif)</label>
+    <input type="text" id="odoo_url" name="odoo_url" spellcheck="false" autocapitalize="none"
+           value="{{ request.form.get('odoo_url', '') }}"
+           placeholder="ex. https://monclient.odoo.com — vide = portail Mes bases">
+
+    {% if session_store_ok %}
+    <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;font-weight:normal;">
+      <input type="checkbox" name="remember_session" value="1" checked>
+      Mémoriser login et mot de passe sur le serveur pour cette session navigateur
+    </label>
+    {% else %}
+    <input type="hidden" name="remember_session" value="1">
+    {% endif %}
+
+    <button type="submit" formnovalidate style="margin-top:1rem;">Lister les bases</button>
+  </form>
+</div>
+
+{% if result %}
+<div class="sn-card" style="margin-top:1.25rem;">
+  <h2 style="margin-top:0;font-size:1.1rem;">Résultat</h2>
+  {% if result.url_error %}
+  <div class="sn-flash danger">{{ result.url_error }}</div>
+  {% else %}
+    {% if result.server_version %}
+    <h3 style="font-size:0.95rem;color:var(--sn-muted);margin:0 0 0.5rem;">Version serveur (extrait)</h3>
+    <pre class="sn-pre" style="max-height:8rem;font-size:0.78rem;">{{ result.server_version | tojson(indent=2) }}</pre>
+    {% endif %}
+    {% if result.db_list_error %}
+    <p class="sn-flash warning" style="margin:0.75rem 0;">
+      <strong>{% if result.probe_mode == 'odoo_com_portal' %}Portail :{% else %}Liste des bases :{% endif %}</strong>
+      {{ result.db_list_error }}
+    </p>
+    {% endif %}
+    {% if result.truncated %}
+    <p class="sn-flash warning">Liste tronquée à {{ max_probe }} bases (sécurité).</p>
+    {% endif %}
+
+    {% if result.rows %}
+    <p class="sn-muted" style="margin:0.75rem 0;">Bases testées : <strong>{{ result.rows | length }}</strong>
+      — enregistrement proposé uniquement si l’API a répondu <strong>OK</strong> pour cette base.</p>
+    <div class="sn-scroll-x">
+    <table class="sn-table">
+      <thead>
+        <tr>
+          {% if result.probe_mode == 'odoo_com_portal' %}
+          <th>Instance</th>
+          {% endif %}
+          <th>Base</th>
+          <th>Accès API</th>
+          <th>Sociétés (extrait)</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in result.rows %}
+        <tr>
+          {% if result.probe_mode == 'odoo_com_portal' %}
+          <td style="font-size:0.8rem;max-width:10rem;"><a href="{{ r.instance_url }}" target="_blank" rel="noopener noreferrer">{{ r.instance_url }}</a></td>
+          {% endif %}
+          <td><code>{{ r.database }}</code></td>
+          <td>{% if r.accessible %}<span class="sn-pill" style="background:rgba(52,211,153,0.2);">OK</span>{% else %}<span class="sn-muted">Non</span>{% endif %}</td>
+          <td style="font-size:0.85rem;max-width:14rem;">{% if r.companies %}{{ r.companies | join(' · ') }}{% else %}—{% endif %}</td>
+          <td>
+            {% if r.accessible %}
+            <form method="post" style="margin:0;">
+              <input type="hidden" name="action" value="register">
+              <input type="hidden" name="instance_url" value="{{ r.instance_url }}">
+              <input type="hidden" name="database" value="{{ r.database }}">
+              <label class="sn-muted" style="font-size:0.78rem;display:block;margin-bottom:0.25rem;">Environnement</label>
+              <select name="environment" style="margin-bottom:0.35rem;max-width:10rem;">
+                <option value="production" selected>Production</option>
+                <option value="test">Test / recette</option>
+              </select>
+              {% if not session_has_creds %}
+              <label class="sn-muted" style="font-size:0.78rem;display:block;">Login</label>
+              <input type="text" name="odoo_login_register" required autocomplete="username" style="max-width:12rem;margin-bottom:0.35rem;">
+              <label class="sn-muted" style="font-size:0.78rem;display:block;">Mot de passe</label>
+              <input type="password" name="odoo_password_register" required autocomplete="current-password" style="max-width:12rem;margin-bottom:0.35rem;">
+              {% endif %}
+              <button type="submit" class="sn-btn" style="padding:0.35rem 0.65rem;font-size:0.85rem;">Enregistrer et travailler sur cette base</button>
+            </form>
+            {% else %}
+            <span class="sn-muted" style="font-size:0.82rem;">{{ (r.detail or '')[:120] }}{% if r.detail and r.detail|length > 120 %}…{% endif %}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+(function () {
+  var key = "toolbox_staff_odoo_admin_login";
+  var login = document.getElementById("odoo_login");
+  if (!login || !login.form) return;
+  try {
+    if (!login.value.trim()) {
+      var saved = localStorage.getItem(key);
+      if (saved) login.value = saved;
+    }
+  } catch (e) {}
+  login.form.addEventListener("submit", function (ev) {
+    var f = ev.target;
+    if (!f || (f.querySelector('[name="action"]') || {}).value !== "connect") return;
+    try {
+      var v = login.value.trim();
+      if (v) localStorage.setItem(key, v);
+      else localStorage.removeItem(key);
+    } catch (e) {}
+  });
+})();
+</script>
+{% endblock %}

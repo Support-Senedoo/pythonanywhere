@@ -24,10 +24,11 @@
 
 <div class="sn-card sn-card--accent">
   <h2>Administration</h2>
-  <p class="sn-muted">Créer des clients Odoo, comptes portail, bases et applications visibles.</p>
+  <p class="sn-muted">Connexion Odoo une fois, liste des bases du compte, enregistrement et choix de la base active — ou gestion avancée du registre.</p>
   <p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin:0.75rem 0 0;">
-    <a class="sn-btn" href="{{ url_for('staff_admin.clients_list') }}">Gérer clients &amp; accès</a>
-    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}">Ajouter une base Odoo</a>
+    <a class="sn-btn" href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo (liste des bases)</a>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.clients_list') }}">Registre &amp; comptes</a>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}">Ancien formulaire « ajouter une base »</a>
   </p>
 </div>
 

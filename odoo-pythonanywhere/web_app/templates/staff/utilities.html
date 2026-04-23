@@ -35,7 +35,8 @@
   <h2 style="margin-top:0;font-size:1.05rem;">Autres outils</h2>
   <ul style="margin:0;padding-left:1.2rem;">
     <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}#ajouter-base-odoo">Ajouter une base Odoo</a> (formulaire seul, depuis l’utilitaire P&amp;L personnalisé)</li>
-    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.odoo_account_databases_probe') }}">Sonde bases Odoo</a> (login / mot de passe, liste des bases)</li>
+    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo (administration)</a> — parcours recommandé : login une fois, choix de la base.</li>
+    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.odoo_account_databases_probe') }}">Sonde bases Odoo</a> (détail technique, cookie portail, version serveur)</li>
   </ul>
 </div>
 

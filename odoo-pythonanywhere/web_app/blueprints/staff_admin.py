@@ -15,14 +15,19 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 
 from odoo_client import normalize_odoo_base_url
 
 from web_app.blueprints.public import login_required_staff
-from web_app.client_apps import KNOWN_APPS, apps_for_template
-from web_app.odoo_account_probe import format_db_list_error
+from web_app.client_apps import KNOWN_APPS
+from web_app.odoo_account_probe import (
+    MAX_DATABASES_TO_PROBE,
+    format_db_list_error,
+    probe_account_databases,
+)
 from web_app.odoo_registry import (
     delete_client,
     load_clients_registry,
@@ -30,6 +35,14 @@ from web_app.odoo_registry import (
     registry_netloc,
     upsert_client,
 )
+from web_app.staff_odoo_work_session import (
+    clear_staff_odoo_work_credentials,
+    get_staff_odoo_work_credentials,
+    save_staff_odoo_work_credentials,
+    session_may_store_odoo_secrets,
+    staff_odoo_work_login_saved,
+)
+from web_app.staff_selected_client_persist import persist_staff_selected_client_for_xmlrpc
 from web_app.users_store import (
     count_users_for_client,
     delete_user,
@@ -125,6 +138,176 @@ def odoo_databases_suggest():
 @login_required_staff
 def admin_index():
     return redirect(url_for("staff_admin.clients_list"))
+
+
+def _probe_result_allows_remembering_credentials(result: dict[str, Any] | None) -> bool:
+    if not result or result.get("url_error"):
+        return False
+    rows = result.get("rows")
+    if isinstance(rows, list) and len(rows) > 0:
+        return True
+    if result.get("db_list_error"):
+        return False
+    names = result.get("candidate_names")
+    return isinstance(names, list) and len(names) > 0
+
+
+@bp.route("/odoo-connexion", methods=["GET", "POST"])
+@login_required_staff
+def odoo_connexion_staff():
+    """
+    Parcours simplifié : login + mot de passe (éventuellement URL instance ou cookie portail),
+    liste des bases (portail Mes bases ou db.list), puis enregistrement dans le registre + base active.
+    """
+    store_ok = session_may_store_odoo_secrets(current_app)
+    result: dict[str, Any] | None = None
+
+    if request.method == "POST":
+        action = (request.form.get("action") or "connect").strip()
+
+        if action == "clear":
+            clear_staff_odoo_work_credentials(session)
+            flash(
+                "Identifiants Odoo oubliés sur ce serveur (prochaine liste : saisie complète).",
+                "info",
+            )
+            return redirect(url_for("staff_admin.odoo_connexion_staff"))
+
+        if action == "register":
+            db_raw = (request.form.get("database") or "").strip()
+            inst_url = (request.form.get("instance_url") or "").strip()
+            env = (request.form.get("environment") or "production").strip().lower()
+            if env not in ("production", "test"):
+                env = "production"
+            creds = get_staff_odoo_work_credentials(session)
+            login = ""
+            password: str | None = None
+            if creds:
+                login = creds["login"]
+                password = creds["password"]
+            if not password:
+                password = (request.form.get("odoo_password_register") or "").strip() or None
+            if not login:
+                login = (request.form.get("odoo_login_register") or "").strip()
+            if not login or not password:
+                flash(
+                    "Login et mot de passe requis pour enregistrer la base "
+                    "(reconnectez-vous ou saisissez-les dans le formulaire).",
+                    "danger",
+                )
+                return redirect(url_for("staff_admin.odoo_connexion_staff"))
+            try:
+                cid = normalize_registry_db_key(db_raw)
+            except ValueError as e:
+                flash(str(e), "danger")
+                return redirect(url_for("staff_admin.odoo_connexion_staff"))
+            if not inst_url:
+                flash("URL d’instance manquante.", "danger")
+                return redirect(url_for("staff_admin.odoo_connexion_staff"))
+            try:
+                upsert_client(
+                    _clients_path(),
+                    cid,
+                    cid,
+                    normalize_odoo_base_url(inst_url),
+                    db_raw,
+                    login,
+                    password,
+                    ["odoo_status"],
+                    environment=env,
+                )
+            except ValueError as e:
+                flash(str(e), "danger")
+                return redirect(url_for("staff_admin.odoo_connexion_staff"))
+            session["staff_selected_client_id"] = cid
+            persist_staff_selected_client_for_xmlrpc(current_app, cid)
+            flash(
+                f"Base « {db_raw} » enregistrée dans le registre et sélectionnée pour les applications.",
+                "success",
+            )
+            return redirect(url_for("staff.staff_home"))
+
+        if action == "list_session":
+            creds = get_staff_odoo_work_credentials(session)
+            if not creds:
+                flash(
+                    "Aucun identifiant mémorisé : utilisez le formulaire ci-dessous "
+                    "(ou activez les sessions fichiers sur ce déploiement).",
+                    "warning",
+                )
+            else:
+                result = probe_account_databases(
+                    creds["base_url"],
+                    creds["login"],
+                    creds["password"],
+                    portal_session_cookie=creds["portal_cookie"],
+                )
+        else:
+            login = (request.form.get("odoo_login") or "").strip()
+            password = (request.form.get("odoo_password") or "").strip()
+            base_url = (request.form.get("odoo_url") or "").strip()
+            portal_cookie = (request.form.get("odoo_portal_session_cookie") or "").strip()
+            remember = (request.form.get("remember_session") or "1").strip() == "1"
+
+            prev = get_staff_odoo_work_credentials(session)
+            if prev:
+                if not login:
+                    login = prev["login"]
+                if not password:
+                    password = prev["password"]
+                if not base_url:
+                    base_url = prev["base_url"]
+                if not portal_cookie and (prev.get("portal_cookie") or "").strip():
+                    portal_cookie = (prev["portal_cookie"] or "").strip()
+
+            if not login:
+                flash("Login Odoo requis.", "warning")
+            elif not base_url and not portal_cookie and not password:
+                flash(
+                    "Mot de passe requis (sauf si vous collez un cookie de session portail odoo.com).",
+                    "warning",
+                )
+            else:
+                result = probe_account_databases(
+                    base_url,
+                    login,
+                    password,
+                    portal_session_cookie=portal_cookie or None,
+                )
+                if (
+                    store_ok
+                    and remember
+                    and _probe_result_allows_remembering_credentials(result)
+                ):
+                    save_staff_odoo_work_credentials(
+                        session,
+                        current_app,
+                        login=login,
+                        password=password,
+                        base_url=base_url,
+                        portal_cookie=portal_cookie or None,
+                    )
+                    flash(
+                        "Identifiants mémorisés sur le serveur pour cette session navigateur "
+                        "(bouton « Relancer la liste »).",
+                        "success",
+                    )
+                elif remember and not store_ok and _probe_result_allows_remembering_credentials(result):
+                    flash(
+                        "Astuce : ce serveur n’utilise pas les sessions « fichiers » — le mot de passe ne peut pas "
+                        "être conservé entre deux visites. Sur PythonAnywhere, c’est en général automatique ; "
+                        "en local, définissez TOOLBOX_FILESYSTEM_SESSION=1 (voir déploiement).",
+                        "info",
+                    )
+
+    return render_template(
+        "staff/admin/odoo_connexion.html",
+        result=result,
+        max_probe=MAX_DATABASES_TO_PROBE,
+        session_store_ok=store_ok,
+        session_login_saved=staff_odoo_work_login_saved(session),
+        session_has_creds=bool(get_staff_odoo_work_credentials(session)),
+    )
 
 
 @bp.route("/clients")

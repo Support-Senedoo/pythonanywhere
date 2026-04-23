@@ -4,9 +4,12 @@
 {% block body %}
 <h1>Bases Odoo</h1>
 <p class="sn-muted">Chaque ligne est une base (nom technique = identifiant dans le registre et les comptes portail).</p>
-<p><a class="sn-btn" href="{{ url_for('staff_admin.client_new') }}">+ Nouvelle base</a>
-   <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.users_list') }}">Comptes</a>
-   <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.staff_home') }}">← Tableau de bord</a></p>
+<p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+  <a class="sn-btn" href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo — lister et choisir une base</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.client_new') }}">+ Saisie manuelle (registre)</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.users_list') }}">Comptes</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.staff_home') }}">← Tableau de bord</a>
+</p>
 
 {% if not clients %}
 <p class="sn-muted">Aucune base. Créez-en une pour lier des comptes et la connexion Odoo.</p>
