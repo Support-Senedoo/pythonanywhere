@@ -7,18 +7,18 @@ Intervention : captcha + login dans la fenêtre. Dès que l’URL contient ``/my
 affiche la ligne ``Cookie`` (stdout) et optionnellement l’écrit dans un fichier.
 
 Dépendances : ``pip install -r requirements-capture-browser.txt`` puis
-``playwright install chromium`` (et ``playwright install firefox`` si ``--browser firefox``).
+``playwright install chromium`` ; ``playwright install msedge`` si ``--browser edge`` ;
+``playwright install firefox`` si ``--browser firefox``.
 
 **Si le captcha échoue systématiquement dans la fenêtre Playwright** :
 
-1. Utilise ``--browser chrome`` (Chrome / Chromium Google installé sur la machine, souvent mieux noté).
-2. Utilise ``--profile ~/.cache/senedoo_odoo_portal_pw`` : la **première** fois tu passes captcha + login
-   dans cette fenêtre ; les prochaines exécutions réutilisent le même profil (souvent **sans** recaptcha).
+1. Sous Windows / Mac : ``--browser edge`` (Microsoft Edge installé) ou ``--browser chrome``.
+2. ``--profile ~/.cache/senedoo_odoo_portal_pw`` : la **première** fois captcha + login ;
+   les relances réutilisent le profil (souvent **sans** recaptcha).
 3. Essaie ``--browser firefox``.
-4. Connexion en **4G / autre réseau** que le bureau (box pro, VPN).
-5. Dernier recours : **Chrome ou Safari sans script** — connecte-toi à odoo.com, Mes bases,
-   puis copie le Cookie depuis les outils développeur (onglet Réseau) ; test avec
-   ``scripts/verify_odoo_portal_cookie.py``.
+4. Réseau **4G** / hors **VPN** entreprise.
+5. Dernier recours : **Edge « à la main »** (sans script) → Mes bases → onglet **Réseau** des outils
+   → copier le **Cookie** → ``scripts/verify_odoo_portal_cookie.py``.
 """
 from __future__ import annotations
 
@@ -42,6 +42,7 @@ def _require_playwright():
             "Playwright manquant. Installez :\n"
             "  pip install -r requirements-capture-browser.txt\n"
             "  playwright install chromium\n"
+            "  # si --browser edge : playwright install msedge\n"
             "  # si --browser firefox : playwright install firefox",
             file=sys.stderr,
         )
@@ -74,13 +75,23 @@ def _context_options() -> dict:
     }
 
 
+def _chromium_channel_for_browser(browser: str) -> str | None:
+    """Canal Playwright pour navigateur Chromium embarqué (Google Chrome ou Microsoft Edge)."""
+    if browser == "chrome":
+        return "chrome"
+    if browser == "edge":
+        return "msedge"
+    return None
+
+
 def _print_captcha_help() -> None:
     print(
         "\n--- Captcha qui refuse de se valider ? ---\n"
-        "  1) Relance avec :  --browser chrome --profile ~/.cache/senedoo_odoo_portal_pw\n"
+        "  1) Relance avec :  --browser edge --profile ~/.cache/senedoo_odoo_portal_pw\n"
+        "     (ou --browser chrome avec le même --profile)\n"
         "  2) Ou :  --browser firefox\n"
         "  3) Réseau mobile / hors VPN entreprise\n"
-        "  4) Sans Playwright : navigateur normal + copie Cookie + verify_odoo_portal_cookie.py\n",
+        "  4) Sans Playwright : Edge manuel → Mes bases → Réseau → Cookie → verify_odoo_portal_cookie.py\n",
         file=sys.stderr,
     )
 
@@ -98,15 +109,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--browser",
-        choices=("chromium", "chrome", "firefox"),
+        choices=("chromium", "chrome", "edge", "firefox"),
         default="chromium",
-        help="Moteur : chromium (défaut), chrome (Chrome Google installé), ou firefox",
+        help="Moteur : chromium (défaut), chrome, edge (Microsoft Edge installé), ou firefox",
     )
     parser.add_argument(
         "--profile",
         metavar="DIR",
-        help="Dossier profil persistant Chromium/Chrome : session réutilisée entre les lancements "
-        "(créez un dossier vide ou réutilisez le même chemin). Fortement recommandé si captcha bloque.",
+        help="Dossier profil persistant (Chromium / Chrome / Edge) : session réutilisée entre les lancements. "
+        "Fortement recommandé si captcha bloque.",
     )
     args = parser.parse_args()
 
@@ -133,8 +144,9 @@ def main() -> None:
                     "args": _chromium_launch_args(),
                     **ctx_options,
                 }
-                if args.browser == "chrome":
-                    launch_kw["channel"] = "chrome"
+                ch = _chromium_channel_for_browser(args.browser)
+                if ch:
+                    launch_kw["channel"] = ch
                 context = p.chromium.launch_persistent_context(**launch_kw)
                 page = context.pages[0] if context.pages else context.new_page()
                 print(f"Profil persistant : {profile_dir}", file=sys.stderr)
@@ -147,8 +159,9 @@ def main() -> None:
                     "headless": False,
                     "args": _chromium_launch_args(),
                 }
-                if args.browser == "chrome":
-                    launch_kw2["channel"] = "chrome"
+                ch2 = _chromium_channel_for_browser(args.browser)
+                if ch2:
+                    launch_kw2["channel"] = ch2
                 browser = p.chromium.launch(**launch_kw2)
                 context = browser.new_context(**ctx_options)
                 page = context.new_page()
