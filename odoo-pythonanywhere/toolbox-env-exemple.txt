@@ -27,6 +27,11 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 # TOOLBOX_XMLRPC_CLIENT_ID=nom_base_odoo
 # Ou fichier dont la 1re ligne = ce nom (cron / Bash) :
 # TOOLBOX_XMLRPC_CLIENT_ID_FILE=/home/VOTRE_USER/odoo-pythonanywhere/.toolbox_xmlrpc_client_id
+#
+# Miroir du client choisi dans l’interface staff (écrit automatiquement par Flask ; lu par
+# scripts/xmlrpc_toolbox_client.py si les variables ci-dessus sont absentes). Chemin par défaut :
+# <racine_projet>/.toolbox_staff_selected_client
+# TOOLBOX_STAFF_SELECTED_CLIENT_FILE=/home/VOTRE_USER/odoo-pythonanywhere/.toolbox_staff_selected_client
 
 # Génération des hash mots de passe :
 #   python toolbox_generate_password_hash.py
@@ -63,6 +68,13 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 # Utilitaire « Sonde bases » — mode sans URL (portail odoo.com / Mes bases), rarement à changer :
 # TOOLBOX_ODOO_PORTAL_ORIGIN=https://www.odoo.com
 # TOOLBOX_ODOO_PORTAL_LANG=/fr_FR
+#
+# Cookie portail « Mes bases » (évite de le recoller dans l’interface à chaque liste).
+# Obtenu une fois après captcha : script local scripts/capture_odoo_portal_cookie_playwright.py
+# ou copie manuelle de l’en-tête Cookie (outils développeur). Ne jamais committer cette valeur.
+# Limite ~16000 caractères ; si trop long pour l’onglet Web PA, utiliser un fichier + …_FILE.
+# TOOLBOX_ODOO_PORTAL_COOKIE=session_id=...; cids=...; ...
+# TOOLBOX_ODOO_PORTAL_COOKIE_FILE=/home/VOTRE_USER/secret/odoo_portal_cookie.txt
 
 # Langue Odoo pour l’utilitaire « Rapports comptables » + script personalize_syscohada_detail.py (défaut fr_FR)
 # TOOLBOX_ODOO_LANG=fr_FR

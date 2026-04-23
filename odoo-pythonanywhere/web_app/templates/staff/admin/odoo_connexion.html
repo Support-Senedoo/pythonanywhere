@@ -18,13 +18,22 @@
   <p style="margin:0.65rem 0 0;line-height:1.55;font-size:0.92rem;">
     Le portail <strong>www.odoo.com</strong> déclenche très souvent un <strong>captcha</strong> lorsque la connexion est lancée <strong>depuis le serveur</strong> de la toolbox (IP datacenter).
     La toolbox ne peut pas le résoudre à votre place.
-    <strong>Contournement fiable</strong> : connectez-vous à odoo.com <strong>dans votre navigateur</strong> (captcha résolu), ouvrez <strong>Mes bases</strong>, puis collez ci-dessous l’en-tête <strong>Cookie</strong> de la requête document vers <code>…/my/databases</code> (voir encadré vert sous le login).
+    <strong>Intervention humaine minimale</strong> : une fois le captcha passé <strong>dans un navigateur</strong>, automatisez la suite avec le script local
+    <code>scripts/capture_odoo_portal_cookie_playwright.py</code>, puis définissez sur le serveur <strong>TOOLBOX_ODOO_PORTAL_COOKIE</strong> ou <strong>TOOLBOX_ODOO_PORTAL_COOKIE_FILE</strong>
+    (voir <code>toolbox-env-exemple.txt</code>) : la toolbox réutilise ce cookie sans le recoller dans le formulaire.
+    Vous pouvez aussi coller manuellement le <strong>Cookie</strong> de la requête document vers <code>…/my/databases</code> dans l’encadré vert ci-dessous.
     Le <strong>mot de passe</strong> (ou clé API) reste nécessaire pour tester l’accès XML-RPC sur chaque base listée.
   </p>
   <p style="margin:0.65rem 0 0;font-size:0.88rem;" class="sn-muted">
     Autre option : URL d’instance complète si votre serveur expose <code>db.list()</code> (souvent absent sur Odoo SaaS récent).
   </p>
 </div>
+
+{% if portal_cookie_from_server_config %}
+<div class="sn-flash" style="margin-top:0.85rem;background:rgba(59,130,246,0.15);border-color:rgba(59,130,246,0.35);">
+  <strong>Cookie portail côté serveur.</strong> Une valeur est déjà configurée (<code>TOOLBOX_ODOO_PORTAL_COOKIE</code> ou <code>TOOLBOX_ODOO_PORTAL_COOKIE_FILE</code>) : vous pouvez laisser le champ Cookie vide et lancer <strong>Lister les bases</strong> (login + mot de passe API toujours requis).
+</div>
+{% endif %}
 
 <p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
   <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.clients_list') }}">← Liste des bases enregistrées</a>

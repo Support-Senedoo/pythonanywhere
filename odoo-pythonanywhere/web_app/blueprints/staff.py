@@ -28,6 +28,7 @@ from web_app.blueprints.public import login_required_staff
 from web_app import app_version
 from web_app.client_apps import apps_for_template
 from web_app.odoo_instance_info import collect_authenticated_instance_metadata
+from web_app.staff_selected_client_persist import persist_staff_selected_client_for_xmlrpc
 from web_app.odoo_registry import (
     client_has_app,
     clients_sorted_for_select,
@@ -40,6 +41,7 @@ from web_app.odoo_registry import (
     upsert_client,
 )
 from web_app.odoo_account_probe import MAX_DATABASES_TO_PROBE, probe_account_databases
+from web_app.odoo_portal_cookie_env import read_portal_cookie_from_environment
 from web_app.odoo_instance_info import (
     build_balance_ohada_import_guide,
     format_server_version_info,
@@ -180,6 +182,7 @@ def select_client():
         flash("Client inconnu.", "danger")
         return redirect(url_for("staff.staff_home"))
     session["staff_selected_client_id"] = cid
+    persist_staff_selected_client_for_xmlrpc(current_app, cid)
     flash(f"Base active pour les applications : {_registry()[cid].db}", "success")
     return redirect(url_for("staff.apps_home"))
 
@@ -871,6 +874,8 @@ def pl_analytic_project_report():
     if job_running:
         cid_r = (request.args.get("client_id") or "").strip().lower()
         fh_r = (request.args.get("filter_host") or "").strip()
+        if cid_r and cid_r in reg:
+            persist_staff_selected_client_for_xmlrpc(current_app, cid_r)
         return render_template(
             "staff/pl_analytic_report.html",
             clients=reg,
@@ -992,6 +997,9 @@ def pl_analytic_project_report():
             analytic_q=analytic_q,
         )
 
+    if selected and selected in reg and not add_base_only:
+        persist_staff_selected_client_for_xmlrpc(current_app, selected)
+
     return render_template(
         "staff/pl_analytic_report.html",
         clients=reg,
@@ -1027,6 +1035,10 @@ def odoo_account_databases_probe():
         login = (request.form.get("odoo_login") or "").strip()
         password = (request.form.get("odoo_password") or "").strip()
         portal_cookie = (request.form.get("odoo_portal_session_cookie") or "").strip()
+        if not portal_cookie:
+            env_c = read_portal_cookie_from_environment()
+            if env_c:
+                portal_cookie = env_c
         if not login:
             flash("Login requis.", "warning")
         elif not url and not portal_cookie and not password:
@@ -1854,6 +1866,9 @@ def _accounting_reports_page(accounting_mode: str):
             )
         except Exception:
             balance_import_guide = None
+
+    if selected and selected in reg and not add_base_only:
+        persist_staff_selected_client_for_xmlrpc(current_app, selected)
 
     return render_template(
         "staff/accounting_reports_utility.html",

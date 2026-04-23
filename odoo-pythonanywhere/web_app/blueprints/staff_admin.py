@@ -35,6 +35,10 @@ from web_app.odoo_registry import (
     registry_netloc,
     upsert_client,
 )
+from web_app.odoo_portal_cookie_env import (
+    portal_cookie_configured_in_environment,
+    read_portal_cookie_from_environment,
+)
 from web_app.staff_odoo_work_session import (
     clear_staff_odoo_work_credentials,
     get_staff_odoo_work_credentials,
@@ -254,11 +258,14 @@ def odoo_connexion_staff():
                     "warning",
                 )
             else:
+                pc = (creds["portal_cookie"] or "").strip() or (
+                    read_portal_cookie_from_environment() or ""
+                ).strip()
                 result = probe_account_databases(
                     creds["base_url"],
                     creds["login"],
                     creds["password"],
-                    portal_session_cookie=creds["portal_cookie"],
+                    portal_session_cookie=pc or None,
                 )
         else:
             login = (request.form.get("odoo_login") or "").strip()
@@ -277,6 +284,10 @@ def odoo_connexion_staff():
                     base_url = prev["base_url"]
                 if not portal_cookie and (prev.get("portal_cookie") or "").strip():
                     portal_cookie = (prev["portal_cookie"] or "").strip()
+            if not portal_cookie:
+                env_pc = read_portal_cookie_from_environment()
+                if env_pc:
+                    portal_cookie = env_pc
 
             if not login:
                 flash("Login Odoo requis.", "warning")
@@ -292,6 +303,9 @@ def odoo_connexion_staff():
                     password,
                     portal_session_cookie=portal_cookie or None,
                 )
+                form_cookie_only = (request.form.get("odoo_portal_session_cookie") or "").strip()
+                prev_pc = (prev.get("portal_cookie") or "").strip() if prev else ""
+                cookie_to_store = form_cookie_only or prev_pc or None
                 if (
                     store_ok
                     and remember
@@ -303,7 +317,7 @@ def odoo_connexion_staff():
                         login=login,
                         password=password,
                         base_url=base_url,
-                        portal_cookie=portal_cookie or None,
+                        portal_cookie=cookie_to_store,
                     )
                     flash(
                         "Identifiants mémorisés sur le serveur pour cette session navigateur "
@@ -315,6 +329,16 @@ def odoo_connexion_staff():
                         "Astuce : ce serveur n’utilise pas les sessions « fichiers » — le mot de passe ne peut pas "
                         "être conservé entre deux visites. Sur PythonAnywhere, c’est en général automatique ; "
                         "en local, définissez TOOLBOX_FILESYSTEM_SESSION=1 (voir déploiement).",
+                        "info",
+                    )
+                if (
+                    read_portal_cookie_from_environment()
+                    and not (request.form.get("odoo_portal_session_cookie") or "").strip()
+                    and not (isinstance(result, dict) and result.get("db_list_error"))
+                ):
+                    flash(
+                        "Cookie portail : valeur lue depuis la configuration serveur "
+                        "(TOOLBOX_ODOO_PORTAL_COOKIE ou TOOLBOX_ODOO_PORTAL_COOKIE_FILE).",
                         "info",
                     )
 
@@ -329,6 +353,7 @@ def odoo_connexion_staff():
         portal_captcha_blocked=_portal_db_error_suggests_captcha(
             db_err if isinstance(db_err, str) else None
         ),
+        portal_cookie_from_server_config=portal_cookie_configured_in_environment(),
     )
 
 
