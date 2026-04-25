@@ -97,3 +97,9 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Références** : commit `59176fb`, toolbox **1.10.28**.
 - **Erreur / leçon** : si la version affichée ne bouge pas après merge local, vérifier push + reload PA (une variable Web peut aussi surcharger la version).
 
+### 2026-04-25 — Toolbox 1.10.29 : rattachement portefeuille (upsert) + création client à l’édition ; PA
+- **Action** : `UPSERT_PORTFOLIO_UNCHANGED` dans `upsert_client` (éviter d’interpréter `None` comme « conserver » en mise à jour), formulaire édition base aligné sur `_resolve_portfolio_client_from_form()` + bloc « Créer un client portefeuille », colonne portefeuille dans la liste admin ; `git push` + `bash deploy_to_pa.sh -SkipGitPush`.
+- **Résultat** : OK — PA pull jusqu’à `8d50ff5`, reload Web `{"status":"OK"}`.
+- **Références** : commit `8d50ff5`, toolbox **1.10.29**.
+- **Erreur / leçon** : `portfolio_client_id=None` passé au merge devait signifier « détacher » ou « pas de choix » selon le flux ; un sentinelle explicite évite l’ambiguïté sur les ré-enregistrements.
+
