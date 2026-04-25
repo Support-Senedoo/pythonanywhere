@@ -14,7 +14,7 @@ _SENEGAL_TZ = ZoneInfo("Africa/Dakar")
 #   - patch (1.3.x → 1.3.y) : correctifs sans changement de comportement visible ;
 #   - minor (1.3.x → 1.4.0) : nouvelle fonctionnalité ou évolution d’écran / API toolbox ;
 #   - adapter _DEFAULT_DATE au jour de la livraison (YYYY-MM-DD).
-_DEFAULT_VERSION = "1.10.27"
+_DEFAULT_VERSION = "1.10.28"
 _DEFAULT_DATE = "2026-04-25"
 _DEFAULT_TIME = "16:00"
 

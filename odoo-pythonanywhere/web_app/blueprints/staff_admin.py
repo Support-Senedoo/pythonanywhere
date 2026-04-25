@@ -41,6 +41,7 @@ from web_app.portfolio_clients_store import (
     delete_portfolio_client,
     load_portfolio_clients,
     normalize_portfolio_client_id,
+    portfolio_client_id_from_name,
     portfolio_client_exists,
     portfolio_clients_sorted,
     upsert_portfolio_client,
@@ -173,20 +174,30 @@ def _resolve_odoo_api_user_password(
         creds = get_staff_odoo_work_credentials(session)
         if creds:
             pw = (creds.get("password") or "").strip() or None
+    if not pw or not user:
+        reg = load_clients_registry(_clients_path())
+        selected = (session.get("staff_selected_client_id") or "").strip().lower()
+        cfg = reg.get(selected) if selected else None
+        if cfg is None and reg:
+            cfg = sorted(reg.values(), key=lambda c: c.db.casefold())[0]
+        if cfg:
+            if not user:
+                user = (cfg.user or "").strip()
+            if not pw:
+                pw = (cfg.password or "").strip() or None
     return user, pw
 
 
 def _resolve_portfolio_client_from_form() -> str | None:
-    """Sélection client portefeuille existant, ou création à la volée (id + nom)."""
+    """Sélection client portefeuille existant, ou création à la volée (slug depuis le nom)."""
     existing_raw = (request.form.get("portfolio_client_id") or "").strip()
-    new_id_raw = (request.form.get("portfolio_client_id_new") or "").strip()
     new_name = (request.form.get("portfolio_client_name_new") or "").strip()
-    if new_id_raw:
+    if new_name:
         try:
-            pid = normalize_portfolio_client_id(new_id_raw)
+            pid = portfolio_client_id_from_name(new_name)
         except ValueError as e:
             raise ValueError(f"Nouveau client portefeuille invalide : {e}") from e
-        upsert_portfolio_client(_portfolio_clients_path(), pid, new_name or pid)
+        upsert_portfolio_client(_portfolio_clients_path(), pid, new_name)
         return pid
     if existing_raw:
         try:

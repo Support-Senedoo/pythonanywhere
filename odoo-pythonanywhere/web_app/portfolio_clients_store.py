@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,19 @@ class PortfolioClient:
 def normalize_portfolio_client_id(raw: str) -> str:
     """Même contraintes que le nom de base : slug stable en minuscules."""
     return normalize_registry_db_key(str(raw or "").strip())
+
+
+def portfolio_client_id_from_name(name: str) -> str:
+    """Construit un slug stable depuis le nom client saisi."""
+    src = str(name or "").strip()
+    if not src:
+        raise ValueError("Nom du client portefeuille requis.")
+    norm = unicodedata.normalize("NFKD", src)
+    ascii_only = norm.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", ascii_only).strip("-_").lower()
+    if not slug:
+        raise ValueError("Nom du client portefeuille invalide.")
+    return normalize_portfolio_client_id(slug)
 
 
 def read_portfolio_file(path: str | Path) -> dict[str, Any]:

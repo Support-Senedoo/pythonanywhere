@@ -42,6 +42,7 @@ from web_app.odoo_registry import (
 )
 from web_app.portfolio_clients_store import (
     normalize_portfolio_client_id,
+    portfolio_client_id_from_name,
     portfolio_client_exists,
     portfolio_clients_sorted,
     upsert_portfolio_client,
@@ -162,14 +163,13 @@ def _portfolio_clients_path() -> str:
 
 def _resolve_portfolio_client_from_form() -> str | None:
     existing_raw = (request.form.get("portfolio_client_id") or "").strip()
-    new_id_raw = (request.form.get("portfolio_client_id_new") or "").strip()
     new_name = (request.form.get("portfolio_client_name_new") or "").strip()
-    if new_id_raw:
+    if new_name:
         try:
-            pid = normalize_portfolio_client_id(new_id_raw)
+            pid = portfolio_client_id_from_name(new_name)
         except ValueError as e:
             raise ValueError(f"Nouveau client portefeuille invalide : {e}") from e
-        upsert_portfolio_client(_portfolio_clients_path(), pid, new_name or pid)
+        upsert_portfolio_client(_portfolio_clients_path(), pid, new_name)
         return pid
     if existing_raw:
         try:

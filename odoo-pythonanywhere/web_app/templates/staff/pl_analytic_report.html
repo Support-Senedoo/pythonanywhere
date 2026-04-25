@@ -30,7 +30,7 @@
     <label for="new_url">URL Odoo (https://…)</label>
     <input type="text" id="new_url" name="new_url" required placeholder="https://moninstance.odoo.com" spellcheck="false" autocapitalize="none">
     <label for="new_db">Nom de la base (db)</label>
-    <input type="text" id="new_db" name="new_db" required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
+    <input type="text" id="new_db" name="new_db" required placeholder="nom_technique_postgresql" spellcheck="false" autocapitalize="none">
     <label for="new_user">Utilisateur / e-mail API</label>
     <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
     <label for="new_password">Mot de passe ou clé API</label>
@@ -44,8 +44,7 @@
     </select>
     <details class="sn-doc sn-doc--nav" style="margin-top:0.35rem;">
       <summary>Créer un client portefeuille</summary>
-      <input type="text" name="portfolio_client_id_new" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="id client" spellcheck="false" autocapitalize="none">
-      <input type="text" name="portfolio_client_name_new" placeholder="nom affiché">
+      <input type="text" name="portfolio_client_name_new" placeholder="nom client (ex. La Ripaille)" spellcheck="false" autocapitalize="none">
     </details>
     <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
   </form>
