@@ -62,6 +62,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Références** : commit `5cf5e56`, toolbox **1.10.1** (`app_version.py`).
 - **Erreur / leçon** : une réponse avait indiqué à tort que le déploiement ne pouvait pas se faire depuis macOS ; le bon script local est **`deploy_to_pa.sh`** (équivalent de **`deploy_pa.ps1`**). Toujours vérifier dans le dépôt avant d’affirmer une contrainte d’OS.
 
+### 2026-04-25 — Toolbox 1.10.24 : UI base→utilitaires, accordéons, portefeuille ; déploiement PA
+- **Action** : `git push origin master` ; sur PA `git fetch` puis **`git reset --hard origin/master`** (fichier `web_app/__init__.py` modifié localement sur PA — doublon config — bloquait le pull) ; `bash deploy_to_pa.sh -SkipGitPush` ; reload Web `{"status":"OK"}`.
+- **Résultat** : OK — PA sur commit **`bf43e81`**, toolbox **1.10.24**.
+- **Références** : commit `bf43e81` (remplace `c55429e` côté disque PA).
+- **Erreur / leçon** : ne pas éditer à la main sur PA des fichiers versionnés sans commit ; sinon `pull` échoue — préférer stash ou annuler la modif, ou tout aligner sur `origin/master` si pas de travail local à garder.
+
 ### 2026-04-14 — Menu wizard CPC invisible (Odoo) : act_window + parent = menu rapport
 - **Action** : code `create_cpc_odoo_wizard.py` — menu « 1. Assistant » via **`ir.actions.act_window`** au lieu de **`ir.actions.server`** ; alignement **`parent_id`** du menu assistant sur celui du menu « 2. Rapport ».
 - **Résultat** : livré en toolbox **1.10.2** ; après **Mettre à jour Budget par projet** dans Odoo, l’entrée **1.** doit apparaître au même endroit que **2.** (juste au-dessus si séquences 8/9).
