@@ -62,6 +62,12 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Références** : commit `5cf5e56`, toolbox **1.10.1** (`app_version.py`).
 - **Erreur / leçon** : une réponse avait indiqué à tort que le déploiement ne pouvait pas se faire depuis macOS ; le bon script local est **`deploy_to_pa.sh`** (équivalent de **`deploy_pa.ps1`**). Toujours vérifier dans le dépôt avant d’affirmer une contrainte d’OS.
 
+### 2026-04-25 — Liens « Nouvelle base » visibles (toolbox 1.10.25)
+- **Action** : `git push` + `bash deploy_to_pa.sh -SkipGitPush` ; PA pull jusqu’à `82adc8c`, reload Web `{"status":"OK"}`.
+- **Résultat** : OK — toolbox **1.10.25** (accueil staff + utilitaires).
+- **Références** : commit `82adc8c`.
+- **Erreur / leçon** : (vide)
+
 ### 2026-04-25 — Toolbox 1.10.24 : UI base→utilitaires, accordéons, portefeuille ; déploiement PA
 - **Action** : `git push origin master` ; sur PA `git fetch` puis **`git reset --hard origin/master`** (fichier `web_app/__init__.py` modifié localement sur PA — doublon config — bloquait le pull) ; `bash deploy_to_pa.sh -SkipGitPush` ; reload Web `{"status":"OK"}`.
 - **Résultat** : OK — PA sur commit **`bf43e81`**, toolbox **1.10.24**.
