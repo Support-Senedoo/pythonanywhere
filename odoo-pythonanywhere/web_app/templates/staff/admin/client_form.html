@@ -119,6 +119,33 @@
 
 <script>
 (function(){
+function snBindDefaultOdooUrl(dbId, urlId){
+  var dbInput = document.getElementById(dbId);
+  var urlInput = document.getElementById(urlId);
+  if (!dbInput || !urlInput) return;
+  var autoValue = '';
+  function buildUrl(){
+    var raw = (dbInput.value || '').trim().toLowerCase();
+    if (!raw) return '';
+    return 'https://' + raw + '.odoo.com';
+  }
+  function applySuggestion(){
+    var suggestion = buildUrl();
+    if (!suggestion) return;
+    var current = (urlInput.value || '').trim();
+    if (!current || current === autoValue) {
+      urlInput.value = suggestion;
+      autoValue = suggestion;
+    }
+  }
+  dbInput.addEventListener('input', applySuggestion);
+  dbInput.addEventListener('change', applySuggestion);
+  urlInput.addEventListener('input', function(){
+    if ((urlInput.value || '').trim() !== autoValue) autoValue = '';
+  });
+  applySuggestion();
+}
+
   var btn = document.getElementById('btn-refresh-odoo-dbs');
   var msg = document.getElementById('odoo-db-list-msg');
   if (!btn) return;
@@ -147,6 +174,9 @@
       })
       .catch(function(e){ msg.textContent = 'Erreur réseau.'; });
   });
+
+  snBindDefaultOdooUrl('db', 'url');
+  snBindDefaultOdooUrl('new_db', 'new_url');
 })();
 </script>
 {% endblock %}

@@ -78,3 +78,10 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Action** : code `create_cpc_odoo_wizard.py` — menu « 1. Assistant » via **`ir.actions.act_window`** au lieu de **`ir.actions.server`** ; alignement **`parent_id`** du menu assistant sur celui du menu « 2. Rapport ».
 - **Résultat** : livré en toolbox **1.10.2** ; après **Mettre à jour Budget par projet** dans Odoo, l’entrée **1.** doit apparaître au même endroit que **2.** (juste au-dessus si séquences 8/9).
 - **Leçon** : les menus **`ir.actions.server`** peuvent ne pas s’afficher dans la barre latérale selon édition / droits ; **`ir.actions.act_window`** est le pattern standard des entrées visibles.
+
+### 2026-04-25 — Suggestion automatique URL Odoo depuis le nom de base (toolbox 1.10.26)
+- **Action** : auto-remplissage JS sur formulaires de création de base (`db/new_db` -> `https://<db>.odoo.com`) sans écraser une URL modifiée manuellement.
+- **Résultat** : OK — saisie plus rapide sur admin + utilitaires.
+- **Références** : commit toolbox 1.10.26 (voir historique Git).
+- **Erreur / leçon** : garder le comportement en suggestion seulement (pas de forçage).
+
