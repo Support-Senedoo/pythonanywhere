@@ -176,6 +176,29 @@ def _resolve_odoo_api_user_password(
     return user, pw
 
 
+def _resolve_portfolio_client_from_form() -> str | None:
+    """Sélection client portefeuille existant, ou création à la volée (id + nom)."""
+    existing_raw = (request.form.get("portfolio_client_id") or "").strip()
+    new_id_raw = (request.form.get("portfolio_client_id_new") or "").strip()
+    new_name = (request.form.get("portfolio_client_name_new") or "").strip()
+    if new_id_raw:
+        try:
+            pid = normalize_portfolio_client_id(new_id_raw)
+        except ValueError as e:
+            raise ValueError(f"Nouveau client portefeuille invalide : {e}") from e
+        upsert_portfolio_client(_portfolio_clients_path(), pid, new_name or pid)
+        return pid
+    if existing_raw:
+        try:
+            pid = normalize_portfolio_client_id(existing_raw)
+        except ValueError as e:
+            raise ValueError(f"Client portefeuille invalide : {e}") from e
+        if not portfolio_client_exists(_portfolio_clients_path(), pid):
+            raise ValueError("Client portefeuille inconnu.")
+        return pid
+    return None
+
+
 @bp.route("/odoo-databases")
 @login_required_staff
 def odoo_databases_suggest():
@@ -280,9 +303,10 @@ def odoo_connexion_staff():
             if not inst_url:
                 flash("URL d’instance manquante.", "danger")
                 return redirect(url_for("staff_admin.odoo_connexion_staff"))
-            pc_raw = (request.form.get("portfolio_client_id") or "").strip()
-            if pc_raw and not portfolio_client_exists(_portfolio_clients_path(), pc_raw):
-                flash("Client portefeuille inconnu — créez-le dans Administration.", "danger")
+            try:
+                pc_raw = _resolve_portfolio_client_from_form()
+            except ValueError as e:
+                flash(str(e), "danger")
                 return redirect(url_for("staff_admin.odoo_connexion_staff"))
             try:
                 upsert_client(
@@ -295,7 +319,7 @@ def odoo_connexion_staff():
                     password,
                     ["odoo_status"],
                     environment=env,
-                    portfolio_client_id=pc_raw or None,
+                    portfolio_client_id=pc_raw,
                 )
             except ValueError as e:
                 flash(str(e), "danger")
@@ -413,6 +437,7 @@ def odoo_connexion_staff():
             db_err if isinstance(db_err, str) else None
         ),
         portal_cookie_from_server_config=portal_cookie_configured_in_environment(),
+        portfolio_clients=portfolio_clients_sorted(_portfolio_clients_path()),
     )
 
 
@@ -464,27 +489,24 @@ def client_new():
                     "danger",
                 )
             else:
-                pc_raw = (request.form.get("portfolio_client_id") or "").strip()
-                if pc_raw and not portfolio_client_exists(_portfolio_clients_path(), pc_raw):
-                    flash("Client portefeuille inconnu — créez-le dans Administration.", "danger")
-                else:
-                    try:
-                        upsert_client(
-                            _clients_path(),
-                            cid,
-                            cid,
-                            url,
-                            db,
-                            user,
-                            password,
-                            apps,
-                            environment=(request.form.get("environment") or "production"),
-                            portfolio_client_id=pc_raw or None,
-                        )
-                        flash(f"Base « {cid} » enregistrée.", "success")
-                        return redirect(url_for("staff_admin.clients_list"))
-                    except ValueError as e:
-                        flash(str(e), "danger")
+                try:
+                    pc_raw = _resolve_portfolio_client_from_form()
+                    upsert_client(
+                        _clients_path(),
+                        cid,
+                        cid,
+                        url,
+                        db,
+                        user,
+                        password,
+                        apps,
+                        environment=(request.form.get("environment") or "production"),
+                        portfolio_client_id=pc_raw,
+                    )
+                    flash(f"Base « {cid} » enregistrée.", "success")
+                    return redirect(url_for("staff_admin.clients_list"))
+                except ValueError as e:
+                    flash(str(e), "danger")
     portfolio_choices = portfolio_clients_sorted(_portfolio_clients_path())
     return render_template(
         "staff/admin/client_form.html",

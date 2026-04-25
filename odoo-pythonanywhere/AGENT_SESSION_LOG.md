@@ -85,3 +85,9 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Références** : commit toolbox 1.10.26 (voir historique Git).
 - **Erreur / leçon** : garder le comportement en suggestion seulement (pas de forçage).
 
+### 2026-04-25 — Création base : choisir ou créer client portefeuille (toolbox 1.10.27)
+- **Action** : formulaires de création de base (admin, connexion Odoo, utilitaires) avec liste de clients portefeuille + création inline (id + nom), puis rattachement automatique.
+- **Résultat** : OK — si la liste est vide, création possible sans quitter le formulaire.
+- **Références** : commit toolbox 1.10.27 (voir historique Git).
+- **Erreur / leçon** : création inline doit rester optionnelle et non bloquante.
+

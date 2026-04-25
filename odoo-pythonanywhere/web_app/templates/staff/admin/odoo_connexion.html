@@ -178,6 +178,18 @@
               <input type="hidden" name="action" value="register">
               <input type="hidden" name="instance_url" value="{{ r.instance_url }}">
               <input type="hidden" name="database" value="{{ r.database }}">
+              <label class="sn-muted" style="font-size:0.78rem;display:block;">Client portefeuille</label>
+              <select name="portfolio_client_id" style="margin-bottom:0.35rem;max-width:12rem;">
+                <option value="">— Non rattaché —</option>
+                {% for p in portfolio_clients|default([]) %}
+                <option value="{{ p.id }}">{{ p.name }} ({{ p.id }})</option>
+                {% endfor %}
+              </select>
+              <details class="sn-doc sn-doc--nav" style="margin:0 0 0.35rem;">
+                <summary>Nouveau client portefeuille</summary>
+                <input type="text" name="portfolio_client_id_new" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="id client" style="max-width:12rem;margin-top:0.3rem;">
+                <input type="text" name="portfolio_client_name_new" placeholder="nom affiché" style="max-width:12rem;margin-top:0.3rem;">
+              </details>
               <label class="sn-muted" style="font-size:0.78rem;display:block;margin-bottom:0.25rem;">Environnement</label>
               <select name="environment" style="margin-bottom:0.35rem;max-width:10rem;">
                 <option value="production" selected>Production</option>

@@ -40,6 +40,12 @@ from web_app.odoo_registry import (
     registry_netloc,
     upsert_client,
 )
+from web_app.portfolio_clients_store import (
+    normalize_portfolio_client_id,
+    portfolio_client_exists,
+    portfolio_clients_sorted,
+    upsert_portfolio_client,
+)
 from web_app.odoo_account_probe import MAX_DATABASES_TO_PROBE, probe_account_databases
 from web_app.odoo_portal_cookie_env import read_portal_cookie_from_environment
 from web_app.odoo_instance_info import (
@@ -148,6 +154,32 @@ def _staff_disable_html_cache(response):
 
 def _registry():
     return load_clients_registry(current_app.config["TOOLBOX_CLIENTS_PATH"])
+
+
+def _portfolio_clients_path() -> str:
+    return current_app.config["TOOLBOX_PORTFOLIO_CLIENTS_PATH"]
+
+
+def _resolve_portfolio_client_from_form() -> str | None:
+    existing_raw = (request.form.get("portfolio_client_id") or "").strip()
+    new_id_raw = (request.form.get("portfolio_client_id_new") or "").strip()
+    new_name = (request.form.get("portfolio_client_name_new") or "").strip()
+    if new_id_raw:
+        try:
+            pid = normalize_portfolio_client_id(new_id_raw)
+        except ValueError as e:
+            raise ValueError(f"Nouveau client portefeuille invalide : {e}") from e
+        upsert_portfolio_client(_portfolio_clients_path(), pid, new_name or pid)
+        return pid
+    if existing_raw:
+        try:
+            pid = normalize_portfolio_client_id(existing_raw)
+        except ValueError as e:
+            raise ValueError(f"Client portefeuille invalide : {e}") from e
+        if not portfolio_client_exists(_portfolio_clients_path(), pid):
+            raise ValueError("Client portefeuille inconnu.")
+        return pid
+    return None
 
 
 def _require_staff_client_selected():
@@ -476,6 +508,7 @@ def pl_analytic_project_report():
             env_raw = (request.form.get("new_environment") or "").strip().lower()
             env_kw = env_raw if env_raw in ("production", "test") else None
             try:
+                portfolio_cid = _resolve_portfolio_client_from_form()
                 upsert_client(
                     clients_path,
                     new_cid,
@@ -486,6 +519,7 @@ def pl_analytic_project_report():
                     password,
                     [],
                     environment=env_kw,
+                    portfolio_client_id=portfolio_cid,
                 )
                 flash(f"Base enregistrée : {new_cid}.", "success")
             except ValueError as e:
@@ -1044,6 +1078,7 @@ def pl_analytic_project_report():
         manager_dashboard_installed=manager_dashboard_installed,
         job_running=job_running,
         job_id=jid,
+        portfolio_clients=portfolio_clients_sorted(_portfolio_clients_path()),
     )
 
 
@@ -1174,6 +1209,7 @@ def _accounting_reports_page(accounting_mode: str):
             env_raw = (request.form.get("new_environment") or "").strip().lower()
             env_kw = env_raw if env_raw in ("production", "test") else None
             try:
+                portfolio_cid = _resolve_portfolio_client_from_form()
                 upsert_client(
                     clients_path,
                     new_cid,
@@ -1184,6 +1220,7 @@ def _accounting_reports_page(accounting_mode: str):
                     password,
                     [],
                     environment=env_kw,
+                    portfolio_client_id=portfolio_cid,
                 )
                 flash(f"Base enregistrée : {new_cid}.", "success")
             except ValueError as e:
@@ -1925,6 +1962,7 @@ def _accounting_reports_page(accounting_mode: str):
         utility_date=UTILITY_DATE,
         utility_author=UTILITY_AUTHOR,
         balance_import_guide=balance_import_guide,
+        portfolio_clients=portfolio_clients_sorted(_portfolio_clients_path()),
     )
 
 

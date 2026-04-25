@@ -60,6 +60,19 @@
       <option value="{{ p.id }}" {% if client and client.portfolio_client_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
       {% endfor %}
     </select>
+    {% if mode == 'new' %}
+    <details class="sn-doc sn-doc--nav" style="margin:0.45rem 0 0;">
+      <summary>Client absent ? Créer un client portefeuille</summary>
+      <label for="portfolio_client_id_new" style="margin-top:0.55rem;">Identifiant client (slug)</label>
+      <input type="text" id="portfolio_client_id_new" name="portfolio_client_id_new"
+             pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="ex. la_ripaille"
+             spellcheck="false" autocapitalize="none">
+      <label for="portfolio_client_name_new">Nom affiché</label>
+      <input type="text" id="portfolio_client_name_new" name="portfolio_client_name_new"
+             placeholder="ex. La Ripaille">
+      <p class="sn-muted" style="margin:0.4rem 0 0;font-size:0.82rem;">Si l’identifiant est renseigné, ce nouveau client est créé puis utilisé pour rattacher la base.</p>
+    </details>
+    {% endif %}
     {% endif %}
 
     {% if mode == 'new' %}

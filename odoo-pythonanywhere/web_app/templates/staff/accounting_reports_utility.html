@@ -41,6 +41,18 @@
       <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
       <label for="new_password">Mot de passe ou clé API</label>
       <input type="password" id="new_password" name="new_password" autocomplete="new-password" required placeholder="Obligatoire pour une nouvelle base">
+      <label for="portfolio_client_id">Client portefeuille</label>
+      <select id="portfolio_client_id" name="portfolio_client_id">
+        <option value="">— Non rattaché —</option>
+        {% for p in portfolio_clients|default([]) %}
+        <option value="{{ p.id }}">{{ p.name }} ({{ p.id }})</option>
+        {% endfor %}
+      </select>
+      <details class="sn-doc sn-doc--nav" style="margin-top:0.35rem;">
+        <summary>Créer un client portefeuille</summary>
+        <input type="text" name="portfolio_client_id_new" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="id client" spellcheck="false" autocapitalize="none">
+        <input type="text" name="portfolio_client_name_new" placeholder="nom affiché">
+      </details>
       <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
     </form>
   </div>
@@ -255,6 +267,18 @@ function snBindDefaultOdooUrl(dbId, urlId){
         <input type="text" id="new_user" name="new_user" required autocomplete="username" spellcheck="false">
         <label for="new_password">Mot de passe ou clé API</label>
         <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Obligatoire pour une nouvelle base ; inchangé si la base existe déjà">
+        <label for="portfolio_client_id">Client portefeuille</label>
+        <select id="portfolio_client_id" name="portfolio_client_id">
+          <option value="">— Non rattaché —</option>
+          {% for p in portfolio_clients|default([]) %}
+          <option value="{{ p.id }}">{{ p.name }} ({{ p.id }})</option>
+          {% endfor %}
+        </select>
+        <details class="sn-doc sn-doc--nav" style="margin-top:0.35rem;">
+          <summary>Créer un client portefeuille</summary>
+          <input type="text" name="portfolio_client_id_new" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}" placeholder="id client" spellcheck="false" autocapitalize="none">
+          <input type="text" name="portfolio_client_name_new" placeholder="nom affiché">
+        </details>
         <button type="submit" style="margin-top:0.75rem;">Enregistrer la base</button>
       </form>
     </div>
