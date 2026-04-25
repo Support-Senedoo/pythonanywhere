@@ -23,6 +23,13 @@
 
 <div class="sn-card sn-card--accent">
   <h2 style="margin-top:0;">1. Base de travail</h2>
+  {% if not clients %}
+  <p class="sn-muted" style="margin:0 0 0.65rem;">Aucune base enregistrée — créez-en une pour commencer.</p>
+  <p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin:0 0 0.85rem;">
+    <a class="sn-btn" href="{{ url_for('staff_admin.client_new') }}">+ Nouvelle base (saisie manuelle)</a>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo (lister les bases)</a>
+  </p>
+  {% else %}
   <form method="post" action="{{ url_for('staff.select_client') }}">
     <label for="client_id">Base Odoo</label>
     <select id="client_id" name="client_id" required>
@@ -33,6 +40,12 @@
     </select>
     <button type="submit" style="margin-top:0.65rem;">Valider cette base</button>
   </form>
+  <p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin:0.85rem 0 0;">
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.client_new') }}">+ Nouvelle base</a>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo</a>
+    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.clients_list') }}">Registre des bases</a>
+  </p>
+  {% endif %}
 </div>
 
 <div class="sn-card sn-card--accent" id="sn-staff-utils">

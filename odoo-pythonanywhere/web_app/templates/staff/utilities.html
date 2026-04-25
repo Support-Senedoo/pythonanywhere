@@ -9,13 +9,18 @@
     Base : <strong><code>{{ clients[selected].db }}</code></strong>
     {% if work_filter_host %}<span class="sn-muted"> · <code>{{ work_filter_host }}</code></span>{% endif %}
   </p>
-  <p style="margin:0.5rem 0 0;">
+  <p style="margin:0.5rem 0 0;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
     <a href="{{ url_for('staff.staff_home') }}#sn-staff-utils">← Changer de base</a>
+    <a class="sn-btn sn-btn--ghost" style="padding:0.25rem 0.5rem;font-size:0.85rem;" href="{{ url_for('staff_admin.client_new') }}">+ Nouvelle base</a>
   </p>
 </div>
 {% else %}
-<p class="sn-muted" style="margin:0 0 1rem;">
-  <a href="{{ url_for('staff.staff_home') }}">Choisir une base de travail</a> sur le tableau de bord — ou la base dans chaque écran.
+<p class="sn-muted" style="margin:0 0 0.5rem;">
+  <a href="{{ url_for('staff.staff_home') }}">Choisir une base</a> sur le tableau de bord — ou la base dans chaque écran.
+</p>
+<p style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:0 0 1rem;">
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.client_new') }}">+ Nouvelle base</a>
+  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo</a>
 </p>
 {% endif %}
 
@@ -61,9 +66,10 @@
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Autres outils</h2>
   <ul style="margin:0;padding-left:1.2rem;line-height:1.65;">
+    <li><a href="{{ url_for('staff_admin.client_new') }}">Nouvelle base (registre)</a></li>
     <li>
       {% if selected and selected in clients and work_filter_host %}
-      <a href="{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=work_filter_host) }}#ajouter-base-odoo">Ajouter une base Odoo</a>
+      <a href="{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=work_filter_host) }}#ajouter-base-odoo">Ajouter une base Odoo (formulaire utilitaire)</a>
       {% else %}
       <a href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}#ajouter-base-odoo">Ajouter une base Odoo</a>
       {% endif %}
