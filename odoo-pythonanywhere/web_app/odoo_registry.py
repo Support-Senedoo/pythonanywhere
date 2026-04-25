@@ -14,6 +14,9 @@ from odoo_client import normalize_odoo_base_url
 
 from web_app.client_apps import normalize_app_ids
 
+# Sentinelle : ne pas modifier le rattachement client portefeuille existant (upsert_client, branche mise à jour).
+UPSERT_PORTFOLIO_UNCHANGED = object()
+
 # Clé registre = nom technique de la base Odoo (normalisé minuscules), aligné PostgreSQL / Odoo courant.
 _REGISTRY_DB_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 
@@ -194,9 +197,15 @@ def upsert_client(
     apps: list[str],
     *,
     environment: str | None = None,
-    portfolio_client_id: str | None = None,
+    portfolio_client_id: Any = UPSERT_PORTFOLIO_UNCHANGED,
 ) -> None:
-    """Enregistre une base ; id reste le nom de base normalisé ; label = libellé affichage (défaut = db)."""
+    """Enregistre une base ; id reste le nom de base normalisé ; label = libellé affichage (défaut = db).
+
+    ``portfolio_client_id`` :
+    - ``UPSERT_PORTFOLIO_UNCHANGED`` (défaut) : en mise à jour, conserve le rattachement existant ;
+      en création, n’ajoute pas de champ ``portfolio_client_id``.
+    - ``str`` ou ``None`` explicite : normalise / détache (``None`` = plus de rattachement).
+    """
     del client_id
     db_key = normalize_registry_db_key(str(db or "").strip())
     display_label = (label or "").strip() or db_key
@@ -226,10 +235,10 @@ def upsert_client(
             else _normalize_environment(row.get("environment"))
         )
         pcid: str | None
-        if portfolio_client_id is not None:
-            pcid = _parse_portfolio_client_id(portfolio_client_id)
-        else:
+        if portfolio_client_id is UPSERT_PORTFOLIO_UNCHANGED:
             pcid = _parse_portfolio_client_id(row.get("portfolio_client_id"))
+        else:
+            pcid = _parse_portfolio_client_id(portfolio_client_id)
         row_out: dict[str, Any] = {
             "id": db_key,
             "label": display_label,
@@ -246,7 +255,10 @@ def upsert_client(
     else:
         if not password:
             raise ValueError("Mot de passe Odoo requis pour une nouvelle base.")
-        pcid_new = _parse_portfolio_client_id(portfolio_client_id) if portfolio_client_id is not None else None
+        if portfolio_client_id is UPSERT_PORTFOLIO_UNCHANGED:
+            pcid_new = None
+        else:
+            pcid_new = _parse_portfolio_client_id(portfolio_client_id)
         env_use = _normalize_environment(environment or "production")
         new_row: dict[str, Any] = {
             "id": db_key,

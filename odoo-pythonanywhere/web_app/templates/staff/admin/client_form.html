@@ -60,15 +60,16 @@
       <option value="{{ p.id }}" {% if client and client.portfolio_client_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
       {% endfor %}
     </select>
-    {% if mode == 'new' %}
     <details class="sn-doc sn-doc--nav" style="margin:0.45rem 0 0;">
-      <summary>Client absent ? Créer un client portefeuille</summary>
-      <label for="portfolio_client_name_new" style="margin-top:0.55rem;">Nom du client</label>
+      <summary>{% if mode == 'new' %}Client absent ? {% endif %}Créer un client portefeuille</summary>
+      <label for="portfolio_client_name_new" style="margin-top:0.55rem;">Nom du client (société)</label>
       <input type="text" id="portfolio_client_name_new" name="portfolio_client_name_new"
-             placeholder="ex. La Ripaille">
-      <p class="sn-muted" style="margin:0.4rem 0 0;font-size:0.82rem;">Si ce nom est renseigné, le client portefeuille est créé automatiquement (slug généré), puis la base est rattachée.</p>
+             placeholder="ex. La Ripaille" autocomplete="organization">
+      <p class="sn-muted" style="margin:0.4rem 0 0;font-size:0.82rem;">
+        Si ce nom est renseigné, le client portefeuille est créé (slug généré) et utilisé pour rattacher la base,
+        même si une autre valeur est encore affichée dans la liste ci-dessus (le nom saisi prime).
+      </p>
     </details>
-    {% endif %}
     {% endif %}
 
     {% if mode == 'new' %}

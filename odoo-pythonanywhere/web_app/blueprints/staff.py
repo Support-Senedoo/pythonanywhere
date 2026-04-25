@@ -30,6 +30,7 @@ from web_app.client_apps import apps_for_template
 from web_app.odoo_instance_info import collect_authenticated_instance_metadata
 from web_app.staff_selected_client_persist import persist_staff_selected_client_for_xmlrpc
 from web_app.odoo_registry import (
+    UPSERT_PORTFOLIO_UNCHANGED,
     client_has_app,
     clients_sorted_for_select,
     configs_for_same_host,
@@ -519,7 +520,11 @@ def pl_analytic_project_report():
                     password,
                     [],
                     environment=env_kw,
-                    portfolio_client_id=portfolio_cid,
+                    portfolio_client_id=(
+                        portfolio_cid
+                        if portfolio_cid is not None
+                        else UPSERT_PORTFOLIO_UNCHANGED
+                    ),
                 )
                 flash(f"Base enregistrée : {new_cid}.", "success")
             except ValueError as e:
@@ -1220,7 +1225,11 @@ def _accounting_reports_page(accounting_mode: str):
                     password,
                     [],
                     environment=env_kw,
-                    portfolio_client_id=portfolio_cid,
+                    portfolio_client_id=(
+                        portfolio_cid
+                        if portfolio_cid is not None
+                        else UPSERT_PORTFOLIO_UNCHANGED
+                    ),
                 )
                 flash(f"Base enregistrée : {new_cid}.", "success")
             except ValueError as e:

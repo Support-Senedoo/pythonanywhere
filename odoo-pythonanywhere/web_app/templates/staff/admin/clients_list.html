@@ -22,6 +22,7 @@
   <thead>
     <tr>
       <th>Base (db)</th>
+      <th>Portefeuille</th>
       <th>Env.</th>
       <th>URL</th>
       <th>Apps</th>
@@ -35,6 +36,7 @@
     {% for c in clients %}
     <tr>
       <td><code>{{ c.db }}</code></td>
+      <td class="sn-muted" style="font-size:0.85rem;">{% if c.portfolio_client_id %}<code>{{ c.portfolio_client_id }}</code>{% else %}—{% endif %}</td>
       <td>{% if c.environment == 'test' %}Test{% else %}Prod{% endif %}</td>
       <td class="sn-muted" style="max-width:12rem;overflow:hidden;text-overflow:ellipsis;">{{ c.url }}</td>
       <td class="sn-muted" style="font-size:0.85rem;">{{ c.apps }}</td>

@@ -29,6 +29,7 @@ from web_app.odoo_account_probe import (
     probe_account_databases,
 )
 from web_app.odoo_registry import (
+    UPSERT_PORTFOLIO_UNCHANGED,
     configs_for_portfolio_client,
     count_bases_for_portfolio_client,
     delete_client,
@@ -330,7 +331,9 @@ def odoo_connexion_staff():
                     password,
                     ["odoo_status"],
                     environment=env,
-                    portfolio_client_id=pc_raw,
+                    portfolio_client_id=(
+                        pc_raw if pc_raw is not None else UPSERT_PORTFOLIO_UNCHANGED
+                    ),
                 )
             except ValueError as e:
                 flash(str(e), "danger")
@@ -468,6 +471,7 @@ def clients_list():
                 "environment": cfg.environment,
                 "apps": ", ".join(cfg.apps),
                 "users_count": count_users_for_client(_users_path(), cid),
+                "portfolio_client_id": cfg.portfolio_client_id or "",
             }
         )
     return render_template("staff/admin/clients_list.html", clients=rows)
@@ -512,7 +516,9 @@ def client_new():
                         password,
                         apps,
                         environment=(request.form.get("environment") or "production"),
-                        portfolio_client_id=pc_raw,
+                        portfolio_client_id=(
+                            pc_raw if pc_raw is not None else UPSERT_PORTFOLIO_UNCHANGED
+                        ),
                     )
                     flash(f"Base « {cid} » enregistrée.", "success")
                     return redirect(url_for("staff_admin.clients_list"))
@@ -562,9 +568,10 @@ def client_edit(client_id: str):
             elif not user:
                 flash("Le login Odoo (API) est obligatoire pour enregistrer la fiche.", "danger")
             else:
-                pc_raw = (request.form.get("portfolio_client_id") or "").strip()
-                if pc_raw and not portfolio_client_exists(_portfolio_clients_path(), pc_raw):
-                    flash("Client portefeuille inconnu.", "danger")
+                try:
+                    pc_resolved = _resolve_portfolio_client_from_form()
+                except ValueError as e:
+                    flash(str(e), "danger")
                 else:
                     try:
                         upsert_client(
@@ -577,7 +584,7 @@ def client_edit(client_id: str):
                             password,
                             apps,
                             environment=(request.form.get("environment") or "production"),
-                            portfolio_client_id=pc_raw or None,
+                            portfolio_client_id=pc_resolved,
                         )
                         flash("Base mise à jour.", "success")
                         return redirect(url_for("staff_admin.clients_list"))
