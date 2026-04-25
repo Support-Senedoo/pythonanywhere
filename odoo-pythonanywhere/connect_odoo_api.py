@@ -14,11 +14,13 @@ import argparse
 import os
 import sys
 import xmlrpc.client
+from pathlib import Path
 from typing import Any
 
 try:
     from dotenv import load_dotenv
 
+    load_dotenv(Path(__file__).resolve().parent / ".env")
     load_dotenv()
 except ImportError:
     pass

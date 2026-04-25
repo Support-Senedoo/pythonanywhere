@@ -1,17 +1,20 @@
-{# Bloc version / indicateur de déploiement — variables : toolbox_*, toolbox_git_revision (context_processor) #}
-<div class="sn-deploy-info" role="status" aria-label="Version et déploiement">
-  <div class="sn-deploy-info__title">
-    <span class="sn-deploy-info__dot" title="Révision Git lue sur le disque du serveur" aria-hidden="true"></span>
-    Indicateur de mise à jour
+{# Version / déploiement — replié par défaut (context_processor : toolbox_*) #}
+<details class="sn-doc sn-doc--nav" style="margin:0 0 1rem;">
+  <summary>Version technique et déploiement</summary>
+  <div class="sn-deploy-info" role="status" aria-label="Version et déploiement">
+    <div class="sn-deploy-info__title">
+      <span class="sn-deploy-info__dot" title="Révision Git lue sur le disque du serveur" aria-hidden="true"></span>
+      Indicateur de mise à jour
+    </div>
+    <p class="sn-deploy-info__version">
+      <strong>{{ toolbox_app_label }}</strong>
+      · version <strong>{{ toolbox_version }}</strong>
+      · livraison {{ toolbox_version_date }} {{ toolbox_app_time }}
+      · <strong>heure Sénégal</strong> {{ toolbox_senegal_datetime }}
+      · révision <code>{{ toolbox_git_revision }}</code>
+    </p>
+    <p class="sn-deploy-info__hint">
+      La révision reflète le dernier commit présent sur le serveur. Après un <code>git pull</code>, un <strong>Reload</strong> (onglet Web PythonAnywhere) peut être nécessaire pour que l’application charge ce code en mémoire.
+    </p>
   </div>
-  <p class="sn-deploy-info__version">
-    <strong>{{ toolbox_app_label }}</strong>
-    · version <strong>{{ toolbox_version }}</strong>
-    · livraison {{ toolbox_version_date }} {{ toolbox_app_time }}
-    · <strong>heure Sénégal</strong> {{ toolbox_senegal_datetime }}
-    · révision <code>{{ toolbox_git_revision }}</code>
-  </p>
-  <p class="sn-deploy-info__hint">
-    La révision reflète le dernier commit présent sur le serveur. Après un <code>git pull</code>, un <strong>Reload</strong> (onglet Web PythonAnywhere) peut être nécessaire pour que l’application charge ce code en mémoire.
-  </p>
-</div>
+</details>

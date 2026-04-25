@@ -6,6 +6,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 
 from web_app.dev_auth import dev_login_disabled, try_dev_user
 from web_app.password_reset import consume_reset_token, issue_reset_token, send_reset_email
+from web_app.staff_selected_client_persist import clear_staff_selected_client_file
 from web_app.users_store import get_user_row, set_user_password, verify_user
 
 bp = Blueprint("public", __name__)
@@ -102,6 +103,7 @@ def login():
         session["portal"] = portal
         if user.role == "staff":
             session.pop("staff_selected_client_id", None)
+            clear_staff_selected_client_file(current_app)
 
         if user.role == "client":
             return redirect(url_for("legacy.client_home"))
@@ -181,6 +183,7 @@ def reset_password():
 
 @bp.route("/logout")
 def logout():
+    clear_staff_selected_client_file(current_app)
     session.clear()
     flash("Vous êtes déconnecté.", "info")
     return redirect(url_for("public.index"))

@@ -39,6 +39,14 @@ def create_app() -> Flask:
     app.config["TOOLBOX_CLIENTS_PATH"] = os.environ.get(
         "TOOLBOX_CLIENTS_PATH", str(_ROOT / "toolbox_clients.json")
     )
+    app.config["TOOLBOX_PORTFOLIO_CLIENTS_PATH"] = os.environ.get(
+        "TOOLBOX_PORTFOLIO_CLIENTS_PATH", str(_ROOT / "toolbox_portfolio_clients.json")
+    )
+    # Fichier une ligne = client_id (base) choisi par le staff — lu par scripts/xmlrpc_toolbox_client.py
+    app.config["TOOLBOX_STAFF_SELECTED_CLIENT_FILE"] = (
+        (os.environ.get("TOOLBOX_STAFF_SELECTED_CLIENT_FILE") or "").strip()
+        or str(_ROOT / ".toolbox_staff_selected_client")
+    )
     app.config["DEBUG"] = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
     app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
     _users_p = Path(app.config["TOOLBOX_USERS_PATH"])

@@ -1,6 +1,10 @@
 .env
+# Fichier local de test (ne pas versionner)
+cookie.txt
 toolbox_users.json
 toolbox_clients.json
+toolbox_portfolio_clients.json
+.toolbox_staff_selected_client
 # exports de rapports comptables (peuvent contenir la structure du plan)
 syscohada_senedoo_report.json
 *_report_portable.json

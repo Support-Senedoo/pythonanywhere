@@ -3,41 +3,69 @@
 {% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
 <h1>Espace Senedoo</h1>
-<p class="sn-muted">Sélectionnez une base client pour utiliser les mêmes écrans que l’espace client.</p>
+
+<details class="sn-doc sn-doc--nav" style="margin-bottom:1rem;">
+  <summary>Aide — parcours (base puis utilitaire)</summary>
+  <p class="sn-muted" style="margin:0;line-height:1.5;">
+    <strong>Étape 1 :</strong> choisissez ou créez la base Odoo sur laquelle travailler.
+    <strong>Étape 2 :</strong> ouvrez l’utilitaire à lui appliquer (liens préremplis avec cette base).
+  </p>
+  <p class="sn-muted" style="margin:0.65rem 0 0;line-height:1.45;font-size:0.9rem;">
+    La base sert aux utilitaires et aux scripts XML-RPC ; elle peut être la même que pour le mode applications client.
+    <strong>Pas dans la liste ?</strong>
+    <a href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo</a>,
+    <a href="{{ url_for('staff_admin.clients_list') }}">registre</a>,
+    <a href="{{ url_for('staff_admin.client_new') }}">nouvelle base</a>.
+  </p>
+</details>
 
 {% include '_deploy_info.html' %}
 
 <div class="sn-card sn-card--accent">
-  <h2>Applications (mode client)</h2>
-  <p class="sn-muted">Choisissez une base, puis ouvrez le menu applications.</p>
+  <h2 style="margin-top:0;">1. Base de travail</h2>
   <form method="post" action="{{ url_for('staff.select_client') }}">
-    <label for="client_id">Client / base</label>
+    <label for="client_id">Base Odoo</label>
     <select id="client_id" name="client_id" required>
       <option value="">— Choisir —</option>
       {% for cid, c in clients.items() %}
-      <option value="{{ cid }}" {% if selected == cid %}selected{% endif %}>{{ c.db }}</option>
+      <option value="{{ cid }}" {% if selected == cid %}selected{% endif %}>{{ c.db }}{% if c.environment == 'test' %} (test){% endif %}</option>
       {% endfor %}
     </select>
-    <button type="submit">Valider</button>
+    <button type="submit" style="margin-top:0.65rem;">Valider cette base</button>
   </form>
 </div>
 
-<div class="sn-card sn-card--accent">
-  <h2>Administration</h2>
-  <p class="sn-muted">Connexion Odoo une fois, liste des bases du compte, enregistrement et choix de la base active — ou gestion avancée du registre.</p>
-  <p style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin:0.75rem 0 0;">
-    <a class="sn-btn" href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo (liste des bases)</a>
-    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff_admin.clients_list') }}">Registre &amp; comptes</a>
-    <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}">Ancien formulaire « ajouter une base »</a>
+<div class="sn-card sn-card--accent" id="sn-staff-utils">
+  <h2 style="margin-top:0;">2. Utilitaires pour la base choisie</h2>
+  {% if selected and selected in clients %}
+  <p style="margin:0 0 0.75rem;">
+    Base active : <strong><code>{{ clients[selected].db }}</code></strong>
+    {% if work_filter_host %}<span class="sn-muted"> · <code>{{ work_filter_host }}</code></span>{% endif %}
   </p>
+  <ul style="margin:0;padding-left:1.2rem;line-height:1.65;">
+    <li><a class="sn-btn sn-btn--ghost" style="display:inline-flex;margin:0.2rem 0;" href="{{ url_for('staff.rapports_comptables', client_id=selected, filter_host=work_filter_host) }}">Compte de résultat personnalisé (P&amp;L)</a></li>
+    <li><a class="sn-btn sn-btn--ghost" style="display:inline-flex;margin:0.2rem 0;" href="{{ url_for('staff.rapports_balance', client_id=selected, filter_host=work_filter_host) }}">Balance OHADA (6 colonnes)</a></li>
+    <li><a class="sn-btn sn-btn--ghost" style="display:inline-flex;margin:0.2rem 0;" href="{{ url_for('staff.pl_analytic_project_report', client_id=selected, filter_host=work_filter_host) }}">Compte de résultat analytique / CPC / tableau de bord</a></li>
+  </ul>
+  <p style="margin:0.85rem 0 0;">
+    <a href="{{ url_for('staff.utilities_home') }}">Liste des utilitaires</a>
+    <span class="sn-muted"> · </span>
+    <a href="{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=work_filter_host) }}">Ajouter une autre base (même serveur)</a>
+  </p>
+  {% else %}
+  <p class="sn-muted" style="margin:0;">Sélectionnez une base à l’étape 1, puis « Valider cette base ».</p>
+  {% endif %}
 </div>
 
 <div class="sn-card">
-  <h2>Utilitaires</h2>
-  <p class="sn-muted">Personnalisation de rapports et autres outils techniques.</p>
-  <a class="sn-btn sn-btn--ghost" href="{{ url_for('staff.utilities_home') }}">Liste des utilitaires</a>
+  <h2 style="margin-top:0;">Applications (mode client)</h2>
+  {% if selected and selected in clients %}
+  <p style="margin:0;"><a class="sn-btn" href="{{ url_for('staff.apps_home') }}">Ouvrir le menu applications</a></p>
+  {% else %}
+  <p class="sn-muted" style="margin:0;">Validez d’abord une base à l’étape 1.</p>
+  {% endif %}
 </div>
 
-<p class="sn-muted"><a href="{{ url_for('public.index') }}">← Accueil public</a></p>
+<p class="sn-muted" style="margin-top:1.25rem;"><a href="{{ url_for('public.index') }}">← Accueil public</a></p>
 
 {% endblock %}

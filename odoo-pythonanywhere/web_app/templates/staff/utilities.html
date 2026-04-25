@@ -2,43 +2,76 @@
 {% block title %}Utilitaires — Senedoo{% endblock %}
 {% block body %}
 <h1>Utilitaires</h1>
-<p class="sn-muted">Outils techniques. Le choix de la base Odoo se fait dans chaque écran (filtre par serveur, liste des bases).</p>
+
+{% if selected and selected in clients %}
+<div class="sn-card sn-card--accent" style="margin-bottom:1rem;">
+  <p style="margin:0;line-height:1.45;">
+    Base : <strong><code>{{ clients[selected].db }}</code></strong>
+    {% if work_filter_host %}<span class="sn-muted"> · <code>{{ work_filter_host }}</code></span>{% endif %}
+  </p>
+  <p style="margin:0.5rem 0 0;">
+    <a href="{{ url_for('staff.staff_home') }}#sn-staff-utils">← Changer de base</a>
+  </p>
+</div>
+{% else %}
+<p class="sn-muted" style="margin:0 0 1rem;">
+  <a href="{{ url_for('staff.staff_home') }}">Choisir une base de travail</a> sur le tableau de bord — ou la base dans chaque écran.
+</p>
+{% endif %}
 
 <div class="sn-card sn-card--accent" style="margin-bottom:1rem;">
-  <h2 style="margin-top:0;font-size:1.1rem;">Personnalisation des rapports comptables</h2>
-  <p class="sn-muted" style="margin:0 0 0.85rem;line-height:1.45;">Trois parcours distincts selon l’objectif. Les écrans qui listent des rapports affichent les <code>account.report</code> de la base choisie.</p>
-  <ul style="margin:0;padding-left:1.2rem;line-height:1.55;">
-    <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.rapports_comptables') }}"><strong>Compte de résultat personnalisé</strong></a>
-      — copie d’un rapport P&amp;L (ou équivalent) + personnalisation Senedoo <strong>détail comptes / SYSCOHADA</strong> (<code>personalize_syscohada_detail</code>). Renommage et suppression de rapports depuis la liste.
+  <h2 style="margin-top:0;font-size:1.1rem;">Rapports comptables</h2>
+  <ul style="margin:0;padding-left:1.2rem;line-height:1.75;">
+    <li>
+      {% if selected and selected in clients %}
+      <a href="{{ url_for('staff.rapports_comptables', client_id=selected, filter_host=work_filter_host) }}"><strong>P&amp;L personnalisé (SYSCOHADA)</strong></a>
+      {% else %}
+      <a href="{{ url_for('staff.rapports_comptables') }}"><strong>P&amp;L personnalisé (SYSCOHADA)</strong></a>
+      {% endif %}
     </li>
-    <li style="margin-bottom:0.65rem;">
+    <li>
+      {% if selected and selected in clients %}
+      <a href="{{ url_for('staff.rapports_balance', client_id=selected, filter_host=work_filter_host) }}"><strong>Balance OHADA (6 colonnes)</strong></a>
+      {% else %}
       <a href="{{ url_for('staff.rapports_balance') }}"><strong>Balance OHADA (6 colonnes)</strong></a>
-      — crée sur la base un rapport <strong>Balance OHADA</strong> (six colonnes débit/crédit initiaux et finaux) ou le supprime ; pas de liste de rapports sur cette page.
+      {% endif %}
     </li>
-    <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Compte de résultat analytique</strong></a>
-      — budgets financiers (<code>account.report.budget</code>), copie P&amp;L pilotage par <strong>id</strong> de rapport,
-      wizard <strong>Budget par projet (CPC)</strong>, <strong>Tableau de Bord Manager</strong>, sonde budget × analytique.
-      Pas de liste des <code>account.report</code> (le CPC est autonome via le wizard) ; parcours complet avec tableau sur
-      <a href="{{ url_for('staff.rapports_comptables') }}">P&amp;L personnalisé</a>.
-    </li>
-    <li style="margin-bottom:0.65rem;">
-      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>Tableau de Bord Manager (Odoo natif)</strong></a>
-      — installe un wizard Odoo natif (<code>x_manager_dashboard_wizard</code>) avec KPIs Ventes, Achats, Facturation, Tresorerie, Stock, Fabrication, comparaison N vs N-1. Accessible depuis la page <em>Compte de résultat analytique</em>.
+    <li>
+      {% if selected and selected in clients %}
+      <a href="{{ url_for('staff.pl_analytic_project_report', client_id=selected, filter_host=work_filter_host) }}"><strong>P&amp;L analytique / CPC / tableau de bord manager</strong></a>
+      {% else %}
+      <a href="{{ url_for('staff.pl_analytic_project_report') }}"><strong>P&amp;L analytique / CPC / tableau de bord manager</strong></a>
+      {% endif %}
     </li>
   </ul>
-  <p class="sn-muted" style="margin:0.75rem 0 0;font-size:0.88rem;">URL stables : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/pl-analytique-projet</code> (et alias <code>…/personalize-report</code> → P&amp;L personnalisé). L’ancienne entrée <code>…/personalize-pl-budget</code> reste accessible pour les favoris mais n’est plus listée ici (fonctions regroupées sous « compte de résultat analytique »).</p>
+  <details class="sn-doc sn-doc--nav" style="margin:0.85rem 0 0;">
+    <summary>Descriptions détaillées</summary>
+    <ul style="margin:0.5rem 0 0;padding-left:1.2rem;line-height:1.55;">
+      <li style="margin-bottom:0.5rem;"><strong>P&amp;L personnalisé</strong> — copie d’un rapport + personnalisation détail comptes / SYSCOHADA ; renommage et suppression depuis la liste.</li>
+      <li style="margin-bottom:0.5rem;"><strong>Balance OHADA</strong> — rapport six colonnes sur la base ; pas de liste de rapports sur cette page.</li>
+      <li style="margin-bottom:0.5rem;"><strong>P&amp;L analytique</strong> — budgets, copie P&amp;L par id de rapport, wizard CPC, tableau de bord manager, sonde budget × analytique.</li>
+    </ul>
+    <p class="sn-muted" style="margin:0.65rem 0 0;font-size:0.86rem;line-height:1.45;">
+      URLs : <code>/staff/utilities/rapports-comptables</code>, <code>…/personalize-balance</code>, <code>…/pl-analytique-projet</code>, alias <code>…/personalize-report</code>.
+      L’entrée <code>…/personalize-pl-budget</code> reste pour les favoris.
+    </p>
+  </details>
 </div>
 
 <div class="sn-card">
   <h2 style="margin-top:0;font-size:1.05rem;">Autres outils</h2>
-  <ul style="margin:0;padding-left:1.2rem;">
-    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}#ajouter-base-odoo">Ajouter une base Odoo</a> (formulaire seul, depuis l’utilitaire P&amp;L personnalisé)</li>
-    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo (administration)</a> — parcours recommandé : login une fois, choix de la base.</li>
-    <li style="margin-bottom:0.5rem;"><a href="{{ url_for('staff.odoo_account_databases_probe') }}">Sonde bases Odoo</a> (détail technique, cookie portail, version serveur)</li>
+  <ul style="margin:0;padding-left:1.2rem;line-height:1.65;">
+    <li>
+      {% if selected and selected in clients and work_filter_host %}
+      <a href="{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=work_filter_host) }}#ajouter-base-odoo">Ajouter une base Odoo</a>
+      {% else %}
+      <a href="{{ url_for('staff.rapports_comptables', add_base_only='1') }}#ajouter-base-odoo">Ajouter une base Odoo</a>
+      {% endif %}
+    </li>
+    <li><a href="{{ url_for('staff_admin.odoo_connexion_staff') }}">Connexion Odoo (administration)</a></li>
+    <li><a href="{{ url_for('staff.odoo_account_databases_probe') }}">Sonde bases Odoo</a></li>
   </ul>
 </div>
 
-<p style="margin-top:1.25rem;"><a href="{{ url_for('staff.staff_home') }}">← Tableau de bord</a></p>
+<p style="margin-top:1.25rem;"><a href="{{ url_for('staff.staff_home') }}">← Tableau de bord équipe</a></p>
 {% endblock %}

@@ -153,12 +153,12 @@ def _registry():
 def _require_staff_client_selected():
     cid = session.get("staff_selected_client_id")
     if not cid:
-        flash("Choisissez d’abord un client (mode applications).", "warning")
+        flash("Choisissez d’abord une base sur le tableau de bord équipe.", "warning")
         return None
     try:
         get_config_by_id(cid)
     except ValueError:
-        flash("Client invalide.", "danger")
+        flash("Base inconnue ou invalide — sélectionnez-en une autre.", "danger")
         return None
     return cid
 
@@ -167,10 +167,17 @@ def _require_staff_client_selected():
 @login_required_staff
 def staff_home():
     reg = _registry()
+    sel = (session.get("staff_selected_client_id") or "").strip().lower()
+    if sel and sel not in reg:
+        sel = ""
+    work_filter_host = ""
+    if sel and sel in reg:
+        work_filter_host = registry_netloc(reg[sel])
     return render_template(
         "staff/home.html",
         clients=reg,
-        selected=session.get("staff_selected_client_id"),
+        selected=sel or None,
+        work_filter_host=work_filter_host,
     )
 
 
@@ -183,8 +190,11 @@ def select_client():
         return redirect(url_for("staff.staff_home"))
     session["staff_selected_client_id"] = cid
     persist_staff_selected_client_for_xmlrpc(current_app, cid)
-    flash(f"Base active pour les applications : {_registry()[cid].db}", "success")
-    return redirect(url_for("staff.apps_home"))
+    flash(
+        f"Base de travail : {_registry()[cid].db}. Choisissez un utilitaire ci-dessous ou ouvrez les applications.",
+        "success",
+    )
+    return redirect(url_for("staff.staff_home") + "#sn-staff-utils")
 
 
 @bp.route("/apps")
@@ -285,7 +295,18 @@ def staff_apps_pointage_import():
 @login_required_staff
 def utilities_home():
     reg = _registry()
-    return render_template("staff/utilities.html", clients=reg)
+    sel = (session.get("staff_selected_client_id") or "").strip().lower()
+    if sel and sel not in reg:
+        sel = ""
+    work_filter_host = ""
+    if sel and sel in reg:
+        work_filter_host = registry_netloc(reg[sel])
+    return render_template(
+        "staff/utilities.html",
+        clients=reg,
+        selected=sel or None,
+        work_filter_host=work_filter_host,
+    )
 
 
 def _pl_analytic_url_params(

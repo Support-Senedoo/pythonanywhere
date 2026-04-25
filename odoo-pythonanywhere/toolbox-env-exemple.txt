@@ -64,6 +64,10 @@ TOOLBOX_SECRET_KEY=generer_une_longue_chaine_aleatoire
 
 # Placeholder du champ « Login Odoo » dans le formulaire client (optionnel, défaut support@senedoo.com)
 # TOOLBOX_ODOO_DEFAULT_API_USER=support@senedoo.com
+#
+# Mot de passe / clé API commun staff pour les nouvelles bases (jamais dans Git ; option Web PA ou fichier .env serveur).
+# Si défini, le formulaire « Nouvelle base » peut laisser login/mot de passe vides.
+# TOOLBOX_ODOO_DEFAULT_API_PASSWORD=
 
 # Utilitaire « Sonde bases » — mode sans URL (portail odoo.com / Mes bases), rarement à changer :
 # TOOLBOX_ODOO_PORTAL_ORIGIN=https://www.odoo.com

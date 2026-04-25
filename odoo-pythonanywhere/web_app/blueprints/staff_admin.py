@@ -29,11 +29,21 @@ from web_app.odoo_account_probe import (
     probe_account_databases,
 )
 from web_app.odoo_registry import (
+    configs_for_portfolio_client,
+    count_bases_for_portfolio_client,
     delete_client,
     load_clients_registry,
     normalize_registry_db_key,
     registry_netloc,
     upsert_client,
+)
+from web_app.portfolio_clients_store import (
+    delete_portfolio_client,
+    load_portfolio_clients,
+    normalize_portfolio_client_id,
+    portfolio_client_exists,
+    portfolio_clients_sorted,
+    upsert_portfolio_client,
 )
 from web_app.odoo_portal_cookie_env import (
     portal_cookie_configured_in_environment,
@@ -117,6 +127,10 @@ def _clients_path():
     return current_app.config["TOOLBOX_CLIENTS_PATH"]
 
 
+def _portfolio_clients_path():
+    return current_app.config["TOOLBOX_PORTFOLIO_CLIENTS_PATH"]
+
+
 def _odoo_db_presets() -> list[str]:
     return managed_databases_from_env(os.environ.get("TOOLBOX_ODOO_MANAGED_DATABASES"))
 
@@ -124,6 +138,42 @@ def _odoo_db_presets() -> list[str]:
 def _default_odoo_api_user_placeholder() -> str:
     """Placeholder champ login API (pas de mot de passe ici)."""
     return (os.environ.get("TOOLBOX_ODOO_DEFAULT_API_USER") or "support@senedoo.com").strip()
+
+
+def _default_odoo_api_password_from_env() -> str | None:
+    """Mot de passe / clé API commun staff (uniquement variable d’environnement serveur, jamais dans Git)."""
+    p = (os.environ.get("TOOLBOX_ODOO_DEFAULT_API_PASSWORD") or "").strip()
+    return p or None
+
+
+def _resolve_odoo_api_user_password(
+    *,
+    form_user: str,
+    form_password: str | None,
+    for_new_base: bool,
+) -> tuple[str, str | None]:
+    """
+    Nouvelle base (for_new_base=True) : login et mot de passe vides → identifiants staff
+    (session « Connexion Odoo » mémorisée, puis TOOLBOX_ODOO_DEFAULT_API_USER / …_PASSWORD).
+    Édition (for_new_base=False) : valeurs telles que saisies (mot de passe vide = inchangé côté appelant).
+    """
+    user = (form_user or "").strip()
+    pw = (form_password or "").strip() or None
+    if not for_new_base:
+        return user, pw
+    if not user:
+        creds = get_staff_odoo_work_credentials(session)
+        if creds:
+            user = (creds.get("login") or "").strip()
+    if not user:
+        user = _default_odoo_api_user_placeholder()
+    if not pw:
+        pw = _default_odoo_api_password_from_env()
+    if not pw:
+        creds = get_staff_odoo_work_credentials(session)
+        if creds:
+            pw = (creds.get("password") or "").strip() or None
+    return user, pw
 
 
 @bp.route("/odoo-databases")
@@ -202,19 +252,23 @@ def odoo_connexion_staff():
             if env not in ("production", "test"):
                 env = "production"
             creds = get_staff_odoo_work_credentials(session)
-            login = ""
-            password: str | None = None
+            login = (request.form.get("odoo_login_register") or "").strip()
+            password = (request.form.get("odoo_password_register") or "").strip() or None
             if creds:
-                login = creds["login"]
-                password = creds["password"]
+                if not login:
+                    login = creds["login"]
+                if not password:
+                    password = creds.get("password")
+            login, password = _resolve_odoo_api_user_password(
+                form_user=login,
+                form_password=password,
+                for_new_base=True,
+            )
             if not password:
-                password = (request.form.get("odoo_password_register") or "").strip() or None
-            if not login:
-                login = (request.form.get("odoo_login_register") or "").strip()
-            if not login or not password:
                 flash(
-                    "Login et mot de passe requis pour enregistrer la base "
-                    "(reconnectez-vous ou saisissez-les dans le formulaire).",
+                    "Mot de passe ou clé API Odoo requis pour enregistrer la base "
+                    "(saisie dans le formulaire, ou variable serveur TOOLBOX_ODOO_DEFAULT_API_PASSWORD, "
+                    "ou session « Connexion Odoo » mémorisée avec mot de passe).",
                     "danger",
                 )
                 return redirect(url_for("staff_admin.odoo_connexion_staff"))
@@ -225,6 +279,10 @@ def odoo_connexion_staff():
                 return redirect(url_for("staff_admin.odoo_connexion_staff"))
             if not inst_url:
                 flash("URL d’instance manquante.", "danger")
+                return redirect(url_for("staff_admin.odoo_connexion_staff"))
+            pc_raw = (request.form.get("portfolio_client_id") or "").strip()
+            if pc_raw and not portfolio_client_exists(_portfolio_clients_path(), pc_raw):
+                flash("Client portefeuille inconnu — créez-le dans Administration.", "danger")
                 return redirect(url_for("staff_admin.odoo_connexion_staff"))
             try:
                 upsert_client(
@@ -237,6 +295,7 @@ def odoo_connexion_staff():
                     password,
                     ["odoo_status"],
                     environment=env,
+                    portfolio_client_id=pc_raw or None,
                 )
             except ValueError as e:
                 flash(str(e), "danger")
@@ -247,7 +306,7 @@ def odoo_connexion_staff():
                 f"Base « {db_raw} » enregistrée dans le registre et sélectionnée pour les applications.",
                 "success",
             )
-            return redirect(url_for("staff.staff_home"))
+            return redirect(url_for("staff.staff_home") + "#sn-staff-utils")
 
         if action == "list_session":
             creds = get_staff_odoo_work_credentials(session)
@@ -384,30 +443,49 @@ def client_new():
     if request.method == "POST":
         url = normalize_odoo_base_url((request.form.get("url") or "").strip())
         db = (request.form.get("db") or "").strip()
-        user = (request.form.get("odoo_user") or "").strip()
-        password = (request.form.get("odoo_password") or "").strip() or None
+        raw_user = (request.form.get("odoo_user") or "").strip()
+        raw_password = (request.form.get("odoo_password") or "").strip() or None
+        user, password = _resolve_odoo_api_user_password(
+            form_user=raw_user,
+            form_password=raw_password,
+            for_new_base=True,
+        )
         apps = [k for k in KNOWN_APPS if request.form.get(f"app_{k}")]
         try:
             cid = normalize_registry_db_key(db)
         except ValueError as e:
             flash(str(e), "danger")
         else:
-            try:
-                upsert_client(
-                    _clients_path(),
-                    cid,
-                    cid,
-                    url,
-                    db,
-                    user,
-                    password,
-                    apps,
-                    environment=(request.form.get("environment") or "production"),
+            if not password:
+                flash(
+                    "Mot de passe ou clé API Odoo introuvable pour cette nouvelle base : "
+                    "saisissez-les, ou configurez TOOLBOX_ODOO_DEFAULT_API_PASSWORD sur le serveur, "
+                    "ou mémorisez une session sur « Connexion Odoo » (login + mot de passe).",
+                    "danger",
                 )
-                flash(f"Base « {cid} » enregistrée.", "success")
-                return redirect(url_for("staff_admin.clients_list"))
-            except ValueError as e:
-                flash(str(e), "danger")
+            else:
+                pc_raw = (request.form.get("portfolio_client_id") or "").strip()
+                if pc_raw and not portfolio_client_exists(_portfolio_clients_path(), pc_raw):
+                    flash("Client portefeuille inconnu — créez-le dans Administration.", "danger")
+                else:
+                    try:
+                        upsert_client(
+                            _clients_path(),
+                            cid,
+                            cid,
+                            url,
+                            db,
+                            user,
+                            password,
+                            apps,
+                            environment=(request.form.get("environment") or "production"),
+                            portfolio_client_id=pc_raw or None,
+                        )
+                        flash(f"Base « {cid} » enregistrée.", "success")
+                        return redirect(url_for("staff_admin.clients_list"))
+                    except ValueError as e:
+                        flash(str(e), "danger")
+    portfolio_choices = portfolio_clients_sorted(_portfolio_clients_path())
     return render_template(
         "staff/admin/client_form.html",
         mode="new",
@@ -416,6 +494,9 @@ def client_new():
         known_apps=KNOWN_APPS,
         odoo_db_presets=_odoo_db_presets(),
         default_odoo_api_user=_default_odoo_api_user_placeholder(),
+        portfolio_clients=portfolio_choices,
+        staff_session_login=(get_staff_odoo_work_credentials(session) or {}).get("login") or "",
+        has_default_api_password=bool(_default_odoo_api_password_from_env()),
     )
 
 
@@ -445,23 +526,31 @@ def client_edit(client_id: str):
                     "Le nom de base (identifiant) ne peut pas être modifié : supprimez l’entrée et recréez-la si besoin.",
                     "danger",
                 )
+            elif not user:
+                flash("Le login Odoo (API) est obligatoire pour enregistrer la fiche.", "danger")
             else:
-                try:
-                    upsert_client(
-                        _clients_path(),
-                        cid_key,
-                        cid_key,
-                        url,
-                        db,
-                        user,
-                        password,
-                        apps,
-                        environment=(request.form.get("environment") or "production"),
-                    )
-                    flash("Base mise à jour.", "success")
-                    return redirect(url_for("staff_admin.clients_list"))
-                except ValueError as e:
-                    flash(str(e), "danger")
+                pc_raw = (request.form.get("portfolio_client_id") or "").strip()
+                if pc_raw and not portfolio_client_exists(_portfolio_clients_path(), pc_raw):
+                    flash("Client portefeuille inconnu.", "danger")
+                else:
+                    try:
+                        upsert_client(
+                            _clients_path(),
+                            cid_key,
+                            cid_key,
+                            url,
+                            db,
+                            user,
+                            password,
+                            apps,
+                            environment=(request.form.get("environment") or "production"),
+                            portfolio_client_id=pc_raw or None,
+                        )
+                        flash("Base mise à jour.", "success")
+                        return redirect(url_for("staff_admin.clients_list"))
+                    except ValueError as e:
+                        flash(str(e), "danger")
+    portfolio_choices = portfolio_clients_sorted(_portfolio_clients_path())
     return render_template(
         "staff/admin/client_form.html",
         mode="edit",
@@ -470,6 +559,9 @@ def client_edit(client_id: str):
         known_apps=KNOWN_APPS,
         odoo_db_presets=_odoo_db_presets(),
         default_odoo_api_user=_default_odoo_api_user_placeholder(),
+        portfolio_clients=portfolio_choices,
+        staff_session_login="",
+        has_default_api_password=False,
     )
 
 

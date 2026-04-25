@@ -52,20 +52,34 @@ class ClientOdooConfig:
     password: str
     apps: tuple[str, ...]
     environment: str = "production"
+    portfolio_client_id: str | None = None
+
+
+def _parse_portfolio_client_id(raw: Any) -> str | None:
+    s = str(raw or "").strip().lower()
+    if not s:
+        return None
+    try:
+        return normalize_registry_db_key(s)
+    except ValueError:
+        return None
 
 
 def _row_to_config(row: dict[str, Any]) -> ClientOdooConfig:
     db_key = normalize_registry_db_key(str(row.get("db", "")).strip())
     apps = normalize_app_ids(row.get("apps"))
+    label_raw = str(row.get("label", "")).strip()
+    label_use = label_raw if label_raw else db_key
     return ClientOdooConfig(
         id=db_key,
-        label=db_key,
+        label=label_use,
         url=normalize_odoo_base_url(str(row["url"])),
         db=db_key,
         user=str(row["user"]).strip(),
         password=str(row["password"]),
         apps=apps,
         environment=_normalize_environment(row.get("environment")),
+        portfolio_client_id=_parse_portfolio_client_id(row.get("portfolio_client_id")),
     )
 
 
@@ -100,12 +114,37 @@ def configs_for_same_host(reg: dict[str, ClientOdooConfig], netloc: str) -> list
     )
 
 
+def configs_for_portfolio_client(
+    reg: dict[str, ClientOdooConfig], portfolio_client_id: str
+) -> list[tuple[str, ClientOdooConfig]]:
+    """Bases Odoo rattachées au même client portefeuille (slug dans portfolio_client_id)."""
+    key = _parse_portfolio_client_id(portfolio_client_id)
+    if not key:
+        return []
+    return sorted(
+        [(cid, c) for cid, c in reg.items() if (c.portfolio_client_id or "").strip().lower() == key],
+        key=lambda x: (0 if x[1].environment == "production" else 1, x[1].db.casefold()),
+    )
+
+
 def configs_for_label(reg: dict[str, ClientOdooConfig], label: str) -> list[tuple[str, ClientOdooConfig]]:
     """Déprécié : conservé pour appels anciens ; équivalent à même hôte si label ressemble à un netloc, sinon vide."""
     lab = (label or "").strip()
     if not lab:
         return []
     return configs_for_same_host(reg, lab)
+
+
+def count_bases_for_portfolio_client(path: str | Path, portfolio_client_id: str) -> int:
+    """Nombre de bases Odoo dont le champ portfolio_client_id correspond (normalisé)."""
+    key = (portfolio_client_id or "").strip().lower()
+    if not key:
+        return 0
+    n = 0
+    for cfg in load_clients_registry(path).values():
+        if (cfg.portfolio_client_id or "").strip().lower() == key:
+            n += 1
+    return n
 
 
 def load_clients_registry(path: str | Path) -> dict[str, ClientOdooConfig]:
@@ -155,11 +194,12 @@ def upsert_client(
     apps: list[str],
     *,
     environment: str | None = None,
+    portfolio_client_id: str | None = None,
 ) -> None:
-    """Enregistre une base ; id et label sont toujours le nom de base normalisé (client_id / label ignorés)."""
-    del label  # conservé en signature pour appels existants
+    """Enregistre une base ; id reste le nom de base normalisé ; label = libellé affichage (défaut = db)."""
     del client_id
     db_key = normalize_registry_db_key(str(db or "").strip())
+    display_label = (label or "").strip() or db_key
     data = read_clients_raw(path)
     clients: list[dict[str, Any]] = list(data.get("clients", []))
     url = (url or "").strip().rstrip("/")
@@ -185,9 +225,14 @@ def upsert_client(
             if environment is not None
             else _normalize_environment(row.get("environment"))
         )
-        clients[found_idx] = {
+        pcid: str | None
+        if portfolio_client_id is not None:
+            pcid = _parse_portfolio_client_id(portfolio_client_id)
+        else:
+            pcid = _parse_portfolio_client_id(row.get("portfolio_client_id"))
+        row_out: dict[str, Any] = {
             "id": db_key,
-            "label": db_key,
+            "label": display_label,
             "url": url,
             "db": db_key,
             "user": user,
@@ -195,22 +240,27 @@ def upsert_client(
             "apps": app_ids,
             "environment": env_use,
         }
+        if pcid:
+            row_out["portfolio_client_id"] = pcid
+        clients[found_idx] = row_out
     else:
         if not password:
             raise ValueError("Mot de passe Odoo requis pour une nouvelle base.")
+        pcid_new = _parse_portfolio_client_id(portfolio_client_id) if portfolio_client_id is not None else None
         env_use = _normalize_environment(environment or "production")
-        clients.append(
-            {
-                "id": db_key,
-                "label": db_key,
-                "url": url,
-                "db": db_key,
-                "user": user,
-                "password": password,
-                "apps": app_ids,
-                "environment": env_use,
-            }
-        )
+        new_row: dict[str, Any] = {
+            "id": db_key,
+            "label": display_label,
+            "url": url,
+            "db": db_key,
+            "user": user,
+            "password": password,
+            "apps": app_ids,
+            "environment": env_use,
+        }
+        if pcid_new:
+            new_row["portfolio_client_id"] = pcid_new
+        clients.append(new_row)
     data["clients"] = clients
     write_clients_raw(path, data)
 
@@ -267,7 +317,8 @@ def migrate_registry_ids_to_database_names(
         seen_keys.add(db_key)
         new_row = dict(row)
         new_row["id"] = db_key
-        new_row["label"] = db_key
+        if not str(new_row.get("label", "")).strip():
+            new_row["label"] = db_key
         new_row["db"] = db_key
         new_rows.append(new_row)
 

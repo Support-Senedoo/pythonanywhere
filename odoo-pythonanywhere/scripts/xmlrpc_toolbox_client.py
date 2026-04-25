@@ -10,7 +10,9 @@ Résolution de la base (``client_id`` = nom de base normalisé, comme dans le me
 1. ``--client-id <db>``
 2. ``TOOLBOX_XMLRPC_CLIENT_ID`` (sur PA : même valeur que la base choisie dans l’utilitaire staff)
 3. ``TOOLBOX_XMLRPC_CLIENT_ID_FILE`` : fichier dont la première ligne est le ``client_id``
-4. registre avec **une seule** base → utilisée par défaut
+4. Fichier miroir de l’interface staff (écrit automatiquement au choix de base) :
+   ``TOOLBOX_STAFF_SELECTED_CLIENT_FILE`` ou par défaut ``<racine>/.toolbox_staff_selected_client``
+5. registre avec **une seule** base → utilisée par défaut
 
 Fichier clients : ``TOOLBOX_CLIENTS_PATH``, ``--clients-path``, ou
 ``<racine_odoo-pythonanywhere>/toolbox_clients.json``.
@@ -137,6 +139,21 @@ def _read_client_id_from_file() -> str:
     return line
 
 
+def _staff_selected_client_file_path() -> Path:
+    raw = (os.environ.get("TOOLBOX_STAFF_SELECTED_CLIENT_FILE") or "").strip()
+    if raw:
+        return Path(raw)
+    return _ROOT / ".toolbox_staff_selected_client"
+
+
+def _read_staff_selected_client_id() -> str:
+    p = _staff_selected_client_file_path()
+    if not p.is_file():
+        return ""
+    line = (p.read_text(encoding="utf-8").splitlines() or [""])[0].strip().lower()
+    return line
+
+
 def resolve_client_id(
     explicit: str | None,
     reg: dict[str, ClientOdooConfig],
@@ -150,13 +167,17 @@ def resolve_client_id(
     cid = _read_client_id_from_file()
     if cid:
         return cid
+    cid = _read_staff_selected_client_id()
+    if cid:
+        return cid
     if len(reg) == 1:
         return next(iter(reg.keys()))
     raise SystemExit(
         "client_id manquant : passez --client-id <nom_base>, ou définissez "
         "TOOLBOX_XMLRPC_CLIENT_ID (recommandé sur PA), ou TOOLBOX_XMLRPC_CLIENT_ID_FILE "
-        "vers un fichier contenant le nom de base sur la première ligne, ou un registre "
-        "avec une seule base."
+        "vers un fichier contenant le nom de base sur la première ligne, ou laissez la toolbox "
+        "écrire le fichier staff (TOOLBOX_STAFF_SELECTED_CLIENT_FILE / .toolbox_staff_selected_client), "
+        "ou un registre avec une seule base."
     )
 
 

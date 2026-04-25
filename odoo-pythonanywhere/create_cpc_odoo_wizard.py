@@ -22,8 +22,9 @@ Les champs manuels ``x_analytic_account_id`` sur ``account.report.budget`` et
 ``account.report.budget.item`` sont créés par la toolbox (idempotent si déjà présents).
 L'analytique est porté par **l'en-tête** du budget (un budget = un compte analytique) ; sur les **lignes**,
 il est affiché en **lecture seule** dans les vues toolbox et aligné sur l'en-tête (import / sync).
-Le provision **Budget Senedoo** ajoute aussi ``x_sn_account_code`` (numéro de compte sur les lignes),
-des **vues** héritées (analytique + colonnes), une **icône** menu (``web_icon_data``) et une feuille
+Le provision **Budget Senedoo** peut ajouter ``x_sn_account_code`` / ``x_sn_account_name`` (liés au compte,
+utiles en API) ; les **vues** listes / formulaire n’affichent que **Compte** (``account_id``) pour le général.
+Il ajoute des **vues** héritées (analytique), une **icône** menu (``web_icon_data``) et une feuille
 **CSS** (``ir.attachment`` + ``ir.asset`` → ``web.assets_backend``, classes ``o_sn_senedoo_financial_budget*``).
 Des règles ``ir.model.access`` sont créées sur le modèle wizard pour les **profils comptables**
 (Facturation / Comptable / Responsable) : sans elles, Odoo **masque l’entrée de menu** pour les
@@ -1483,8 +1484,8 @@ def ensure_budget_report_senedoo_budget_form_view(
     pwd: str,
 ) -> dict[str, Any]:
     """
-    Vue formulaire héritée : analytique sur l’en-tête, colonnes **numéro de compte** + analytique
-    dans la sous-liste ``item_ids``.
+    Vue formulaire héritée : analytique sur l’en-tête ; sous-liste ``item_ids`` : **Compte**
+    (``account_id``) seul pour le général, colonne analytique budget en lecture seule.
     """
     inherit_id = _resolve_account_report_budget_form_view_id(models, db, uid, pwd)
     if not inherit_id:
@@ -1500,8 +1501,6 @@ def ensure_budget_report_senedoo_budget_form_view(
     </group>
   </xpath>
   <xpath expr="//field[@name='item_ids']/list/field[@name='account_id']" position="after">
-    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1" width="10%%"/>
-    <field name="x_sn_account_name" string="Libelle compte" optional="show" readonly="1" width="22%%"/>
     <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"
            options="{'no_create': True, 'no_create_edit': True, 'no_open': True}" width="18%%"/>
   </xpath>
@@ -1647,7 +1646,7 @@ def ensure_budget_report_senedoo_budget_item_list_view(
 ) -> dict[str, Any]:
     """
     Enrichit la liste primaire ``account.report.budget.item`` (menu « Lignes de budget ») :
-    budget, compte, numéro, période, montant, analytique.
+    budget, compte (seul libellé/code utile), période, montant, analytique.
     """
     model_name = "account.report.budget.item"
     inherit_id = _primary_list_view_id(models, db, uid, pwd, model_name)
@@ -1662,9 +1661,7 @@ def ensure_budget_report_senedoo_budget_item_list_view(
   </xpath>
   <xpath expr="//field[@name='id']" position="replace">
     <field name="budget_id" optional="show"/>
-    <field name="account_id" optional="show"/>
-    <field name="x_sn_account_code" string="Numero compte" optional="show" readonly="1"/>
-    <field name="x_sn_account_name" string="Libelle compte" optional="show" readonly="1"/>
+    <field name="account_id" string="Compte" optional="show"/>
     <field name="date"/>
     <field name="amount"/>
     <field name="x_analytic_account_id" string="Compte analytique (budget)" optional="show" readonly="1"

@@ -5,7 +5,7 @@
 <h1>Applications</h1>
 {% if not selected %}
 <p class="sn-muted">Aucune base sélectionnée.</p>
-<a class="sn-btn" href="{{ url_for('staff.staff_home') }}">Choisir un client</a>
+<a class="sn-btn" href="{{ url_for('staff.staff_home') }}">Choisir une base</a>
 {% else %}
 <p>Base active : <strong>{{ selected_label }}</strong> (<code>{{ selected }}</code>)</p>
 <p class="sn-muted">Même menu que côté client pour ce profil (applications cochées dans l’admin).</p>

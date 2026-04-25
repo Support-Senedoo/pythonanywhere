@@ -3,7 +3,27 @@
 {% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
 <h1>{% if mode == 'new' %}Nouvelle base Odoo{% else %}Modifier la base « {{ client.db }} »{% endif %}</h1>
-<p class="sn-muted">L’identifiant portail et dans le registre est le <strong>nom technique de la base</strong> (db), en minuscules après enregistrement.</p>
+
+<details class="sn-doc sn-doc--nav" style="margin-bottom:1rem;">
+  <summary>Aide — champs du formulaire</summary>
+  <p class="sn-muted" style="margin:0;line-height:1.45;">L’identifiant portail / registre est le <strong>nom technique de la base</strong> (db), en minuscules après enregistrement.</p>
+  {% if mode == 'new' %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.86rem;line-height:1.45;">
+    Suggestions de noms : variable <code>TOOLBOX_ODOO_MANAGED_DATABASES</code> et bouton « Actualiser les suggestions » après l’URL.
+  </p>
+  {% endif %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.86rem;line-height:1.45;">Plusieurs entrées sur le <strong>même hôte d’URL</strong> permettent de regrouper prod / test côté portail.</p>
+  {% if portfolio_clients is defined and portfolio_clients %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.86rem;line-height:1.45;">Le <strong>client portefeuille</strong> regroupe les sociétés ; optionnel pour d’anciennes entrées.</p>
+  {% endif %}
+  {% if mode == 'new' %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.86rem;line-height:1.45;">
+    <strong>Identifiants API :</strong> champs vides = compte staff (session « Connexion Odoo » ou <code>TOOLBOX_ODOO_DEFAULT_API_*</code> sur le serveur).
+  </p>
+  {% else %}
+  <p class="sn-muted" style="margin:0.5rem 0 0;font-size:0.86rem;line-height:1.45;">Mot de passe : laisser vide pour ne pas modifier le secret enregistré.</p>
+  {% endif %}
+</details>
 
 <div class="sn-card">
   <form method="post">
@@ -18,11 +38,8 @@
            pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}"
            title="Lettre ou chiffre, puis lettres, chiffres, tiret ou underscore"
            placeholder="ex. ma_societe_prod" spellcheck="false" autocapitalize="none">
-    <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">
-      Suggestions : <code>TOOLBOX_ODOO_MANAGED_DATABASES</code> + bouton ci-dessous pour interroger <code>db.list()</code> une fois l’URL renseignée.
-    </p>
     {% else %}
-    <p><strong>Nom de base (identifiant) :</strong> <code>{{ client.db }}</code> — non modifiable ici.</p>
+    <p><strong>Nom de base :</strong> <code>{{ client.db }}</code></p>
     <input type="hidden" name="db" value="{{ client.db }}">
     {% endif %}
 
@@ -31,10 +48,19 @@
       <option value="production" {% if not client or client.environment != 'test' %}selected{% endif %}>Production</option>
       <option value="test" {% if client and client.environment == 'test' %}selected{% endif %}>Test / recette</option>
     </select>
-    <p class="sn-muted" style="margin-top:0.35rem;font-size:0.82rem;">Plusieurs entrées sur le <strong>même serveur Odoo</strong> (même hôte d’URL) peuvent être regroupées pour le portail client (bascule prod / test).</p>
 
     <label for="url">URL Odoo</label>
     <input type="url" id="url" name="url" required value="{{ client.url if client else '' }}" placeholder="https://xxx.odoo.com">
+
+    {% if portfolio_clients is defined %}
+    <label for="portfolio_client_id">Client portefeuille (société)</label>
+    <select id="portfolio_client_id" name="portfolio_client_id">
+      <option value="">— Non rattaché —</option>
+      {% for p in portfolio_clients %}
+      <option value="{{ p.id }}" {% if client and client.portfolio_client_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+      {% endfor %}
+    </select>
+    {% endif %}
 
     {% if mode == 'new' %}
     <button type="button" class="sn-btn sn-btn--ghost" id="btn-refresh-odoo-dbs" style="margin-top:0.5rem;">Actualiser les suggestions de bases</button>
@@ -44,13 +70,18 @@
     <span id="odoo-db-list-msg" class="sn-muted" style="font-size:0.82rem;margin-left:0.5rem;"></span>
     {% endif %}
 
-    <label for="odoo_user">Login Odoo (connexion API / XML-RPC)</label>
-    <input type="text" id="odoo_user" name="odoo_user" required value="{{ client.user if client else '' }}"
+    <label for="odoo_user">Login Odoo (API / XML-RPC)</label>
+    {% if mode == 'new' %}
+    <input type="text" id="odoo_user" name="odoo_user" value=""
+           placeholder="Vide = staff ({{ default_odoo_api_user }})" autocomplete="off">
+    {% else %}
+    <input type="text" id="odoo_user" name="odoo_user" required value="{{ client.user }}"
            placeholder="{{ default_odoo_api_user }}" autocomplete="off">
+    {% endif %}
 
-    <label for="odoo_password">Mot de passe Odoo ou clé API</label>
+    <label for="odoo_password">Mot de passe ou clé API</label>
     <input type="password" id="odoo_password" name="odoo_password" autocomplete="new-password"
-           placeholder="{% if client %}Laisser vide pour ne pas changer{% else %}Obligatoire{% endif %}">
+           placeholder="{% if client %}Vide = inchangé{% else %}Vide = staff / serveur{% endif %}">
 
     <fieldset style="border:1px solid var(--sn-border);border-radius:8px;padding:1rem;margin-top:1rem;">
       <legend style="color:var(--sn-muted);font-size:0.9rem;">Applications visibles par le client</legend>
@@ -69,14 +100,16 @@
 </div>
 
 {% if mode == 'edit' %}
-<div class="sn-card" style="margin-top:1.25rem;">
-  <h2 style="margin-top:0;font-size:1.05rem;">Autre base (même serveur)</h2>
-  <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Pour enregistrer une <strong>deuxième</strong> base sur le même hôte Odoo (ex. recette), ouvrez l’écran dédié — le filtre serveur sera présélectionné.</p>
-  <a class="sn-btn" href="{% if add_base_filter_host %}{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=add_base_filter_host) }}{% else %}{{ url_for('staff.rapports_comptables', add_base_only='1') }}{% endif %}">Ajouter une autre base (formulaire seul)</a>
-</div>
+<details class="sn-doc sn-doc--nav" style="margin-top:1.25rem;">
+  <summary>Autre base sur le même serveur</summary>
+  <div style="margin-top:0.5rem;">
+    <p class="sn-muted" style="margin:0 0 0.75rem;line-height:1.45;">Deuxième base (ex. recette) : formulaire dédié avec filtre serveur.</p>
+    <a class="sn-btn" href="{% if add_base_filter_host %}{{ url_for('staff.rapports_comptables', add_base_only='1', filter_host=add_base_filter_host) }}{% else %}{{ url_for('staff.rapports_comptables', add_base_only='1') }}{% endif %}">Ajouter une autre base</a>
+  </div>
+</details>
 <div class="sn-card" style="border-color:var(--sn-danger);margin-top:1.5rem;">
   <h2 style="color:var(--sn-danger);margin-top:0;">Supprimer cette base</h2>
-  <p class="sn-muted">Impossible s’il reste des comptes portail liés. Tapez le nom de base <code>{{ client.db }}</code> pour confirmer.</p>
+  <p class="sn-muted">Comptes portail liés : suppression bloquée. Saisissez <code>{{ client.db }}</code> pour confirmer.</p>
   <form method="post" action="{{ url_for('staff_admin.client_delete', client_id=client.id) }}" onsubmit="return confirm('Supprimer définitivement cette base ?');">
     <input type="text" name="confirm" placeholder="{{ client.db }}" required autocomplete="off">
     <button type="submit" style="background:linear-gradient(165deg,#f87171,#dc2626);box-shadow:none;">Supprimer</button>

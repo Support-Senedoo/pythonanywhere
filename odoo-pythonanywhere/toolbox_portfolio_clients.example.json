@@ -1,0 +1,8 @@
+{
+  "clients": [
+    {
+      "id": "exemple_societe",
+      "name": "Exemple société (libellé affiché)"
+    }
+  ]
+}

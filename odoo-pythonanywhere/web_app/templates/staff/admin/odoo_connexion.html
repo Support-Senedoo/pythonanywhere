@@ -3,31 +3,32 @@
 {% block main_class %}sn-main--wide{% endblock %}
 {% block body %}
 <h1>Connexion Odoo et choix de la base</h1>
-<p class="sn-muted" style="max-width:52rem;line-height:1.5;">
-  Saisissez le <strong>login</strong> et le <strong>mot de passe</strong> du compte Odoo (souvent le compte administrateur API) <strong>une fois</strong> :
-  la toolbox interroge le portail <strong>Mes bases</strong> (odoo.com) si l’URL est vide, ou <code>db.list()</code> sur une instance si vous renseignez l’URL.
-  {% if session_store_ok %}
-  Avec la session serveur activée, vous pouvez <strong>relancer la liste</strong> sans ressaisir le mot de passe tant que cette session navigateur est ouverte.
-  {% else %}
-  Sur ce déploiement, le mot de passe n’est pas conservé entre deux pages : vous le ressaisissez à chaque analyse (voir message d’information après une liste réussie).
-  {% endif %}
-</p>
+<p class="sn-muted" style="margin:0 0 0.75rem;">Renseignez login et mot de passe, option cookie portail, puis <strong>Lister les bases</strong>.</p>
 
-<div class="sn-card" style="margin-top:1rem;border-color:rgba(52,211,153,0.45);background:rgba(52,211,153,0.08);">
-  <h2 style="margin:0;font-size:1rem;">Hébergement type PythonAnywhere et captcha odoo.com</h2>
-  <p style="margin:0.65rem 0 0;line-height:1.55;font-size:0.92rem;">
-    Le portail <strong>www.odoo.com</strong> déclenche très souvent un <strong>captcha</strong> lorsque la connexion est lancée <strong>depuis le serveur</strong> de la toolbox (IP datacenter).
-    La toolbox ne peut pas le résoudre à votre place.
-    <strong>Intervention humaine minimale</strong> : une fois le captcha passé <strong>dans un navigateur</strong>, automatisez la suite avec le script local
-    <code>scripts/capture_odoo_portal_cookie_playwright.py</code>, puis définissez sur le serveur <strong>TOOLBOX_ODOO_PORTAL_COOKIE</strong> ou <strong>TOOLBOX_ODOO_PORTAL_COOKIE_FILE</strong>
-    (voir <code>toolbox-env-exemple.txt</code>) : la toolbox réutilise ce cookie sans le recoller dans le formulaire.
-    Vous pouvez aussi coller manuellement le <strong>Cookie</strong> de la requête document vers <code>…/my/databases</code> dans l’encadré vert ci-dessous.
-    Le <strong>mot de passe</strong> (ou clé API) reste nécessaire pour tester l’accès XML-RPC sur chaque base listée.
+<details class="sn-doc sn-doc--nav" style="margin-bottom:0.85rem;">
+  <summary>Aide — portail Mes bases, URL, mémorisation session</summary>
+  <p class="sn-muted" style="margin:0;line-height:1.5;">
+    Le compte Odoo (souvent administrateur API) : la toolbox interroge le portail <strong>Mes bases</strong> (odoo.com) si l’URL est vide, ou <code>db.list()</code> si vous renseignez l’URL.
+    {% if session_store_ok %}
+    Avec la session serveur, vous pouvez <strong>relancer la liste</strong> sans ressaisir le mot de passe tant que cette session navigateur est ouverte.
+    {% else %}
+    Sur ce déploiement, le mot de passe peut ne pas être conservé entre deux pages (voir message après une liste réussie).
+    {% endif %}
   </p>
-  <p style="margin:0.65rem 0 0;font-size:0.88rem;" class="sn-muted">
-    Autre option : URL d’instance complète si votre serveur expose <code>db.list()</code> (souvent absent sur Odoo SaaS récent).
+</details>
+
+<details class="sn-doc sn-doc--nav" style="margin-bottom:0.85rem;">
+  <summary>Captcha odoo.com, cookie portail, PythonAnywhere</summary>
+  <p style="margin:0;line-height:1.55;font-size:0.92rem;">
+    Le portail <strong>www.odoo.com</strong> déclenche souvent un <strong>captcha</strong> depuis le <strong>serveur</strong> de la toolbox (IP datacenter).
+    Après captcha dans un navigateur : script <code>scripts/capture_odoo_portal_cookie_playwright.py</code>, puis
+    <strong>TOOLBOX_ODOO_PORTAL_COOKIE</strong> ou <strong>…_FILE</strong> (voir <code>toolbox-env-exemple.txt</code>), ou collez le Cookie de la requête document vers <code>…/my/databases</code>.
+    Le <strong>mot de passe / clé API</strong> reste nécessaire pour tester l’XML-RPC sur chaque base.
   </p>
-</div>
+  <p style="margin:0.55rem 0 0;font-size:0.88rem;" class="sn-muted">
+    Alternative : URL d’instance si <code>db.list()</code> est disponible (souvent absent sur Odoo SaaS récent).
+  </p>
+</details>
 
 {% if portal_cookie_from_server_config %}
 <div class="sn-flash" style="margin-top:0.85rem;background:rgba(59,130,246,0.15);border-color:rgba(59,130,246,0.35);">
@@ -66,16 +67,22 @@
            autocomplete="username" spellcheck="false">
 
     <fieldset style="border:1px solid rgba(52,211,153,0.5);border-radius:8px;padding:0.85rem 1rem;margin-top:1rem;background:rgba(52,211,153,0.06);">
-      <legend style="font-size:0.95rem;font-weight:600;padding:0 0.35rem;">Cookie portail (recommandé depuis la toolbox)</legend>
-      <p class="sn-muted" style="font-size:0.86rem;line-height:1.5;margin:0 0 0.5rem;">
-        Chrome / Edge : F12 → <strong>Réseau</strong> → ouvrir <strong>Mes bases</strong> sur odoo.com → cliquer la requête <strong>document</strong> vers <code>…/my/databases</code> → onglet <strong>En-têtes</strong> → copier la valeur complète de <strong>Cookie</strong>.
-        Même langue d’URL que sur odoo.com (ex. <code>/fr_FR</code>) que celle configurée sur le serveur si besoin (<code>TOOLBOX_ODOO_PORTAL_LANG</code>).
-      </p>
+      <legend style="font-size:0.95rem;font-weight:600;padding:0 0.35rem;">Cookie portail</legend>
+      <details class="sn-doc sn-doc--nav" style="margin:0 0 0.6rem;">
+        <summary>Comment copier le cookie (navigateur)</summary>
+        <p class="sn-muted" style="font-size:0.86rem;line-height:1.5;margin:0.4rem 0 0;">
+          Chrome / Edge : F12 → <strong>Réseau</strong> → <strong>Mes bases</strong> sur odoo.com → requête <strong>document</strong> vers <code>…/my/databases</code> → <strong>En-têtes</strong> → valeur <strong>Cookie</strong>.
+          Aligner la langue d’URL (<code>/fr_FR</code>) sur <code>TOOLBOX_ODOO_PORTAL_LANG</code> si besoin.
+        </p>
+      </details>
       <label for="odoo_portal_session_cookie">Coller le Cookie ici</label>
       <textarea id="odoo_portal_session_cookie" name="odoo_portal_session_cookie" rows="3" maxlength="16000"
                 spellcheck="false" autocomplete="off"
                 placeholder="Laisser vide si vous comptez uniquement sur le mot de passe portail (risque captcha depuis le serveur)">{{ request.form.get('odoo_portal_session_cookie', '') }}</textarea>
-      <p class="sn-muted" style="font-size:0.8rem;margin:0.45rem 0 0;">Ne partagez pas ce cookie ; ne le collez pas dans un ticket public.</p>
+      <details class="sn-doc sn-doc--nav" style="margin:0.45rem 0 0;">
+        <summary>Sécurité du cookie</summary>
+        <p class="sn-muted" style="font-size:0.82rem;margin:0.35rem 0 0;">Ne partagez pas ce cookie ; ne le collez pas dans un ticket public.</p>
+      </details>
     </fieldset>
 
     <label for="odoo_password" style="margin-top:1rem;">Mot de passe ou clé API Odoo</label>
@@ -83,11 +90,13 @@
            placeholder="{% if session_has_creds %}Laisser vide pour réutiliser la session mémorisée…{% else %}Obligatoire pour XML-RPC sur chaque base ; avec cookie seul le portail peut lister sans mot de passe portail{% endif %}">
 
     <hr style="margin:1.15rem 0;border:none;border-top:1px solid var(--sn-border);">
-    <p class="sn-muted" style="font-size:0.88rem;margin:0 0 0.5rem;line-height:1.45;">
-      <strong>URL d’instance</strong> : laissez vide pour le mode portail « Mes bases » (recommandé sur odoo.com).
-      Remplissez-la seulement pour une instance auto-hébergée ou si <code>db.list()</code> est disponible.
-    </p>
-    <label for="odoo_url" class="sn-muted">URL de l’instance (facultatif)</label>
+    <details class="sn-doc sn-doc--nav" style="margin:0 0 0.5rem;">
+      <summary>URL d’instance (facultatif)</summary>
+      <p class="sn-muted" style="font-size:0.88rem;margin:0.35rem 0 0;line-height:1.45;">
+        Laissez vide pour le portail « Mes bases » (odoo.com). Remplissez pour une instance auto-hébergée si <code>db.list()</code> est disponible.
+      </p>
+    </details>
+    <label for="odoo_url" class="sn-muted">URL de l’instance</label>
     <input type="text" id="odoo_url" name="odoo_url" spellcheck="false" autocapitalize="none"
            value="{{ request.form.get('odoo_url', '') }}"
            placeholder="ex. https://monclient.odoo.com — vide = portail Mes bases">
@@ -112,8 +121,10 @@
   <div class="sn-flash danger">{{ result.url_error }}</div>
   {% else %}
     {% if result.server_version %}
-    <h3 style="font-size:0.95rem;color:var(--sn-muted);margin:0 0 0.5rem;">Version serveur (extrait)</h3>
-    <pre class="sn-pre" style="max-height:8rem;font-size:0.78rem;">{{ result.server_version | tojson(indent=2) }}</pre>
+    <details class="sn-doc sn-doc--nav" style="margin:0 0 0.75rem;">
+      <summary>Version serveur (extrait JSON)</summary>
+      <pre class="sn-pre" style="max-height:8rem;font-size:0.78rem;margin:0.5rem 0 0;">{{ result.server_version | tojson(indent=2) }}</pre>
+    </details>
     {% endif %}
     {% if result.db_list_error %}
     <p class="sn-flash warning" style="margin:0.75rem 0;">
@@ -121,11 +132,12 @@
       {{ result.db_list_error }}
     </p>
     {% if portal_captcha_blocked %}
-    <div class="sn-card" style="margin:0.75rem 0 0;border-color:rgba(52,211,153,0.45);background:rgba(52,211,153,0.08);">
-      <p style="margin:0;font-size:0.95rem;line-height:1.55;">
-        <strong>Étape suivante :</strong> remontez au formulaire, collez le <strong>Cookie</strong> (encadré vert « Cookie portail »), gardez le <strong>login</strong> et le <strong>mot de passe / clé API</strong> du compte utilisé sur les bases, laissez l’URL vide, puis cliquez à nouveau <strong>Lister les bases</strong>.
+    <details class="sn-doc" style="margin:0.75rem 0 0;">
+      <summary>Blocage captcha — que faire ?</summary>
+      <p style="margin:0.45rem 0 0;font-size:0.95rem;line-height:1.55;">
+        Collez le <strong>Cookie</strong> (champ portail), gardez <strong>login</strong> et <strong>mot de passe / clé API</strong>, laissez l’URL vide, puis <strong>Lister les bases</strong>.
       </p>
-    </div>
+    </details>
     {% endif %}
     {% endif %}
     {% if result.truncated %}
@@ -133,8 +145,11 @@
     {% endif %}
 
     {% if result.rows %}
-    <p class="sn-muted" style="margin:0.75rem 0;">Bases testées : <strong>{{ result.rows | length }}</strong>
-      — enregistrement proposé uniquement si l’API a répondu <strong>OK</strong> pour cette base.</p>
+    <p class="sn-muted" style="margin:0.75rem 0 0;">Bases testées : <strong>{{ result.rows | length }}</strong></p>
+    <details class="sn-doc sn-doc--nav" style="margin:0.35rem 0 0.75rem;">
+      <summary>À propos de l’enregistrement des bases</summary>
+      <p class="sn-muted" style="margin:0.35rem 0 0;font-size:0.88rem;">L’enregistrement n’est proposé que si l’API a répondu <strong>OK</strong> pour la base.</p>
+    </details>
     <div class="sn-scroll-x">
     <table class="sn-table">
       <thead>
