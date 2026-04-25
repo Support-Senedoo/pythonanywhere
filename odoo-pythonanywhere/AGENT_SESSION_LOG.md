@@ -91,3 +91,9 @@ Les assistants **n’ont pas** de mémoire des chats précédents. Ce fichier, *
 - **Références** : commit toolbox 1.10.27 (voir historique Git).
 - **Erreur / leçon** : création inline doit rester optionnelle et non bloquante.
 
+### 2026-04-25 — Toolbox 1.10.28 : slug auto portefeuille + fallback identifiants ; déploiement PA
+- **Action** : commit minimal `59176fb` (slug client portefeuille généré depuis le nom, plus fallback identifiants pour éviter l'erreur mot de passe introuvable), `git push origin master`, puis `bash deploy_to_pa.sh -SkipGitPush`.
+- **Résultat** : OK — PA fast-forward `4e3e06d..59176fb`, reload Web API `{"status":"OK"}`.
+- **Références** : commit `59176fb`, toolbox **1.10.28**.
+- **Erreur / leçon** : si la version affichée ne bouge pas après merge local, vérifier push + reload PA (une variable Web peut aussi surcharger la version).
+
